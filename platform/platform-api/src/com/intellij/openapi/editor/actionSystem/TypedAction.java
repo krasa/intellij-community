@@ -127,7 +127,12 @@ public class TypedAction {
           Document doc = myEditor.getDocument();
           doc.startGuardedBlockChecking();
           try {
-            getHandler().execute(myEditor, myCharTyped, myDataContext);
+            MultiEditAction.executeWithMultipleCursors(new Runnable() {
+              @Override
+              public void run() {
+                getHandler().execute(myEditor, myCharTyped, myDataContext);
+              }
+            }, myEditor, null);
           }
           catch (ReadOnlyFragmentModificationException e) {
             EditorActionManager.getInstance().getReadonlyFragmentModificationHandler(doc).handle(e);

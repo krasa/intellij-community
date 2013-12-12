@@ -31,6 +31,7 @@ import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.ActionPlaces;
 import com.intellij.openapi.actionSystem.ActionPopupMenu;
 import com.intellij.openapi.editor.*;
+import com.intellij.openapi.editor.actionSystem.MultiEditAction;
 import com.intellij.openapi.editor.event.EditorMouseEvent;
 import com.intellij.openapi.editor.event.EditorMouseEventArea;
 import com.intellij.openapi.editor.event.EditorMouseListener;
@@ -260,84 +261,86 @@ public class EditorActionUtil {
     return !Character.isWhitespace(prev) && !firstIsIdentifierPart &&
            (Character.isWhitespace(current) || secondIsIdentifierPart);
   }
-
   /**
    * Depending on the current caret position and 'smart Home' editor settings, moves caret to the start of current visual line
    * or to the first non-whitespace character on it.
    *
    * @param isWithSelection if true - sets selection from old caret position to the new one, if false - clears selection
-   *
    * @see com.intellij.openapi.editor.actions.EditorActionUtil#moveCaretToLineStartIgnoringSoftWraps(com.intellij.openapi.editor.Editor)
    */
-  public static void moveCaretToLineStart(Editor editor, boolean isWithSelection) {
-    Document document = editor.getDocument();
-    SelectionModel selectionModel = editor.getSelectionModel();
-    int selectionStart = selectionModel.getLeadSelectionOffset();
-    CaretModel caretModel = editor.getCaretModel();
-    LogicalPosition blockSelectionStart = selectionModel.hasBlockSelection()
-                                          ? selectionModel.getBlockStart()
-                                          : caretModel.getLogicalPosition();
-    EditorSettings editorSettings = editor.getSettings();
+  public static void moveCaretToLineStart(final Editor editor, final boolean isWithSelection) {
+    MultiEditAction.executeWithMultipleCursors(new Runnable() {
+      @Override
+      public void run() {
+        Document document = editor.getDocument();
+        SelectionModel selectionModel = editor.getSelectionModel();
+        int selectionStart = selectionModel.getLeadSelectionOffset();
+        CaretModel caretModel = editor.getCaretModel();
+        LogicalPosition blockSelectionStart =
+          selectionModel.hasBlockSelection() ? selectionModel.getBlockStart() : caretModel.getLogicalPosition();
+        EditorSettings editorSettings = editor.getSettings();
 
-    int logCaretLine = caretModel.getLogicalPosition().line;
-    VisualPosition currentVisCaret = caretModel.getVisualPosition();
-    VisualPosition caretLogLineStartVis = editor.offsetToVisualPosition(document.getLineStartOffset(logCaretLine));
+        int logCaretLine = caretModel.getLogicalPosition().line;
+        VisualPosition currentVisCaret = caretModel.getVisualPosition();
+        VisualPosition caretLogLineStartVis = editor.offsetToVisualPosition(document.getLineStartOffset(logCaretLine));
 
-    if (currentVisCaret.line > caretLogLineStartVis.line) {
-      // Caret is located not at the first visual line of soft-wrapped logical line.
-      if (editorSettings.isSmartHome()) {
-        moveCaretToStartOfSoftWrappedLine(editor, currentVisCaret, currentVisCaret.line - caretLogLineStartVis.line);
-      }
-      else {
-        caretModel.moveToVisualPosition(new VisualPosition(currentVisCaret.line, 0));
-      }
-      setupSelection(editor, isWithSelection, selectionStart, blockSelectionStart);
-      editor.getScrollingModel().scrollToCaret(ScrollType.RELATIVE);
-      return;
-    }
-
-    // Skip folded lines.
-    int logLineToUse = logCaretLine - 1;
-    while (logLineToUse >= 0 && editor.offsetToVisualPosition(document.getLineEndOffset(logLineToUse)).line == currentVisCaret.line) {
-      logLineToUse--;
-    }
-    logLineToUse++;
-
-    if (logLineToUse >= document.getLineCount() || !editorSettings.isSmartHome()) {
-      editor.getCaretModel().moveToLogicalPosition(new LogicalPosition(logLineToUse, 0));
-    }
-    else if (logLineToUse == logCaretLine) {
-      int line = currentVisCaret.line;
-      int column;
-      if (currentVisCaret.column == 0) {
-        column = findSmartIndentColumn(editor, currentVisCaret.line);
-      }
-      else {
-        column = findFirstNonSpaceColumnOnTheLine(editor, currentVisCaret.line);
-        if (column >= currentVisCaret.column) {
-          column = 0;
+        if (currentVisCaret.line > caretLogLineStartVis.line) {
+          // Caret is located not at the first visual line of soft-wrapped logical line.
+          if (editorSettings.isSmartHome()) {
+            moveCaretToStartOfSoftWrappedLine(editor, currentVisCaret, currentVisCaret.line - caretLogLineStartVis.line);
+          }
+          else {
+            caretModel.moveToVisualPosition(new VisualPosition(currentVisCaret.line, 0));
+          }
+          setupSelection(editor, isWithSelection, selectionStart, blockSelectionStart);
+          editor.getScrollingModel().scrollToCaret(ScrollType.RELATIVE);
+          return;
         }
-      }
-      caretModel.moveToVisualPosition(new VisualPosition(line, Math.max(column, 0)));
-    }
-    else {
-      LogicalPosition logLineEndLog = editor.offsetToLogicalPosition(document.getLineEndOffset(logLineToUse));
-      VisualPosition logLineEndVis = editor.logicalToVisualPosition(logLineEndLog);
-      if (logLineEndLog.softWrapLinesOnCurrentLogicalLine > 0) {
-        moveCaretToStartOfSoftWrappedLine(editor, logLineEndVis, logLineEndLog.softWrapLinesOnCurrentLogicalLine);
-      }
-      else {
-        int line = logLineEndVis.line;
-        int column = 0;
-        if (currentVisCaret.column == 0 && editorSettings.isSmartHome()) {
-          findSmartIndentColumn(editor, line);
-        }
-        caretModel.moveToVisualPosition(new VisualPosition(line, column));
-      }
-    }
 
-    setupSelection(editor, isWithSelection, selectionStart, blockSelectionStart);
-    editor.getScrollingModel().scrollToCaret(ScrollType.RELATIVE);
+        // Skip folded lines.
+        int logLineToUse = logCaretLine - 1;
+        while (logLineToUse >= 0 && editor.offsetToVisualPosition(document.getLineEndOffset(logLineToUse)).line == currentVisCaret.line) {
+          logLineToUse--;
+        }
+        logLineToUse++;
+
+        if (logLineToUse >= document.getLineCount() || !editorSettings.isSmartHome()) {
+          editor.getCaretModel().moveToLogicalPosition(new LogicalPosition(logLineToUse, 0));
+        }
+        else if (logLineToUse == logCaretLine) {
+          int line = currentVisCaret.line;
+          int column;
+          if (currentVisCaret.column == 0) {
+            column = findSmartIndentColumn(editor, currentVisCaret.line);
+          }
+          else {
+            column = findFirstNonSpaceColumnOnTheLine(editor, currentVisCaret.line);
+            if (column >= currentVisCaret.column) {
+              column = 0;
+            }
+          }
+          caretModel.moveToVisualPosition(new VisualPosition(line, Math.max(column, 0)));
+        }
+        else {
+          LogicalPosition logLineEndLog = editor.offsetToLogicalPosition(document.getLineEndOffset(logLineToUse));
+          VisualPosition logLineEndVis = editor.logicalToVisualPosition(logLineEndLog);
+          if (logLineEndLog.softWrapLinesOnCurrentLogicalLine > 0) {
+            moveCaretToStartOfSoftWrappedLine(editor, logLineEndVis, logLineEndLog.softWrapLinesOnCurrentLogicalLine);
+          }
+          else {
+            int line = logLineEndVis.line;
+            int column = 0;
+            if (currentVisCaret.column == 0 && editorSettings.isSmartHome()) {
+              findSmartIndentColumn(editor, line);
+            }
+            caretModel.moveToVisualPosition(new VisualPosition(line, column));
+          }
+        }
+
+        setupSelection(editor, isWithSelection, selectionStart, blockSelectionStart);
+        editor.getScrollingModel().scrollToCaret(ScrollType.RELATIVE);
+      }
+    }, editor, null);
   }
 
   private static void moveCaretToStartOfSoftWrappedLine(Editor editor, VisualPosition currentVisual, int softWrappedLines) {
@@ -498,118 +501,126 @@ public class EditorActionUtil {
     return -1;
   }
 
-  public static void moveCaretToLineEnd(Editor editor, boolean isWithSelection) {
-    Document document = editor.getDocument();
-    SelectionModel selectionModel = editor.getSelectionModel();
-    int selectionStart = selectionModel.getLeadSelectionOffset();
-    CaretModel caretModel = editor.getCaretModel();
-    LogicalPosition blockSelectionStart = selectionModel.hasBlockSelection()
-                                          ? selectionModel.getBlockStart()
-                                          : caretModel.getLogicalPosition();
-    SoftWrapModel softWrapModel = editor.getSoftWrapModel();
+  public static void moveCaretToLineEnd(final Editor editor, final boolean isWithSelection) {
+    MultiEditAction.executeWithMultipleCursors(new Runnable() {
+      @Override
+      public void run() {
+        Document document = editor.getDocument();
+        SelectionModel selectionModel = editor.getSelectionModel();
+        int selectionStart = selectionModel.getLeadSelectionOffset();
+        CaretModel caretModel = editor.getCaretModel();
+        LogicalPosition blockSelectionStart =
+          selectionModel.hasBlockSelection() ? selectionModel.getBlockStart() : caretModel.getLogicalPosition();
+        SoftWrapModel softWrapModel = editor.getSoftWrapModel();
 
-    int lineNumber = editor.getCaretModel().getLogicalPosition().line;
-    if (lineNumber >= document.getLineCount()) {
-      LogicalPosition pos = new LogicalPosition(lineNumber, 0);
-      editor.getCaretModel().moveToLogicalPosition(pos);
-      setupSelection(editor, isWithSelection, selectionStart, blockSelectionStart);
-      editor.getScrollingModel().scrollToCaret(ScrollType.RELATIVE);
-      return;
-    }
-    VisualPosition currentVisualCaret = editor.getCaretModel().getVisualPosition();
-    VisualPosition visualEndOfLineWithCaret
-      = new VisualPosition(currentVisualCaret.line, EditorUtil.getLastVisualLineColumnNumber(editor, currentVisualCaret.line));
-
-    // There is a possible case that the caret is already located at the visual end of line and the line is soft wrapped.
-    // We want to move the caret to the end of the next visual line then.
-    if (currentVisualCaret.equals(visualEndOfLineWithCaret)) {
-      LogicalPosition logical = editor.visualToLogicalPosition(visualEndOfLineWithCaret);
-      int offset = editor.logicalPositionToOffset(logical);
-      if (offset < editor.getDocument().getTextLength()) {
-
-        SoftWrap softWrap = softWrapModel.getSoftWrap(offset);
-        if (softWrap == null) {
-          // Same offset may correspond to positions on different visual lines in case of soft wraps presence
-          // (all soft-wrap introduced virtual text is mapped to the same offset as the first document symbol after soft wrap).
-          // Hence, we check for soft wraps presence at two offsets.
-          softWrap = softWrapModel.getSoftWrap(offset + 1);
+        int lineNumber = editor.getCaretModel().getLogicalPosition().line;
+        if (lineNumber >= document.getLineCount()) {
+          LogicalPosition pos = new LogicalPosition(lineNumber, 0);
+          editor.getCaretModel().moveToLogicalPosition(pos);
+          setupSelection(editor, isWithSelection, selectionStart, blockSelectionStart);
+          editor.getScrollingModel().scrollToCaret(ScrollType.RELATIVE);
+          return;
         }
-        int line = currentVisualCaret.line;
-        int column = currentVisualCaret.column;
-        if (softWrap != null) {
-          line++;
-          column = EditorUtil.getLastVisualLineColumnNumber(editor, line);
+        VisualPosition currentVisualCaret = editor.getCaretModel().getVisualPosition();
+        VisualPosition visualEndOfLineWithCaret =
+          new VisualPosition(currentVisualCaret.line, EditorUtil.getLastVisualLineColumnNumber(editor, currentVisualCaret.line));
+
+        // There is a possible case that the caret is already located at the visual end of line and the line is soft wrapped.
+        // We want to move the caret to the end of the next visual line then.
+        if (currentVisualCaret.equals(visualEndOfLineWithCaret)) {
+          LogicalPosition logical = editor.visualToLogicalPosition(visualEndOfLineWithCaret);
+          int offset = editor.logicalPositionToOffset(logical);
+          if (offset < editor.getDocument().getTextLength()) {
+
+            SoftWrap softWrap = softWrapModel.getSoftWrap(offset);
+            if (softWrap == null) {
+              // Same offset may correspond to positions on different visual lines in case of soft wraps presence
+              // (all soft-wrap introduced virtual text is mapped to the same offset as the first document symbol after soft wrap).
+              // Hence, we check for soft wraps presence at two offsets.
+              softWrap = softWrapModel.getSoftWrap(offset + 1);
+            }
+            int line = currentVisualCaret.line;
+            int column = currentVisualCaret.column;
+            if (softWrap != null) {
+              line++;
+              column = EditorUtil.getLastVisualLineColumnNumber(editor, line);
+            }
+            visualEndOfLineWithCaret = new VisualPosition(line, column);
+          }
         }
-        visualEndOfLineWithCaret = new VisualPosition(line, column);
-      }
-    }
 
-    int offset;
-    int newOffset;
-    LogicalPosition logLineEnd = editor.visualToLogicalPosition(visualEndOfLineWithCaret);
-    offset = editor.logicalPositionToOffset(logLineEnd);
-    lineNumber = logLineEnd.line;
-    newOffset = offset;
-
-    CharSequence text = document.getCharsSequence();
-    for (int i = newOffset - 1; i >= document.getLineStartOffset(lineNumber); i--) {
-      if (softWrapModel.getSoftWrap(i) != null) {
+        int offset;
+        int newOffset;
+        LogicalPosition logLineEnd = editor.visualToLogicalPosition(visualEndOfLineWithCaret);
+        offset = editor.logicalPositionToOffset(logLineEnd);
+        lineNumber = logLineEnd.line;
         newOffset = offset;
-        break;
+
+        CharSequence text = document.getCharsSequence();
+        for (int i = newOffset - 1; i >= document.getLineStartOffset(lineNumber); i--) {
+          if (softWrapModel.getSoftWrap(i) != null) {
+            newOffset = offset;
+            break;
+          }
+          if (text.charAt(i) != ' ' && text.charAt(i) != '\t') {
+            break;
+          }
+          newOffset = i;
+        }
+
+        // Move to the calculated end of visual line if caret is located on a last non-white space symbols on a line and there are
+        // remaining white space symbols.
+        if (newOffset == offset || newOffset == caretModel.getOffset()) {
+          caretModel.moveToVisualPosition(visualEndOfLineWithCaret);
+        }
+        else {
+          caretModel.moveToOffset(newOffset);
+        }
+
+        editor.getScrollingModel().scrollToCaret(ScrollType.RELATIVE);
+
+        setupSelection(editor, isWithSelection, selectionStart, blockSelectionStart);
       }
-      if (text.charAt(i) != ' ' && text.charAt(i) != '\t') {
-        break;
-      }
-      newOffset = i;
-    }
-
-    // Move to the calculated end of visual line if caret is located on a last non-white space symbols on a line and there are
-    // remaining white space symbols.
-    if (newOffset == offset || newOffset == caretModel.getOffset()) {
-      caretModel.moveToVisualPosition(visualEndOfLineWithCaret);
-    }
-    else {
-      caretModel.moveToOffset(newOffset);
-    }
-
-    editor.getScrollingModel().scrollToCaret(ScrollType.RELATIVE);
-
-    setupSelection(editor, isWithSelection, selectionStart, blockSelectionStart);
+    }, editor, null);
   }
 
-  public static void moveCaretToNextWord(Editor editor, boolean isWithSelection, boolean camel) {
-    Document document = editor.getDocument();
-    SelectionModel selectionModel = editor.getSelectionModel();
-    int selectionStart = selectionModel.getLeadSelectionOffset();
-    CaretModel caretModel = editor.getCaretModel();
-    LogicalPosition blockSelectionStart = selectionModel.hasBlockSelection()
-                                          ? selectionModel.getBlockStart()
-                                          : caretModel.getLogicalPosition();
+  public static void moveCaretToNextWord(final Editor editor, final boolean isWithSelection, final boolean camel) {
+    MultiEditAction.executeWithMultipleCursors(new Runnable() {
+      @Override
+      public void run() {
+        Document document = editor.getDocument();
+        SelectionModel selectionModel = editor.getSelectionModel();
+        int selectionStart = selectionModel.getLeadSelectionOffset();
+        CaretModel caretModel = editor.getCaretModel();
+        LogicalPosition blockSelectionStart =
+          selectionModel.hasBlockSelection() ? selectionModel.getBlockStart() : caretModel.getLogicalPosition();
 
-    int offset = caretModel.getOffset();
-    CharSequence text = document.getCharsSequence();
-    if (offset == document.getTextLength()) {
-      return;
-    }
-    int newOffset = offset + 1;
-    int lineNumber = caretModel.getLogicalPosition().line;
-    if (lineNumber >= document.getLineCount()) return;
-    int maxOffset = document.getLineEndOffset(lineNumber);
-    if (newOffset > maxOffset) {
-      if (lineNumber + 1 >= document.getLineCount()) {
-        return;
-      }
-      maxOffset = document.getLineEndOffset(lineNumber + 1);
-    }
-    for (; newOffset < maxOffset; newOffset++) {
-      if (isWordStart(text, newOffset, camel)) {
-        break;
-      }
-    }
-    caretModel.moveToOffset(newOffset);
-    editor.getScrollingModel().scrollToCaret(ScrollType.RELATIVE);
+        int offset = caretModel.getOffset();
+        CharSequence text = document.getCharsSequence();
+        if (offset == document.getTextLength()) {
+          return;
+        }
+        int newOffset = offset + 1;
+        int lineNumber = caretModel.getLogicalPosition().line;
+        if (lineNumber >= document.getLineCount()) return;
+        int maxOffset = document.getLineEndOffset(lineNumber);
+        if (newOffset > maxOffset) {
+          if (lineNumber + 1 >= document.getLineCount()) {
+            return;
+          }
+          maxOffset = document.getLineEndOffset(lineNumber + 1);
+        }
+        for (; newOffset < maxOffset; newOffset++) {
+          if (isWordStart(text, newOffset, camel)) {
+            break;
+          }
+        }
+        caretModel.moveToOffset(newOffset);
+        editor.getScrollingModel().scrollToCaret(ScrollType.RELATIVE);
 
-    setupSelection(editor, isWithSelection, selectionStart, blockSelectionStart);
+        setupSelection(editor, isWithSelection, selectionStart, blockSelectionStart);
+      }
+    }, editor, null);
   }
 
   private static void setupSelection(Editor editor,
@@ -658,29 +669,34 @@ public class EditorActionUtil {
     editor.putUserData(PREV_POS, pos);
   }
 
-  public static void moveCaretToPreviousWord(Editor editor, boolean isWithSelection, boolean camel) {
-    Document document = editor.getDocument();
-    SelectionModel selectionModel = editor.getSelectionModel();
-    int selectionStart = selectionModel.getLeadSelectionOffset();
-    CaretModel caretModel = editor.getCaretModel();
-    LogicalPosition blockSelectionStart = selectionModel.hasBlockSelection()
-                                          ? selectionModel.getBlockStart()
-                                          : caretModel.getLogicalPosition();
+  public static void moveCaretToPreviousWord(final Editor editor, final boolean isWithSelection, final boolean camel) {
+    MultiEditAction.executeWithMultipleCursors(new Runnable() {
+      @Override
+      public void run() {
+        Document document = editor.getDocument();
+        SelectionModel selectionModel = editor.getSelectionModel();
+        int selectionStart = selectionModel.getLeadSelectionOffset();
+        CaretModel caretModel = editor.getCaretModel();
+        LogicalPosition blockSelectionStart =
+          selectionModel.hasBlockSelection() ? selectionModel.getBlockStart() : caretModel.getLogicalPosition();
 
-    int offset = editor.getCaretModel().getOffset();
-    if (offset == 0) return;
+        int offset = editor.getCaretModel().getOffset();
+        if (offset == 0) return;
 
-    int lineNumber = editor.getCaretModel().getLogicalPosition().line;
-    CharSequence text = document.getCharsSequence();
-    int newOffset = offset - 1;
-    int minOffset = lineNumber > 0 ? document.getLineEndOffset(lineNumber - 1) : 0;
-    for (; newOffset > minOffset; newOffset--) {
-      if (isWordStart(text, newOffset, camel)) break;
-    }
-    editor.getCaretModel().moveToOffset(newOffset);
-    editor.getScrollingModel().scrollToCaret(ScrollType.RELATIVE);
+        int lineNumber = editor.getCaretModel().getLogicalPosition().line;
+        CharSequence text = document.getCharsSequence();
+        int newOffset = offset - 1;
+        int minOffset = lineNumber > 0 ? document.getLineEndOffset(lineNumber - 1) : 0;
+        for (; newOffset > minOffset; newOffset--) {
+          if (isWordStart(text, newOffset, camel)) break;
+        }
+        editor.getCaretModel().moveToOffset(newOffset);
+        editor.getScrollingModel().scrollToCaret(ScrollType.RELATIVE);
 
-    setupSelection(editor, isWithSelection, selectionStart, blockSelectionStart);
+        setupSelection(editor, isWithSelection, selectionStart, blockSelectionStart);
+      }
+    }, editor, null);
+
   }
 
   public static void moveCaretPageUp(Editor editor, boolean isWithSelection) {
