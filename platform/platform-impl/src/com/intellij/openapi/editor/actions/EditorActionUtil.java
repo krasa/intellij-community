@@ -26,10 +26,7 @@ package com.intellij.openapi.editor.actions;
 
 import com.intellij.codeStyle.CodeStyleFacade;
 import com.intellij.ide.ui.customization.CustomActionsSchema;
-import com.intellij.openapi.actionSystem.ActionGroup;
-import com.intellij.openapi.actionSystem.ActionManager;
-import com.intellij.openapi.actionSystem.ActionPlaces;
-import com.intellij.openapi.actionSystem.ActionPopupMenu;
+import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.editor.*;
 import com.intellij.openapi.editor.actionSystem.MultiEditAction;
 import com.intellij.openapi.editor.event.EditorMouseEvent;
@@ -265,10 +262,12 @@ public class EditorActionUtil {
    * Depending on the current caret position and 'smart Home' editor settings, moves caret to the start of current visual line
    * or to the first non-whitespace character on it.
    *
+   *
+   * @param dataContext
    * @param isWithSelection if true - sets selection from old caret position to the new one, if false - clears selection
    * @see com.intellij.openapi.editor.actions.EditorActionUtil#moveCaretToLineStartIgnoringSoftWraps(com.intellij.openapi.editor.Editor)
    */
-  public static void moveCaretToLineStart(final Editor editor, final boolean isWithSelection) {
+  public static void moveCaretToLineStart(final Editor editor, DataContext dataContext, final boolean isWithSelection) {
     MultiEditAction.executeWithMultipleCursors(new Runnable() {
       @Override
       public void run() {
@@ -340,7 +339,7 @@ public class EditorActionUtil {
         setupSelection(editor, isWithSelection, selectionStart, blockSelectionStart);
         editor.getScrollingModel().scrollToCaret(ScrollType.RELATIVE);
       }
-    }, editor, null);
+    }, editor, dataContext);
   }
 
   private static void moveCaretToStartOfSoftWrappedLine(Editor editor, VisualPosition currentVisual, int softWrappedLines) {
@@ -501,7 +500,7 @@ public class EditorActionUtil {
     return -1;
   }
 
-  public static void moveCaretToLineEnd(final Editor editor, final boolean isWithSelection) {
+  public static void moveCaretToLineEnd(final Editor editor, DataContext dataContext, final boolean isWithSelection) {
     MultiEditAction.executeWithMultipleCursors(new Runnable() {
       @Override
       public void run() {
@@ -581,10 +580,10 @@ public class EditorActionUtil {
 
         setupSelection(editor, isWithSelection, selectionStart, blockSelectionStart);
       }
-    }, editor, null);
+    }, editor, dataContext);
   }
 
-  public static void moveCaretToNextWord(final Editor editor, final boolean isWithSelection, final boolean camel) {
+  public static void moveCaretToNextWord(final Editor editor, DataContext dataContext, final boolean isWithSelection, final boolean camel) {
     MultiEditAction.executeWithMultipleCursors(new Runnable() {
       @Override
       public void run() {
@@ -620,7 +619,7 @@ public class EditorActionUtil {
 
         setupSelection(editor, isWithSelection, selectionStart, blockSelectionStart);
       }
-    }, editor, null);
+    }, editor, dataContext);
   }
 
   private static void setupSelection(Editor editor,
@@ -669,7 +668,7 @@ public class EditorActionUtil {
     editor.putUserData(PREV_POS, pos);
   }
 
-  public static void moveCaretToPreviousWord(final Editor editor, final boolean isWithSelection, final boolean camel) {
+  public static void moveCaretToPreviousWord(final Editor editor, DataContext dataContext, final boolean isWithSelection, final boolean camel) {
     MultiEditAction.executeWithMultipleCursors(new Runnable() {
       @Override
       public void run() {
@@ -695,7 +694,7 @@ public class EditorActionUtil {
 
         setupSelection(editor, isWithSelection, selectionStart, blockSelectionStart);
       }
-    }, editor, null);
+    }, editor, dataContext);
 
   }
 
@@ -799,7 +798,7 @@ public class EditorActionUtil {
    * This method moves caret to the nearest preceding visual line start, which is not a soft line wrap
    *
    * @see com.intellij.openapi.editor.ex.util.EditorUtil#calcCaretLineRange(com.intellij.openapi.editor.Editor)
-   * @see com.intellij.openapi.editor.actions.EditorActionUtil#moveCaretToLineStart(com.intellij.openapi.editor.Editor, boolean)
+   * @see EditorActionUtil#moveCaretToLineStart(com.intellij.openapi.editor.Editor, com.intellij.openapi.actionSystem.DataContext, boolean)
    */
   public static void moveCaretToLineStartIgnoringSoftWraps(Editor editor) {
     editor.getCaretModel().moveToLogicalPosition(EditorUtil.calcCaretLineRange(editor).first);

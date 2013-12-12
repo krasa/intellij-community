@@ -91,7 +91,7 @@ public class MultiEditAction extends AnAction {
   }
 
   public static void executeWithMultipleCursors(Runnable executeHandler, Editor editor, DataContext dataContext) {
-    //e.g. backspace goes throught this multiple times
+    //e.g. backspace workaround
     if (dataContext instanceof UserDataHolder) {
       final UserDataHolder userDataHolder = (UserDataHolder)dataContext;
       if (userDataHolder.getUserData(OBJECT_KEY) != null) {
@@ -103,7 +103,7 @@ public class MultiEditAction extends AnAction {
       }
     }
     else if (dataContext != null) {
-      //enter workaround
+      //e.g. enter workaround
       final Editor data = CommonDataKeys.EDITOR.getData(dataContext);
       if (data != null) {
         if (data.getUserData(OBJECT_KEY) != null) {
@@ -134,7 +134,7 @@ public class MultiEditAction extends AnAction {
       }
     }
 
-    //enter workaround
+    //e.g. enter workaround
     if (dataContext != null) {
       final Editor data = CommonDataKeys.EDITOR.getData(dataContext);
       if (data != null) {

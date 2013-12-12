@@ -25,7 +25,6 @@
 package com.intellij.openapi.editor.actions;
 
 import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.editor.actionSystem.EditorAction;
 import com.intellij.openapi.editor.actionSystem.EditorActionHandler;
 import com.intellij.openapi.actionSystem.DataContext;
 
@@ -37,7 +36,7 @@ public class PreviousWordAction extends TextComponentEditorAction {
   private static class Handler extends EditorActionHandler {
     @Override
     public void execute(Editor editor, DataContext dataContext) {
-      EditorActionUtil.moveCaretToPreviousWord(editor, false, editor.getSettings().isCamelWords());
+      EditorActionUtil.moveCaretToPreviousWord(editor, dataContext, false, editor.getSettings().isCamelWords());
     }
   }
 }

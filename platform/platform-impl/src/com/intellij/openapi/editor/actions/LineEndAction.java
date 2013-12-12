@@ -36,7 +36,7 @@ public class LineEndAction extends TextComponentEditorAction {
   private static class Handler extends EditorActionHandler {
     @Override
     public void execute(Editor editor, DataContext dataContext) {
-      EditorActionUtil.moveCaretToLineEnd(editor, false);
+      EditorActionUtil.moveCaretToLineEnd(editor, dataContext, false);
     }
   }
 }

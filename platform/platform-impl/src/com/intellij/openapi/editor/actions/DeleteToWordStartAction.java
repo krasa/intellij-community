@@ -80,10 +80,10 @@ public class DeleteToWordStartAction extends TextComponentEditorAction {
     @Override
     public void executeWriteAction(Editor editor, DataContext dataContext) {
       CommandProcessor.getInstance().setCurrentCommandGroupId(EditorActionUtil.DELETE_COMMAND_GROUP);
-      deleteToWordStart(editor);
+      deleteToWordStart(editor, dataContext);
     }
 
-    private void deleteToWordStart(Editor editor) {
+    private void deleteToWordStart(Editor editor, DataContext dataContext) {
       boolean camel = editor.getSettings().isCamelWords();
       if (myNegateCamelMode) {
         camel = !camel;
@@ -99,7 +99,7 @@ public class DeleteToWordStartAction extends TextComponentEditorAction {
       }
       countQuotes(myQuotesNumber, text, minOffset, endOffset);
       
-      EditorActionUtil.moveCaretToPreviousWord(editor, false, camel);
+      EditorActionUtil.moveCaretToPreviousWord(editor, dataContext, false, camel);
       
       for (int offset = caretModel.getOffset(); offset > minOffset; offset = caretModel.getOffset()) {
         char previous = text.charAt(offset - 1);
@@ -115,7 +115,7 @@ public class DeleteToWordStartAction extends TextComponentEditorAction {
           }
           if (myQuotesNumber.get(current) % 2 == 0) {
             // Was 'one "two" [caret]', now 'one "two[caret]"', we want to get 'one [caret]"two"'
-            EditorActionUtil.moveCaretToPreviousWord(editor, false, camel);
+            EditorActionUtil.moveCaretToPreviousWord(editor, dataContext, false, camel);
             continue;
           }
           break;
