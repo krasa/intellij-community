@@ -102,6 +102,20 @@ public class MultiEditAction extends AnAction {
         userDataHolder.putUserData(OBJECT_KEY, "1");
       }
     }
+    else if (dataContext != null) {
+      //enter workaround
+      final Editor data = CommonDataKeys.EDITOR.getData(dataContext);
+      if (data != null) {
+        if (data.getUserData(OBJECT_KEY) != null) {
+          executeHandler.run();
+          return;
+        }
+        else {
+          data.putUserData(OBJECT_KEY, "1");
+        }
+      }
+    }
+
 
     CaretModel caretModel = editor.getCaretModel();
     List<Integer> offsets = getAdditionalCaretOffsets(editor);
@@ -120,6 +134,13 @@ public class MultiEditAction extends AnAction {
       }
     }
 
+    //enter workaround
+    if (dataContext != null) {
+      final Editor data = CommonDataKeys.EDITOR.getData(dataContext);
+      if (data != null) {
+        data.putUserData(OBJECT_KEY, null);
+      }
+    }
   }
 
   private static List<Integer> getAdditionalCaretOffsets(Editor editor) {
