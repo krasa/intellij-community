@@ -29,11 +29,13 @@ import com.intellij.openapi.editor.markup.RangeHighlighter;
 import com.intellij.openapi.editor.markup.TextAttributes;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.UserDataHolder;
+import com.intellij.util.containers.HashSet;
 
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 /**
  * TODO : fix escape, live templates, caret display, ctrl+z
@@ -42,7 +44,8 @@ import java.util.List;
  */
 public class MultiEditAction extends AnAction {
 
-  public static final Key<Object> OBJECT_KEY = Key.create("MultiEditAction");
+  public static final Key<Object> ALREADY_PROCESSING_ADDITIONAL_CARETS = Key.create("MultiEditAction.alreadyProcessingAdditionalCarets");
+  public static final Key<Object> LISTENER_PRESENT = Key.create("MultiEditAction.listenerPresent");
 
   public void actionPerformed(AnActionEvent e) {
     final DataContext dataContext = e.getDataContext();
@@ -50,17 +53,19 @@ public class MultiEditAction extends AnAction {
     if (editor == null) {
       return;
     }
+
+    if (editor.getUserData(LISTENER_PRESENT) == null) {
+      editor.putUserData(LISTENER_PRESENT, "1");
+      editor.addEditorMouseListener(new EditorMouseAdapter() {
+        @Override
+        public void mouseClicked(EditorMouseEvent e) {
+          removeAdditionalCarets(editor);
+        }
+      });
+    }
+
     final CaretModel caretModel = editor.getCaretModel();
-
-    editor.addEditorMouseListener(new EditorMouseAdapter() {
-
-      @Override
-      public void mouseClicked(EditorMouseEvent e) {
-        removeAdditionalCarets(editor);
-      }
-    });
-
-    addAdditionalCarets(editor, caretModel.getOffset());
+    addAdditionalCaret(editor, caretModel.getOffset());
   }
 
   public static void removeAdditionalCarets(Editor editor) {
@@ -80,32 +85,55 @@ public class MultiEditAction extends AnAction {
     return false;
   }
 
-  public static void addAdditionalCarets(Editor editor, int offset) {
+  private static void addAdditionalCaret(Editor editor, int offset) {
     TextAttributes attributes = new TextAttributes();
     attributes.setBackgroundColor(Color.CYAN);
     if (editor.getDocument().getTextLength() == offset) {
       return;
     }
     editor.getMarkupModel()
-      .addRangeHighlighter(offset, offset + 1, HighlighterLayer.MULTI_EDIT_CARET, attributes, HighlighterTargetArea.EXACT_RANGE);
+      .addRangeHighlighter(offset, offset, HighlighterLayer.MULTI_EDIT_CARET, attributes, HighlighterTargetArea.EXACT_RANGE);
+  }
+
+  public static List<Integer> getAdditionalCaretsOffsets(Editor editor) {
+    final RangeHighlighter[] allHighlighters = editor.getMarkupModel().getAllHighlighters();
+    Set<Integer> offsets = new HashSet<Integer>();
+    for (RangeHighlighter highlighter : allHighlighters) {
+      if (highlighter.getLayer() == HighlighterLayer.MULTI_EDIT_CARET) {
+        offsets.add(highlighter.getStartOffset());
+      }
+    }
+    return new ArrayList<Integer>(offsets);
+  }
+
+  private static List<Integer> getAdditionalCaretOffsetsAndRemoveThem(Editor editor) {
+    final RangeHighlighter[] allHighlighters = editor.getMarkupModel().getAllHighlighters();
+    Set<Integer> offsets = new HashSet<Integer>();
+    for (RangeHighlighter highlighter : allHighlighters) {
+      if (highlighter.getLayer() == HighlighterLayer.MULTI_EDIT_CARET) {
+        offsets.add(highlighter.getStartOffset());
+        editor.getMarkupModel().removeHighlighter(highlighter);
+      }
+    }
+    return new ArrayList<Integer>(offsets);
   }
 
   public static void executeWithMultipleCursors(Runnable executeHandler, Editor editor, DataContext dataContext) {
     //e.g. backspace workaround
     if (dataContext instanceof UserDataHolder) {
       final UserDataHolder userDataHolder = (UserDataHolder)dataContext;
-      if (userDataHolder.getUserData(OBJECT_KEY) != null) {
+      if (userDataHolder.getUserData(ALREADY_PROCESSING_ADDITIONAL_CARETS) != null) {
         executeHandler.run();
         return;
       }
       else {
-        userDataHolder.putUserData(OBJECT_KEY, "1");
+        userDataHolder.putUserData(ALREADY_PROCESSING_ADDITIONAL_CARETS, "1");
       }
     }
 
 
     CaretModel caretModel = editor.getCaretModel();
-    List<Integer> offsets = getAdditionalCaretOffsets(editor);
+    List<Integer> offsets = getAdditionalCaretOffsetsAndRemoveThem(editor);
     if (offsets.isEmpty()) {
       executeHandler.run();
     }
@@ -117,21 +145,10 @@ public class MultiEditAction extends AnAction {
         caretModel.moveToOffset(offset);
         executeHandler.run();
         int afterAction = caretModel.getOffset();
-        addAdditionalCarets(editor, afterAction);
+        addAdditionalCaret(editor, afterAction);
       }
     }
   }
 
-  private static List<Integer> getAdditionalCaretOffsets(Editor editor) {
-    final RangeHighlighter[] allHighlighters = editor.getMarkupModel().getAllHighlighters();
-    List<Integer> offsets = new ArrayList<Integer>();
-    for (RangeHighlighter highlighter : allHighlighters) {
-      if (highlighter.getLayer() == HighlighterLayer.MULTI_EDIT_CARET) {
-        offsets.add(highlighter.getStartOffset());
-        editor.getMarkupModel().removeHighlighter(highlighter);
-      }
-    }
-    return offsets;
-  }
 
 }

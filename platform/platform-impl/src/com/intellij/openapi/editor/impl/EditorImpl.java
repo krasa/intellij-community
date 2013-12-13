@@ -172,6 +172,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
 
   private boolean myIsInsertMode = true;
 
+  private final Map<Integer, CaretCursor> myAdditionalCarets = new HashMap<Integer, CaretCursor>();
   @NotNull private final CaretCursor myCaretCursor;
   private final ScrollingTimer myScrollingTimer = new ScrollingTimer();
 
@@ -2914,6 +2915,37 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     // We check if that's the case and ask caret model to recalculate visual position if necessary.
 
     myCaretCursor.paint(g);
+    paintAdditionalCarets(g);
+  }
+
+  /*TODO my first painting, looks like shit...*/
+  private void paintAdditionalCarets(Graphics g) {
+    final List<Integer> offsets = MultiEditAction.getAdditionalCaretsOffsets(this);
+    if (offsets.isEmpty() && myAdditionalCarets.isEmpty()) {
+      return;
+    }
+    for (Integer offset : offsets) {
+      if (myAdditionalCarets.get(offset) == null) {
+        final CaretCursor caretCursor = new CaretCursor();
+        final VisualPosition visualPosition = offsetToVisualPosition(offset);
+        Point pos1 = visualPositionToXY(visualPosition);
+        Point pos2 = visualPositionToXY(new VisualPosition(visualPosition.line, visualPosition.column + 1));
+        caretCursor.setPosition(pos1, pos2.x - pos1.x);
+        myAdditionalCarets.put(offset, caretCursor);
+      }
+    }
+    List<Integer> forRemoval = new ArrayList<Integer>();
+    for (Map.Entry<Integer, CaretCursor> additionalCaret : myAdditionalCarets.entrySet()) {
+      if (offsets.contains(additionalCaret.getKey())) {
+        additionalCaret.getValue().paint(g);
+      }
+      else {
+        forRemoval.add(additionalCaret.getKey());
+      }
+    }
+    for (Integer integer : forRemoval) {
+      myAdditionalCarets.remove(integer);
+    }
   }
 
   private void paintLineMarkersSeparators(@NotNull final Graphics g,
