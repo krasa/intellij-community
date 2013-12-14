@@ -41,7 +41,6 @@ import java.util.Set;
  * Highlighters are used only because they can keep offsets up to date.
  *
  * TODO : fix: live templates, ctrl+z should restore carets positions, escape is ignored - com.intellij.codeInsight.hint.EscapeHandler:33
- * , 
  *
  * @author Vojtech Krasa
  */
@@ -137,13 +136,16 @@ public class MultiEditAction extends AnAction {
       }
     }
 
-
     CaretModel caretModel = editor.getCaretModel();
     List<Integer> offsets = getAdditionalCaretOffsetsAndRemoveThem(editor);
     if (offsets.isEmpty()) {
       executeHandler.run();
     }
     else {
+      if (editor.getSelectionModel().hasBlockSelection()) {
+        editor.getSelectionModel().removeBlockSelection();
+      }
+
       Collections.sort(offsets);
       Collections.reverse(offsets);
 
