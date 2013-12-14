@@ -38,7 +38,10 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * TODO : fix escape, live templates, caret display, ctrl+z
+ * Highlighters are used only because they can keep offsets up to date.
+ *
+ * TODO : fix: live templates, ctrl+z should restore carets positions, escape is ignored - com.intellij.codeInsight.hint.EscapeHandler:33
+ * , 
  *
  * @author Vojtech Krasa
  */
@@ -59,7 +62,10 @@ public class MultiEditAction extends AnAction {
       editor.addEditorMouseListener(new EditorMouseAdapter() {
         @Override
         public void mouseClicked(EditorMouseEvent e) {
-          removeAdditionalCarets(editor);
+          final int modifiers = e.getMouseEvent().getModifiers();
+          if ((modifiers & Event.SHIFT_MASK) == 0 && (modifiers & Event.ALT_MASK) == 0) {
+            removeAdditionalCarets(editor);
+          }
         }
       });
     }
