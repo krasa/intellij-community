@@ -41,8 +41,6 @@ import java.util.Set;
 /**
  * Highlighters are used only because they can keep offsets up to date.
  *
- * TODO :  escape is ignored - com.intellij.codeInsight.hint.EscapeHandler:33
- *
  * @author Vojtech Krasa
  */
 public class MultiEditAction extends AnAction {
