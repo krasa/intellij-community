@@ -40,7 +40,7 @@ import java.util.Set;
 /**
  * Highlighters are used only because they can keep offsets up to date.
  *
- * TODO : fix: live templates, ctrl+z should restore carets positions, escape is ignored - com.intellij.codeInsight.hint.EscapeHandler:33
+ * TODO :  escape is ignored - com.intellij.codeInsight.hint.EscapeHandler:33
  *
  * @author Vojtech Krasa
  */
