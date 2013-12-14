@@ -32,6 +32,7 @@ import com.intellij.openapi.util.UserDataHolder;
 import com.intellij.util.containers.HashSet;
 
 import java.awt.*;
+import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -61,14 +62,13 @@ public class MultiEditAction extends AnAction {
       editor.addEditorMouseListener(new EditorMouseAdapter() {
         @Override
         public void mouseClicked(EditorMouseEvent e) {
-          final int modifiers = e.getMouseEvent().getModifiers();
-          if ((modifiers & Event.SHIFT_MASK) == 0 && (modifiers & Event.ALT_MASK) == 0) {
+          final MouseEvent mouseEvent = e.getMouseEvent();
+          if (!mouseEvent.isShiftDown() && !mouseEvent.isAltDown()) {
             removeAdditionalCarets(editor);
           }
         }
       });
     }
-
     final CaretModel caretModel = editor.getCaretModel();
     addAdditionalCaret(editor, caretModel.getOffset());
   }
@@ -90,7 +90,7 @@ public class MultiEditAction extends AnAction {
     return false;
   }
 
-  private static void addAdditionalCaret(Editor editor, int offset) {
+  public static void addAdditionalCaret(Editor editor, int offset) {
     TextAttributes attributes = new TextAttributes();
     attributes.setBackgroundColor(Color.CYAN);
     if (editor.getDocument().getTextLength() == offset) {

@@ -4009,6 +4009,11 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
         && !myMousePressedEvent.isShiftDown() && !myMousePressedEvent.isPopupTrigger()) {
       getSelectionModel().removeSelection();
     }
+    
+    //It is nice to add the caret even when mouse was dragged
+    if (e.isAltDown() && e.isShiftDown()) {
+      MultiEditAction.addAdditionalCaret(this, logicalPositionToOffset(xyToLogicalPosition(e.getPoint())));
+    }
   }
 
   @NotNull
@@ -4171,11 +4176,11 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
         selectionModel.setSelection(oldSelectionStart, newCaretOffset);
       }
       else {
-        if (isColumnMode() || e.isAltDown()) {
+        if (isColumnMode() || (e.isAltDown() && !e.isShiftDown())) {
           final LogicalPosition blockStart = selectionModel.hasBlockSelection() ? selectionModel.getBlockStart() : oldLogicalCaret;
           selectionModel.setBlockSelection(blockStart, getCaretModel().getLogicalPosition());
         }
-        else {
+        else if (!e.isAltDown() && !e.isShiftDown()) {
           if (getMouseSelectionState() != MOUSE_SELECTION_STATE_NONE) {
             if (caretShift < 0) {
               int newSelection = newCaretOffset;
