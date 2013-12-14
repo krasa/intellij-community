@@ -4012,7 +4012,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     
     //It is nice to add the caret even when mouse was dragged
     if (e.isAltDown() && e.isShiftDown()) {
-      MultiEditAction.addAdditionalCaret(this, logicalPositionToOffset(xyToLogicalPosition(e.getPoint())));
+      MultiEditAction.addOrRemoveAdditionalCaret(this, logicalPositionToOffset(xyToLogicalPosition(e.getPoint())));
     }
   }
 

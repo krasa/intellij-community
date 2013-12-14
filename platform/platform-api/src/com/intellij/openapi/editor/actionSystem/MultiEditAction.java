@@ -68,7 +68,7 @@ public class MultiEditAction extends AnAction {
       });
     }
     final CaretModel caretModel = editor.getCaretModel();
-    addAdditionalCaret(editor, caretModel.getOffset());
+    addOrRemoveAdditionalCaret(editor, caretModel.getOffset());
   }
 
   public static void removeAdditionalCarets(Editor editor) {
@@ -86,6 +86,20 @@ public class MultiEditAction extends AnAction {
       }
     }
     return false;
+  }
+
+  public static void addOrRemoveAdditionalCaret(Editor editor, int offset) {
+    final RangeHighlighter[] allHighlighters = editor.getMarkupModel().getAllHighlighters();
+    boolean existed = false;
+    for (RangeHighlighter highlighter : allHighlighters) {
+      if (highlighter.getLayer() == HighlighterLayer.MULTI_EDIT_CARET && offset == highlighter.getStartOffset()) {
+        existed = true;
+        editor.getMarkupModel().removeHighlighter(highlighter);
+      }
+    }
+    if (!existed) {
+      addAdditionalCaret(editor, offset);
+    }
   }
 
   public static void addAdditionalCaret(Editor editor, int offset) {
