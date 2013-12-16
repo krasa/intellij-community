@@ -349,4 +349,6 @@ public interface Editor extends UserDataHolder {
 
   @NotNull
   IndentsModel getIndentsModel();
+
+  void setMultiCaretsMode(boolean multiCaretsMode);
 }

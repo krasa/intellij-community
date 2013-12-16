@@ -93,9 +93,7 @@ import com.intellij.util.ui.GraphicsUtil;
 import com.intellij.util.ui.MacUIUtil;
 import com.intellij.util.ui.UIUtil;
 import com.intellij.util.ui.update.UiNotifyConnector;
-import gnu.trove.TIntArrayList;
-import gnu.trove.TIntHashSet;
-import gnu.trove.TIntIntHashMap;
+import gnu.trove.*;
 import org.intellij.lang.annotations.JdkConstants;
 import org.intellij.lang.annotations.MagicConstant;
 import org.jdom.Element;
@@ -172,7 +170,9 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
 
   private boolean myIsInsertMode = true;
 
-  private final Map<Integer, CaretCursor> myAdditionalCarets = new HashMap<Integer, CaretCursor>();
+  private boolean myMultiCaretsMode = false;
+  private final TIntObjectHashMap<CaretCursor> myAdditionalCarets = new TIntObjectHashMap<CaretCursor>();
+
   @NotNull private final CaretCursor myCaretCursor;
   private final ScrollingTimer myScrollingTimer = new ScrollingTimer();
 
@@ -2918,13 +2918,18 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     paintAdditionalCarets(g);
   }
 
-  /*TODO my first painting, looks like shit...*/
-  private void paintAdditionalCarets(Graphics g) {
-    final List<Integer> offsets = MultiEditAction.getAdditionalCaretsOffsets(this);
-    if (offsets.isEmpty() && myAdditionalCarets.isEmpty()) {
+  private void paintAdditionalCarets(final Graphics g) {
+    if (!myMultiCaretsMode) {
       return;
     }
+    final Collection<Integer> offsets = MultiEditAction.getAdditionalCaretsOffsets(this);
+    if (offsets.isEmpty()) {
+      myMultiCaretsMode = false;
+      myAdditionalCarets.clear();
+    }
+
     for (Integer offset : offsets) {
+      //I guess it is better to cache instances than calculating visual position every time, but it is possible as well(but without calling #repaint which eats cpu)
       if (myAdditionalCarets.get(offset) == null) {
         final CaretCursor caretCursor = new CaretCursor();
         final VisualPosition visualPosition = offsetToVisualPosition(offset);
@@ -2934,18 +2939,18 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
         myAdditionalCarets.put(offset, caretCursor);
       }
     }
-    List<Integer> forRemoval = new ArrayList<Integer>();
-    for (Map.Entry<Integer, CaretCursor> additionalCaret : myAdditionalCarets.entrySet()) {
-      if (offsets.contains(additionalCaret.getKey())) {
-        additionalCaret.getValue().paint(g);
+    myAdditionalCarets.forEachEntry(new TIntObjectProcedure<CaretCursor>() {
+      @Override
+      public boolean execute(int key, CaretCursor cursor) {
+        if (offsets.contains(key)) {
+          cursor.paint(g);
+        }
+        else {
+          myAdditionalCarets.remove(key);
+        }
+        return true;
       }
-      else {
-        forRemoval.add(additionalCaret.getKey());
-      }
-    }
-    for (Integer integer : forRemoval) {
-      myAdditionalCarets.remove(integer);
-    }
+    });
   }
 
   private void paintLineMarkersSeparators(@NotNull final Graphics g,
@@ -6685,5 +6690,10 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     {
       drawCharsCached(g, new CharArrayCharSequence(data), start, end, x, y, fontInfo, color);
     }
+  }
+
+  @Override
+  public void setMultiCaretsMode(boolean multiCaretsMode) {
+    this.myMultiCaretsMode = multiCaretsMode;
   }
 }

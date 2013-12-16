@@ -31,12 +31,8 @@ import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.UserDataHolder;
 import com.intellij.util.containers.HashSet;
 
-import java.awt.*;
 import java.awt.event.MouseEvent;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Highlighters are used only because they can keep offsets up to date.
@@ -44,8 +40,9 @@ import java.util.Set;
  * @author Vojtech Krasa
  */
 public class MultiEditAction extends AnAction {
+  public static final TextAttributes TEXT_ATTRIBUTES = new TextAttributes();
 
-  public static final Key<Object> ALREADY_PROCESSING_ADDITIONAL_CARETS = Key.create("MultiEditAction.alreadyProcessingAdditionalCarets");
+  public static final Key<Object> ALREADY_PROCESSING = Key.create("MultiEditAction.alreadyProcessing");
   public static final Key<Object> LISTENER_PRESENT = Key.create("MultiEditAction.listenerPresent");
 
   public void actionPerformed(AnActionEvent e) {
@@ -99,20 +96,20 @@ public class MultiEditAction extends AnAction {
     }
     if (!existed) {
       addAdditionalCaret(editor, offset);
+      editor.setMultiCaretsMode(true);
     }
   }
 
   public static void addAdditionalCaret(Editor editor, int offset) {
-    TextAttributes attributes = new TextAttributes();
-    attributes.setBackgroundColor(Color.CYAN);
-    if (editor.getDocument().getTextLength() == offset) {
+    if (editor.getDocument().getTextLength() < offset) {
       return;
     }
     editor.getMarkupModel()
-      .addRangeHighlighter(offset, offset, HighlighterLayer.MULTI_EDIT_CARET, attributes, HighlighterTargetArea.EXACT_RANGE);
+      .addRangeHighlighter(offset, offset, HighlighterLayer.MULTI_EDIT_CARET, TEXT_ATTRIBUTES, HighlighterTargetArea.EXACT_RANGE);
+    editor.setMultiCaretsMode(true);
   }
 
-  public static List<Integer> getAdditionalCaretsOffsets(Editor editor) {
+  public static Collection<Integer> getAdditionalCaretsOffsets(Editor editor) {
     final RangeHighlighter[] allHighlighters = editor.getMarkupModel().getAllHighlighters();
     Set<Integer> offsets = new HashSet<Integer>();
     for (RangeHighlighter highlighter : allHighlighters) {
@@ -120,7 +117,7 @@ public class MultiEditAction extends AnAction {
         offsets.add(highlighter.getStartOffset());
       }
     }
-    return new ArrayList<Integer>(offsets);
+    return offsets;
   }
 
   private static List<Integer> getAdditionalCaretOffsetsAndRemoveThem(Editor editor) {
@@ -139,12 +136,12 @@ public class MultiEditAction extends AnAction {
     //e.g. backspace workaround
     if (dataContext instanceof UserDataHolder) {
       final UserDataHolder userDataHolder = (UserDataHolder)dataContext;
-      if (userDataHolder.getUserData(ALREADY_PROCESSING_ADDITIONAL_CARETS) != null) {
+      if (userDataHolder.getUserData(ALREADY_PROCESSING) != null) {
         executeHandler.run();
         return;
       }
       else {
-        userDataHolder.putUserData(ALREADY_PROCESSING_ADDITIONAL_CARETS, "1");
+        userDataHolder.putUserData(ALREADY_PROCESSING, "1");
       }
     }
 
