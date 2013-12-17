@@ -19,6 +19,9 @@ import com.intellij.openapi.editor.event.CaretListener;
 import com.intellij.openapi.editor.markup.TextAttributes;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Collection;
+import java.util.List;
+
 /**
  * Provides services for moving the caret and retrieving information about caret position.
  *
@@ -137,4 +140,16 @@ public interface CaretModel {
    * @return Caret attributes.
    */
   TextAttributes getTextAttributes();
+
+  void removeAdditionalCarets();
+
+  boolean hasAdditionalCarets();
+
+  void addOrRemoveAdditionalCaret(int offset);
+
+  void addAdditionalCaret(int offset);
+
+  Collection<Integer> getAdditionalCaretsOffsets();
+
+  Collection<Integer> getAdditionalCaretOffsetsAndRemoveThem();
 }

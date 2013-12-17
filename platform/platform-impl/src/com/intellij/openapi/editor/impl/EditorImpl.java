@@ -2922,7 +2922,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     if (!myMultiCaretsMode) {
       return;
     }
-    final Collection<Integer> offsets = MultiEditAction.getAdditionalCaretsOffsets(this);
+    final Collection<Integer> offsets = myCaretModel.getAdditionalCaretsOffsets();
     if (offsets.isEmpty()) {
       myMultiCaretsMode = false;
       myAdditionalCarets.clear();
@@ -4017,7 +4017,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     
     //It is nice to add the caret even when mouse was dragged
     if (e.isAltDown() && e.isShiftDown()) {
-      MultiEditAction.addOrRemoveAdditionalCaret(this, logicalPositionToOffset(xyToLogicalPosition(e.getPoint())));
+      myCaretModel.addOrRemoveAdditionalCaret(logicalPositionToOffset(xyToLogicalPosition(e.getPoint())));
     }
   }
 

@@ -21,7 +21,6 @@ import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.SelectionModel;
 import com.intellij.openapi.editor.actionSystem.EditorAction;
 import com.intellij.openapi.editor.actionSystem.EditorActionHandler;
-import com.intellij.openapi.editor.actionSystem.MultiEditAction;
 import com.intellij.openapi.editor.ex.EditorEx;
 
 /**
@@ -44,14 +43,14 @@ public class EscapeAction extends EditorAction {
       }
 
       editor.getSelectionModel().removeSelection();
-      MultiEditAction.removeAdditionalCarets(editor);
+      editor.getCaretModel().removeAdditionalCarets();
     }
 
     @Override
     public boolean isEnabled(Editor editor, DataContext dataContext) {
       SelectionModel selectionModel = editor.getSelectionModel();
       return //PlatformDataKeys.IS_MODAL_CONTEXT.getData(dataContext) != Boolean.TRUE &&
-        (selectionModel.hasSelection() || selectionModel.hasBlockSelection() || MultiEditAction.hasAdditionalCarets(editor));
+        (selectionModel.hasSelection() || selectionModel.hasBlockSelection() || editor.getCaretModel().hasAdditionalCarets());
     }
   }
 }
