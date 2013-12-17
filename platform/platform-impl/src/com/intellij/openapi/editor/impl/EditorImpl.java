@@ -4026,9 +4026,9 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
       getSelectionModel().removeSelection();
     }
     
-    //It is nice to add the caret even when mouse was dragged
     if (isMultiEditMode(e)) {
-       final TextAttributes textAttributes = getSelectionModel().getTextAttributes();
+      final TextAttributes textAttributes = getSelectionModel().getTextAttributes();
+      //TODO remove additional caret insde
       getMarkupModel()
         .addRangeHighlighter(getSelectionModel().getSelectionStart(), getSelectionModel().getSelectionEnd(), HighlighterLayer.MULTI_EDIT_SELECTION,
                              textAttributes, HighlighterTargetArea.EXACT_RANGE);
