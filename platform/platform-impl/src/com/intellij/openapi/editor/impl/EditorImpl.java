@@ -853,6 +853,17 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     myEditorComponent.addMouseMotionListener(mouseMotionListener);
     myGutterComponent.addMouseMotionListener(mouseMotionListener);
 
+    this.addEditorMouseListener(new EditorMouseAdapter() {
+      @Override
+      public void mouseClicked(EditorMouseEvent e) {
+        final MouseEvent mouseEvent = e.getMouseEvent();
+        if (!isMultiEditMode(mouseEvent)) {
+          getSelectionModel().removeMultiSelection();
+          getCaretModel().removeAdditionalCarets();
+        }
+      }
+    });
+    
     myEditorComponent.addFocusListener(new FocusAdapter() {
       @Override
       public void focusGained(FocusEvent e) {
@@ -4016,9 +4027,17 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     }
     
     //It is nice to add the caret even when mouse was dragged
-    if (e.isAltDown() && e.isShiftDown()) {
-      myCaretModel.addOrRemoveAdditionalCaret(logicalPositionToOffset(xyToLogicalPosition(e.getPoint())));
+    if (isMultiEditMode(e)) {
+       final TextAttributes textAttributes = getSelectionModel().getTextAttributes();
+      getMarkupModel()
+        .addRangeHighlighter(getSelectionModel().getSelectionStart(), getSelectionModel().getSelectionEnd(), HighlighterLayer.MULTI_EDIT_SELECTION,
+                             textAttributes, HighlighterTargetArea.EXACT_RANGE);
+      getSelectionModel().setHasMultiSelection(true);
     }
+  }
+
+  private boolean isMultiEditMode(MouseEvent e) {
+    return e.isAltDown() && e.isShiftDown();
   }
 
   @NotNull
@@ -4185,7 +4204,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
           final LogicalPosition blockStart = selectionModel.hasBlockSelection() ? selectionModel.getBlockStart() : oldLogicalCaret;
           selectionModel.setBlockSelection(blockStart, getCaretModel().getLogicalPosition());
         }
-        else if (!e.isAltDown() && !e.isShiftDown()) {
+        else {
           if (getMouseSelectionState() != MOUSE_SELECTION_STATE_NONE) {
             if (caretShift < 0) {
               int newSelection = newCaretOffset;

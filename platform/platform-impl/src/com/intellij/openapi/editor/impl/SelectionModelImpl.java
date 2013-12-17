@@ -40,6 +40,8 @@ import com.intellij.openapi.editor.ex.DocumentEx;
 import com.intellij.openapi.editor.ex.FoldingModelEx;
 import com.intellij.openapi.editor.ex.PrioritizedDocumentListener;
 import com.intellij.openapi.editor.ex.util.EditorUtil;
+import com.intellij.openapi.editor.markup.HighlighterLayer;
+import com.intellij.openapi.editor.markup.RangeHighlighter;
 import com.intellij.openapi.editor.markup.TextAttributes;
 import com.intellij.openapi.ide.CopyPasteManager;
 import com.intellij.openapi.util.Pair;
@@ -70,6 +72,7 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
   private int[] myBlockSelectionStarts;
   private int[] myBlockSelectionEnds;
   private boolean myUnknownDirection;
+  private boolean myHasMultiSelection;
 
   private class MyRangeMarker extends RangeMarkerImpl {
     private VisualPosition myStartPosition;
@@ -887,6 +890,24 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
 
     return myTextAttributes;
   }
+
+  @Override
+  public void removeMultiSelection() {
+    if (myHasMultiSelection) {
+      for (RangeHighlighter rangeHighlighter : myEditor.getMarkupModel().getAllHighlighters()) {
+        if (rangeHighlighter.getLayer() == HighlighterLayer.MULTI_EDIT_SELECTION) {
+          myEditor.getMarkupModel().removeHighlighter(rangeHighlighter);
+        }
+      }
+      myHasMultiSelection = false;
+    }
+  }
+  
+  public void setHasMultiSelection(boolean hasMultiSelection) {
+    myHasMultiSelection = hasMultiSelection;
+  }
+
+  
 
   public void reinitSettings() {
     myTextAttributes = null;

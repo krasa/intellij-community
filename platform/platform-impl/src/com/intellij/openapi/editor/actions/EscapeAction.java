@@ -43,6 +43,7 @@ public class EscapeAction extends EditorAction {
       }
 
       editor.getSelectionModel().removeSelection();
+      editor.getSelectionModel().removeMultiSelection();
       editor.getCaretModel().removeAdditionalCarets();
     }
 

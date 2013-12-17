@@ -194,4 +194,9 @@ public class SelectionModelWindow implements SelectionModel {
   public TextAttributes getTextAttributes() {
     return myHostModel.getTextAttributes();
   }
+
+  @Override
+  public void removeMultiSelection() {
+    myHostModel.removeMultiSelection();
+  }
 }

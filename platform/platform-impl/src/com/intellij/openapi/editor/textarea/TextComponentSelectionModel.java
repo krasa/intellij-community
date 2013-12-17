@@ -200,4 +200,9 @@ public class TextComponentSelectionModel implements SelectionModel {
   public TextAttributes getTextAttributes() {
     return null;
   }
+
+  @Override
+  public void removeMultiSelection() {
+    throw new UnsupportedOperationException("Not implemented");
+  }
 }
