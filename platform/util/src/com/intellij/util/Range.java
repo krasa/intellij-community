@@ -41,4 +41,12 @@ public class Range<T extends Comparable<T>> {
   public T getTo() {
     return myTo;
   }
+
+  @Override
+  public String toString() {
+    return "Range{" +
+           "myFrom=" + myFrom +
+           ", myTo=" + myTo +
+           '}';
+  }
 }

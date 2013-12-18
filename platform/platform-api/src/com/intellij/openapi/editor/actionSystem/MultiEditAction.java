@@ -29,10 +29,9 @@ import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.UserDataHolder;
 import com.intellij.util.Range;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
+
+import static java.lang.Math.min;
 
 /**
  * Highlighters are used only because they can keep offsets up to date.
@@ -88,19 +87,20 @@ public class MultiEditAction extends AnAction {
           return to2.compareTo(to);
         }
       });
-      int lastFromOffset = Integer.MAX_VALUE;
-      for (Range<Integer> caretsOrSelection : caretsAndSelections) {
-        if (caretsOrSelection.getTo() >= lastFromOffset) {
-          continue;
+      for (int i = 0; i < caretsAndSelections.size(); i++) {
+        Range<Integer> range = caretsAndSelections.get(i);
+        Range<Integer> nextRange = getNextRange(caretsAndSelections, i);
+        while (nextRange != null && nextRange.getTo() >=  range.getFrom()) {
+          range = new Range<Integer>(min(nextRange.getFrom(), range.getFrom()), range.getTo());
+          nextRange = getNextRange(caretsAndSelections, i);
+          i++;
         }
-        lastFromOffset = caretsOrSelection.getFrom();
-
-        if (isCaret(caretsOrSelection)) {
-          caretModel.moveToOffset(caretsOrSelection.getFrom());
+        if (isCaret(range)) {
+          caretModel.moveToOffset(range.getFrom());
         }
         else {
-          caretModel.moveToOffset(caretsOrSelection.getFrom());
-          selectionModel.setSelection(caretsOrSelection.getFrom(), caretsOrSelection.getTo());
+          caretModel.moveToOffset(range.getFrom());
+          selectionModel.setSelection(range.getFrom(), range.getTo());
         }
         executeHandler.run();
         int afterAction = caretModel.getOffset();
@@ -109,11 +109,18 @@ public class MultiEditAction extends AnAction {
     }
   }
 
+  private static Range<Integer> getNextRange(List<Range<Integer>> caretsAndSelections, int current) {
+    final int next = current + 1;
+    if (next == caretsAndSelections.size()) {
+      return null;
+    }
+    return caretsAndSelections.get(next);
+  }
+
   private static boolean isCaret(Range<Integer> caretsOrSelection) {
     return caretsOrSelection.getFrom().equals(caretsOrSelection.getTo());
   }
 
-  //TODO merge overlapping ranges
   private static List<Range<Integer>> merge(List<Integer> offsets, List<Range<Integer>> caretModel) {
     final ArrayList<Range<Integer>> merge = new ArrayList<Range<Integer>>(offsets.size() + caretModel.size());
     merge.addAll(caretModel);
