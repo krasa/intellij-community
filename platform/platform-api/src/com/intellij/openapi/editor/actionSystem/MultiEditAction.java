@@ -113,6 +113,7 @@ public class MultiEditAction extends AnAction {
     return caretsOrSelection.getFrom().equals(caretsOrSelection.getTo());
   }
 
+  //TODO merge overlapping ranges
   private static List<Range<Integer>> merge(List<Integer> offsets, List<Range<Integer>> caretModel) {
     final ArrayList<Range<Integer>> merge = new ArrayList<Range<Integer>>(offsets.size() + caretModel.size());
     merge.addAll(caretModel);
