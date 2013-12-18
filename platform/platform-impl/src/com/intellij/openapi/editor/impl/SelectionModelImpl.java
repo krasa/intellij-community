@@ -40,6 +40,9 @@ import com.intellij.openapi.editor.ex.DocumentEx;
 import com.intellij.openapi.editor.ex.FoldingModelEx;
 import com.intellij.openapi.editor.ex.PrioritizedDocumentListener;
 import com.intellij.openapi.editor.ex.util.EditorUtil;
+import com.intellij.openapi.editor.markup.HighlighterLayer;
+import com.intellij.openapi.editor.markup.HighlighterTargetArea;
+import com.intellij.openapi.editor.markup.RangeHighlighter;
 import com.intellij.openapi.editor.markup.TextAttributes;
 import com.intellij.openapi.ide.CopyPasteManager;
 import com.intellij.openapi.util.Pair;
@@ -70,6 +73,7 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
   private int[] myBlockSelectionStarts;
   private int[] myBlockSelectionEnds;
   private boolean myUnknownDirection;
+  private boolean myHasMultiSelection;
 
   private class MyRangeMarker extends RangeMarkerImpl {
     private VisualPosition myStartPosition;
@@ -887,6 +891,31 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
 
     return myTextAttributes;
   }
+
+  @Override
+  public void addMultiSelection(int selectionStart, int selectionEnd) {
+    //TODO removing carets within selection would be nice
+    final TextAttributes textAttributes = myEditor.getSelectionModel().getTextAttributes();
+    myEditor.getMarkupModel()
+      .addRangeHighlighter(selectionStart, selectionEnd,
+                           HighlighterLayer.MULTI_EDIT_SELECTION, textAttributes, HighlighterTargetArea.EXACT_RANGE);
+    //we need to add caret on the end or start of selection, so that shift+arrow works
+    myEditor.getCaretModel().addAdditionalCaret(myEditor.getCaretModel().getOffset());
+    myHasMultiSelection = true;
+  }
+  
+  @Override
+  public void removeMultiSelection() {
+    if (myHasMultiSelection) {
+      for (RangeHighlighter rangeHighlighter : myEditor.getMarkupModel().getAllHighlighters()) {
+        if (rangeHighlighter.getLayer() == HighlighterLayer.MULTI_EDIT_SELECTION) {
+          myEditor.getMarkupModel().removeHighlighter(rangeHighlighter);
+        }
+      }
+      myHasMultiSelection = false;
+    }
+  }
+  
 
   public void reinitSettings() {
     myTextAttributes = null;

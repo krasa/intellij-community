@@ -251,4 +251,9 @@ public interface SelectionModel {
    * @return Selection attributes.
    */
   TextAttributes getTextAttributes();
+
+
+  void addMultiSelection(int selectionStart, int selectionEnd);
+
+  void removeMultiSelection();
 }

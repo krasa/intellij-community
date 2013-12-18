@@ -25,6 +25,8 @@ import com.intellij.openapi.editor.ex.EditorEx;
 import com.intellij.openapi.editor.markup.TextAttributes;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Collection;
+
 /**
  * @author Alexey
  */
@@ -139,5 +141,35 @@ public class CaretModelWindow implements CaretModel {
   @Override
   public TextAttributes getTextAttributes() {
     return myDelegate.getTextAttributes();
+  }
+
+  @Override
+  public void removeAdditionalCarets() {
+    myDelegate.removeAdditionalCarets();
+  }
+
+  @Override
+  public boolean hasAdditionalCarets() {
+    return myDelegate.hasAdditionalCarets();
+  }
+
+  @Override
+  public void addOrRemoveAdditionalCaret(int offset) {
+    myDelegate.addOrRemoveAdditionalCaret(offset);
+  }
+
+  @Override
+  public void addAdditionalCaret(int offset) {
+    myDelegate.addAdditionalCaret(offset);
+  }
+
+  @Override
+  public Collection<Integer> getAdditionalCaretsOffsets() {
+    return myDelegate.getAdditionalCaretsOffsets();
+  }
+
+  @Override
+  public Collection<Integer> getAdditionalCaretOffsetsAndRemoveThem() {
+    return myDelegate.getAdditionalCaretOffsetsAndRemoveThem();
   }
 }

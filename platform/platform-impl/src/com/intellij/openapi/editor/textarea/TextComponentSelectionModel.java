@@ -200,4 +200,14 @@ public class TextComponentSelectionModel implements SelectionModel {
   public TextAttributes getTextAttributes() {
     return null;
   }
+
+  @Override
+  public void addMultiSelection(int selectionStart, int selectionEnd) {
+    throw new UnsupportedOperationException("Not implemented");
+  }
+
+  @Override
+  public void removeMultiSelection() {
+    throw new UnsupportedOperationException("Not implemented");
+  }
 }

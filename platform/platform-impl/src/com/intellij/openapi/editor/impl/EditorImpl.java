@@ -55,7 +55,6 @@ import com.intellij.openapi.editor.highlighter.HighlighterClient;
 import com.intellij.openapi.editor.impl.event.MarkupModelListener;
 import com.intellij.openapi.editor.impl.softwrap.SoftWrapAppliancePlaces;
 import com.intellij.openapi.editor.impl.softwrap.SoftWrapDrawingType;
-import com.intellij.openapi.editor.impl.softwrap.SoftWrapHelper;
 import com.intellij.openapi.editor.markup.*;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.ex.IdeDocumentHistory;
@@ -93,9 +92,7 @@ import com.intellij.util.ui.GraphicsUtil;
 import com.intellij.util.ui.MacUIUtil;
 import com.intellij.util.ui.UIUtil;
 import com.intellij.util.ui.update.UiNotifyConnector;
-import gnu.trove.TIntArrayList;
-import gnu.trove.TIntHashSet;
-import gnu.trove.TIntIntHashMap;
+import gnu.trove.*;
 import org.intellij.lang.annotations.JdkConstants;
 import org.intellij.lang.annotations.MagicConstant;
 import org.jdom.Element;
@@ -171,6 +168,9 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
   private int myDescent    = -1;
 
   private boolean myIsInsertMode = true;
+
+  private boolean myMultiCaretsMode = false;
+  private final TIntObjectHashMap<CaretCursor> myAdditionalCarets = new TIntObjectHashMap<CaretCursor>();
 
   @NotNull private final CaretCursor myCaretCursor;
   private final ScrollingTimer myScrollingTimer = new ScrollingTimer();
@@ -842,6 +842,17 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     myEditorComponent.addMouseMotionListener(mouseMotionListener);
     myGutterComponent.addMouseMotionListener(mouseMotionListener);
 
+    this.addEditorMouseListener(new EditorMouseAdapter() {
+      @Override
+      public void mouseClicked(EditorMouseEvent e) {
+        final MouseEvent mouseEvent = e.getMouseEvent();
+        if (!isMultiEditMode(mouseEvent)) {
+          getSelectionModel().removeMultiSelection();
+          getCaretModel().removeAdditionalCarets();
+        }
+      }
+    });
+    
     myEditorComponent.addFocusListener(new FocusAdapter() {
       @Override
       public void focusGained(FocusEvent e) {
@@ -2902,6 +2913,42 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     // We check if that's the case and ask caret model to recalculate visual position if necessary.
 
     myCaretCursor.paint(g);
+    paintAdditionalCarets(g);
+  }
+
+  private void paintAdditionalCarets(final Graphics g) {
+    if (!myMultiCaretsMode) {
+      return;
+    }
+    final Collection<Integer> offsets = myCaretModel.getAdditionalCaretsOffsets();
+    if (offsets.isEmpty()) {
+      myMultiCaretsMode = false;
+      myAdditionalCarets.clear();
+    }
+
+    for (Integer offset : offsets) {
+      //I guess it is better to cache instances than calculating visual position every time, but it is possible as well(but without calling #repaint which eats cpu)
+      if (myAdditionalCarets.get(offset) == null) {
+        final CaretCursor caretCursor = new CaretCursor();
+        final VisualPosition visualPosition = offsetToVisualPosition(offset);
+        Point pos1 = visualPositionToXY(visualPosition);
+        Point pos2 = visualPositionToXY(new VisualPosition(visualPosition.line, visualPosition.column + 1));
+        caretCursor.setPosition(pos1, pos2.x - pos1.x);
+        myAdditionalCarets.put(offset, caretCursor);
+      }
+    }
+    myAdditionalCarets.forEachEntry(new TIntObjectProcedure<CaretCursor>() {
+      @Override
+      public boolean execute(int key, CaretCursor cursor) {
+        if (offsets.contains(key)) {
+          cursor.paint(g);
+        }
+        else {
+          myAdditionalCarets.remove(key);
+        }
+        return true;
+      }
+    });
   }
 
   private void paintLineMarkersSeparators(@NotNull final Graphics g,
@@ -3965,6 +4012,14 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
         && !myMousePressedEvent.isShiftDown() && !myMousePressedEvent.isPopupTrigger()) {
       getSelectionModel().removeSelection();
     }
+    
+    if (isMultiEditMode(e)) {
+      mySelectionModel.addMultiSelection(getSelectionModel().getSelectionStart(), getSelectionModel().getSelectionEnd());
+    }
+  }
+
+  private boolean isMultiEditMode(MouseEvent e) {
+    return e.isAltDown() && e.isShiftDown();
   }
 
   @NotNull
@@ -4127,7 +4182,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
         selectionModel.setSelection(oldSelectionStart, newCaretOffset);
       }
       else {
-        if (isColumnMode() || e.isAltDown()) {
+        if (isColumnMode() || (e.isAltDown() && !e.isShiftDown())) {
           final LogicalPosition blockStart = selectionModel.hasBlockSelection() ? selectionModel.getBlockStart() : oldLogicalCaret;
           selectionModel.setBlockSelection(blockStart, getCaretModel().getLogicalPosition());
         }
@@ -6636,5 +6691,10 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     {
       drawCharsCached(g, new CharArrayCharSequence(data), start, end, x, y, fontInfo, color);
     }
+  }
+
+  @Override
+  public void setMultiCaretsMode(boolean multiCaretsMode) {
+    this.myMultiCaretsMode = multiCaretsMode;
   }
 }

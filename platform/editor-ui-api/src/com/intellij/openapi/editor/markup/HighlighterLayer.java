@@ -23,6 +23,8 @@ public interface HighlighterLayer {
   int WARNING = 4000;
   int ERROR = 5000;
   int SELECTION = 6000;
+  int MULTI_EDIT_SELECTION = 6666;
+  int MULTI_EDIT_CARET = 9999;
 
   int FIRST = CARET_ROW;
   int LAST = SELECTION;

@@ -41,10 +41,14 @@ import com.intellij.openapi.editor.ex.PrioritizedDocumentListener;
 import com.intellij.openapi.editor.ex.util.EditorUtil;
 import com.intellij.openapi.editor.impl.event.DocumentEventImpl;
 import com.intellij.openapi.editor.impl.softwrap.SoftWrapHelper;
+import com.intellij.openapi.editor.markup.HighlighterLayer;
+import com.intellij.openapi.editor.markup.HighlighterTargetArea;
+import com.intellij.openapi.editor.markup.RangeHighlighter;
 import com.intellij.openapi.editor.markup.TextAttributes;
 import com.intellij.openapi.ide.CopyPasteManager;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.util.EventDispatcher;
+import com.intellij.util.containers.HashSet;
 import com.intellij.util.diff.FilesTooBigForDiffException;
 import com.intellij.util.text.CharArrayUtil;
 import org.jetbrains.annotations.NonNls;
@@ -52,9 +56,12 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.awt.*;
+import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
 public class CaretModelImpl implements CaretModel, PrioritizedDocumentListener, Disposable {
+  public static final TextAttributes TEXT_ATTRIBUTES = new TextAttributes();
   private static final Logger LOG = Logger.getInstance("#com.intellij.openapi.editor.impl.CaretModelImpl");
 
   private final EditorImpl myEditor;
@@ -852,4 +859,76 @@ public class CaretModelImpl implements CaretModel, PrioritizedDocumentListener, 
       this.height = height;
     }
   }
+  
+  
+  @Override
+  public  void removeAdditionalCarets() {
+     for (RangeHighlighter rangeHighlighter : myEditor.getMarkupModel().getAllHighlighters()) {
+       if (rangeHighlighter.getLayer() == HighlighterLayer.MULTI_EDIT_CARET) {
+         myEditor.getMarkupModel().removeHighlighter(rangeHighlighter);
+       }
+     }
+   }
+ 
+   @Override
+   public  boolean hasAdditionalCarets() {
+     for (RangeHighlighter rangeHighlighter : myEditor.getMarkupModel().getAllHighlighters()) {
+       if (rangeHighlighter.getLayer() == HighlighterLayer.MULTI_EDIT_CARET) {
+         return true;
+       }
+     }
+     return false;
+   }
+ 
+   @Override
+   public  void addOrRemoveAdditionalCaret(int offset) {
+     final RangeHighlighter[] allHighlighters = myEditor.getMarkupModel().getAllHighlighters();
+     boolean existed = false;
+     for (RangeHighlighter highlighter : allHighlighters) {
+       if (highlighter.getLayer() == HighlighterLayer.MULTI_EDIT_CARET && offset == highlighter.getStartOffset()) {
+         existed = true;
+         myEditor.getMarkupModel().removeHighlighter(highlighter);
+       }
+     }
+     if (!existed) {
+       addAdditionalCaret(offset);
+       myEditor.setMultiCaretsMode(true);
+     }
+   }
+ 
+   @Override
+   public  void addAdditionalCaret(int offset) {
+     if (myEditor.getDocument().getTextLength() < offset) {
+       return;
+     }
+     myEditor.getMarkupModel()
+       .addRangeHighlighter(offset, offset, HighlighterLayer.MULTI_EDIT_CARET, TEXT_ATTRIBUTES, HighlighterTargetArea.EXACT_RANGE);
+     myEditor.setMultiCaretsMode(true);
+   }
+ 
+   @Override
+   public  Collection<Integer> getAdditionalCaretsOffsets() {
+     final RangeHighlighter[] allHighlighters = myEditor.getMarkupModel().getAllHighlighters();
+     Set<Integer> offsets = new HashSet<Integer>();
+     for (RangeHighlighter highlighter : allHighlighters) {
+       if (highlighter.getLayer() == HighlighterLayer.MULTI_EDIT_CARET) {
+         offsets.add(highlighter.getStartOffset());
+       }
+     }
+     return offsets;
+   }
+ 
+   @Override
+   public  Collection<Integer> getAdditionalCaretOffsetsAndRemoveThem() {
+     final RangeHighlighter[] allHighlighters = myEditor.getMarkupModel().getAllHighlighters();
+     Set<Integer> offsets = new HashSet<Integer>();
+     for (RangeHighlighter highlighter : allHighlighters) {
+       if (highlighter.getLayer() == HighlighterLayer.MULTI_EDIT_CARET) {
+         offsets.add(highlighter.getStartOffset());
+         myEditor.getMarkupModel().removeHighlighter(highlighter);
+       }
+     }
+     return offsets;
+   }
+  
 }

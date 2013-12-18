@@ -27,6 +27,7 @@ import com.intellij.ide.ui.UISettings;
 import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.actionSystem.EditorActionHandler;
+import com.intellij.openapi.editor.actionSystem.MultiEditAction;
 import com.intellij.openapi.project.DumbAwareAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.ui.ListScrollingUtil;
@@ -49,14 +50,20 @@ public abstract class LookupActionHandler extends EditorActionHandler {
   }
 
   @Override
-  public void execute(Editor editor, DataContext dataContext){
+  public void execute(final Editor editor, final DataContext dataContext) {
     LookupImpl lookup = (LookupImpl)LookupManager.getActiveLookup(editor);
     if (lookup == null || !lookup.isAvailableToUser() || myRequireFocusedLookup && !lookup.isFocused()) {
       Project project = editor.getProject();
       if (project != null) {
         LookupManager.getInstance(project).hideActiveLookup();
       }
-      myOriginalHandler.execute(editor, dataContext);
+      MultiEditAction.executeWithMultiEdit(new Runnable() {
+        @Override
+        public void run() {
+          myOriginalHandler.execute(editor, dataContext);
+
+        }
+      }, editor, dataContext);
       return;
     }
 

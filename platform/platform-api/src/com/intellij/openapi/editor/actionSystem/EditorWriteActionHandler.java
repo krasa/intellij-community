@@ -34,7 +34,7 @@ public abstract class EditorWriteActionHandler extends EditorActionHandler {
       if (project != null && !FileDocumentManager.getInstance().requestWriting(editor.getDocument(), project)) return;
     }
 
-    ApplicationManager.getApplication().runWriteAction(new DocumentRunnable(editor.getDocument(),editor.getProject()) {
+    ApplicationManager.getApplication().runWriteAction(new DocumentRunnable(editor.getDocument(), editor.getProject()) {
       @Override
       public void run() {
         final Document doc = editor.getDocument();
@@ -51,7 +51,12 @@ public abstract class EditorWriteActionHandler extends EditorActionHandler {
 
         doc.startGuardedBlockChecking();
         try {
-          executeWriteAction(editor, dataContext);
+          MultiEditAction.executeWithMultiEdit(new Runnable() {
+            @Override
+            public void run() {
+              executeWriteAction(editor, dataContext);
+            }
+          }, editor, dataContext);
         }
         catch (ReadOnlyFragmentModificationException e) {
           EditorActionManager.getInstance().getReadonlyFragmentModificationHandler(doc).handle(e);

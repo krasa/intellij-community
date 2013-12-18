@@ -45,7 +45,10 @@ class MoverWrapper {
   }
 
   public final void move(Editor editor, final PsiFile file) {
-    assert myInfo.toMove2 != null;
+    //return when one selection can be moved and other not.
+    if (myInfo.toMove2 == null) {
+      return;
+    }
     myMover.beforeMove(editor, myInfo, myIsDown);
     final Document document = editor.getDocument();
     final int start = StatementUpDownMover.getLineStartSafeOffset(document, myInfo.toMove.startLine);
