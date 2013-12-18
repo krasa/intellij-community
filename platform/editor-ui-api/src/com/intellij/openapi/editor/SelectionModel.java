@@ -253,5 +253,7 @@ public interface SelectionModel {
   TextAttributes getTextAttributes();
 
 
+  void addMultiSelection(int selectionStart, int selectionEnd);
+
   void removeMultiSelection();
 }

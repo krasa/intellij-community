@@ -41,6 +41,7 @@ import com.intellij.openapi.editor.ex.FoldingModelEx;
 import com.intellij.openapi.editor.ex.PrioritizedDocumentListener;
 import com.intellij.openapi.editor.ex.util.EditorUtil;
 import com.intellij.openapi.editor.markup.HighlighterLayer;
+import com.intellij.openapi.editor.markup.HighlighterTargetArea;
 import com.intellij.openapi.editor.markup.RangeHighlighter;
 import com.intellij.openapi.editor.markup.TextAttributes;
 import com.intellij.openapi.ide.CopyPasteManager;
@@ -892,6 +893,18 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
   }
 
   @Override
+  public void addMultiSelection(int selectionStart, int selectionEnd) {
+    //TODO removing old carets would be nice, also merging of selections so it can work like sublime
+    final TextAttributes textAttributes = myEditor.getSelectionModel().getTextAttributes();
+    myEditor.getMarkupModel()
+      .addRangeHighlighter(selectionStart, selectionEnd,
+                           HighlighterLayer.MULTI_EDIT_SELECTION, textAttributes, HighlighterTargetArea.EXACT_RANGE);
+    //we nned to add caret on the end or start of selection, so that shift+arrow works
+    myEditor.getCaretModel().addAdditionalCaret(myEditor.getCaretModel().getOffset());
+    myHasMultiSelection = true;
+  }
+  
+  @Override
   public void removeMultiSelection() {
     if (myHasMultiSelection) {
       for (RangeHighlighter rangeHighlighter : myEditor.getMarkupModel().getAllHighlighters()) {
@@ -902,11 +915,6 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
       myHasMultiSelection = false;
     }
   }
-  
-  public void setHasMultiSelection(boolean hasMultiSelection) {
-    myHasMultiSelection = hasMultiSelection;
-  }
-
   
 
   public void reinitSettings() {

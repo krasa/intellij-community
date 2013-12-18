@@ -196,6 +196,11 @@ public class SelectionModelWindow implements SelectionModel {
   }
 
   @Override
+  public void addMultiSelection(int selectionStart, int selectionEnd) {
+    myHostModel.addMultiSelection(selectionStart, selectionEnd);
+  }
+
+  @Override
   public void removeMultiSelection() {
     myHostModel.removeMultiSelection();
   }

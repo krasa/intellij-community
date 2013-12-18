@@ -29,7 +29,10 @@ import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.UserDataHolder;
 import com.intellij.util.Range;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 
 import static java.lang.Math.min;
 
@@ -67,6 +70,8 @@ public class MultiEditAction extends AnAction {
     }
     final SelectionModel selectionModel = editor.getSelectionModel();
     CaretModel caretModel = editor.getCaretModel();
+
+
     final List<Range<Integer>> multiSelects = getMultiSelects(editor);
     List<Integer> offsets = new ArrayList<Integer>(caretModel.getAdditionalCaretOffsetsAndRemoveThem());
 
@@ -79,33 +84,55 @@ public class MultiEditAction extends AnAction {
       }
       final List<Range<Integer>> caretsAndSelections = merge(offsets, multiSelects);
 
-      Collections.sort(caretsAndSelections, new Comparator<Range<Integer>>() {
-        @Override
-        public int compare(Range<Integer> o1, Range<Integer> o2) {
-          final Integer to = o1.getTo();
-          final Integer to2 = o2.getTo();
-          return to2.compareTo(to);
-        }
-      });
       for (int i = 0; i < caretsAndSelections.size(); i++) {
         Range<Integer> range = caretsAndSelections.get(i);
-        Range<Integer> nextRange = getNextRange(caretsAndSelections, i);
-        while (nextRange != null && nextRange.getTo() >=  range.getFrom()) {
-          range = new Range<Integer>(min(nextRange.getFrom(), range.getFrom()), range.getTo());
-          nextRange = getNextRange(caretsAndSelections, i);
-          i++;
-        }
+        Direction direction = null;
         if (isCaret(range)) {
+          direction = Direction.RIGHT;
+        }
+        Range<Integer> nextRange = getNextRange(caretsAndSelections, i);
+        while (nextRange != null && nextRange.getTo() >= range.getFrom()) {
+          i++;
+          range = new Range<Integer>(min(nextRange.getFrom(), range.getFrom()), range.getTo());
+          if (direction == null && isCaret(nextRange)) {
+            if (nextRange.getFrom().equals(range.getFrom())) {
+              direction = Direction.LEFT;
+            }
+            else {
+              direction = Direction.RIGHT;
+            }
+          }
+          nextRange = getNextRange(caretsAndSelections, i);
+        }
+
+
+        if (isCaret(range)) {
+          selectionModel.removeSelection();
           caretModel.moveToOffset(range.getFrom());
         }
         else {
-          caretModel.moveToOffset(range.getFrom());
           selectionModel.setSelection(range.getFrom(), range.getTo());
+          setCaret(caretModel, range, direction);
         }
         executeHandler.run();
-        int afterAction = caretModel.getOffset();
-        caretModel.addAdditionalCaret(afterAction);
+        if (selectionModel.hasSelection()) {
+          caretModel.addAdditionalCaret(caretModel.getOffset());
+          selectionModel.addMultiSelection(selectionModel.getSelectionStart(), selectionModel.getSelectionEnd());
+        }
+        else {
+          caretModel.addAdditionalCaret(caretModel.getOffset());
+        }
       }
+    }
+  }
+
+  /* set caret on the right place so that shift+arrow work properly */
+  private static void setCaret(CaretModel caretModel, Range<Integer> range, Direction direction) {
+    if (direction == Direction.RIGHT) {
+      caretModel.moveToOffset(range.getTo());
+    }
+    else {
+      caretModel.moveToOffset(range.getFrom());
     }
   }
 
@@ -127,16 +154,36 @@ public class MultiEditAction extends AnAction {
     for (Integer offset : offsets) {
       merge.add(new Range<Integer>(offset, offset));
     }
+    Collections.sort(merge, RANGE_COMPARATOR);
     return merge;
   }
 
+  public static final Comparator<Range<Integer>> RANGE_COMPARATOR = new Comparator<Range<Integer>>() {
+    @Override
+    public int compare(Range<Integer> o1, Range<Integer> o2) {
+      final Integer to = o1.getTo();
+      final Integer to2 = o2.getTo();
+      final int i = to2.compareTo(to);
+      if (i == 0) {
+        final Integer from = o1.getFrom();
+        final Integer from2 = o2.getFrom();
+        //caret before selection
+        return from2.compareTo(from);
+      }
+      return i;
+    }
+  };
+
+  enum Direction {
+    LEFT, RIGHT
+  }
 
   private static List<Range<Integer>> getMultiSelects(Editor editor) {
     List<Range<Integer>> rangeHighlighters = new ArrayList<Range<Integer>>();
     final MarkupModel markupModel = editor.getMarkupModel();
     for (RangeHighlighter rangeHighlighter : markupModel.getAllHighlighters()) {
       if (rangeHighlighter.getLayer() == HighlighterLayer.MULTI_EDIT_SELECTION) {
-        rangeHighlighters.add(new Range(rangeHighlighter.getStartOffset(), rangeHighlighter.getEndOffset()));
+        rangeHighlighters.add(new Range<Integer>(rangeHighlighter.getStartOffset(), rangeHighlighter.getEndOffset()));
         markupModel.removeHighlighter(rangeHighlighter);
       }
     }

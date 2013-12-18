@@ -55,7 +55,6 @@ import com.intellij.openapi.editor.highlighter.HighlighterClient;
 import com.intellij.openapi.editor.impl.event.MarkupModelListener;
 import com.intellij.openapi.editor.impl.softwrap.SoftWrapAppliancePlaces;
 import com.intellij.openapi.editor.impl.softwrap.SoftWrapDrawingType;
-import com.intellij.openapi.editor.impl.softwrap.SoftWrapHelper;
 import com.intellij.openapi.editor.markup.*;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileEditor.ex.IdeDocumentHistory;
@@ -4015,12 +4014,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     }
     
     if (isMultiEditMode(e)) {
-      final TextAttributes textAttributes = getSelectionModel().getTextAttributes();
-      //TODO remove additional caret insde
-      getMarkupModel()
-        .addRangeHighlighter(getSelectionModel().getSelectionStart(), getSelectionModel().getSelectionEnd(), HighlighterLayer.MULTI_EDIT_SELECTION,
-                             textAttributes, HighlighterTargetArea.EXACT_RANGE);
-      getSelectionModel().setHasMultiSelection(true);
+      mySelectionModel.addMultiSelection(getSelectionModel().getSelectionStart(), getSelectionModel().getSelectionEnd());
     }
   }
 
