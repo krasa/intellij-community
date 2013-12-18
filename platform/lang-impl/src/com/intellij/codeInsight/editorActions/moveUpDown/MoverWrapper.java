@@ -45,6 +45,7 @@ class MoverWrapper {
   }
 
   public final void move(Editor editor, final PsiFile file) {
+    //return when one selection can be moved and other not.
     if (myInfo.toMove2 == null) {
       return;
     }

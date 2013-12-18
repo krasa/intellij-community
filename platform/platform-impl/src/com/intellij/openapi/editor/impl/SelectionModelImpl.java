@@ -894,12 +894,12 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
 
   @Override
   public void addMultiSelection(int selectionStart, int selectionEnd) {
-    //TODO removing old carets would be nice, also merging of selections so it can work like sublime
+    //TODO removing carets within selection would be nice
     final TextAttributes textAttributes = myEditor.getSelectionModel().getTextAttributes();
     myEditor.getMarkupModel()
       .addRangeHighlighter(selectionStart, selectionEnd,
                            HighlighterLayer.MULTI_EDIT_SELECTION, textAttributes, HighlighterTargetArea.EXACT_RANGE);
-    //we nned to add caret on the end or start of selection, so that shift+arrow works
+    //we need to add caret on the end or start of selection, so that shift+arrow works
     myEditor.getCaretModel().addAdditionalCaret(myEditor.getCaretModel().getOffset());
     myHasMultiSelection = true;
   }
