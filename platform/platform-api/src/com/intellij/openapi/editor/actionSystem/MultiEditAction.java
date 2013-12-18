@@ -56,7 +56,7 @@ public class MultiEditAction extends AnAction {
   }
 
 
-  public static void executeWithMultipleCursors(Runnable executeHandler, Editor editor, DataContext dataContext) {
+  public static void executeWithMultiEdit(Runnable executeHandler, Editor editor, DataContext dataContext) {
     //e.g. backspace workaround
     if (dataContext instanceof UserDataHolder) {
       final UserDataHolder userDataHolder = (UserDataHolder)dataContext;

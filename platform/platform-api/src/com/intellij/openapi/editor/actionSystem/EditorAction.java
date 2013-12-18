@@ -81,7 +81,7 @@ public abstract class EditorAction extends AnAction implements DumbAware {
       @Override
       public void run() {
         final DataContext projectAwareDataContext = getProjectAwareDataContext(editor, dataContext);
-        MultiEditAction.executeWithMultipleCursors(new Runnable() {
+        MultiEditAction.executeWithMultiEdit(new Runnable() {
           @Override
           public void run() {
             handler.execute(editor, projectAwareDataContext);

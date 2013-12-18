@@ -127,7 +127,7 @@ public class TypedAction {
           Document doc = myEditor.getDocument();
           doc.startGuardedBlockChecking();
           try {
-            MultiEditAction.executeWithMultipleCursors(new Runnable() {
+            MultiEditAction.executeWithMultiEdit(new Runnable() {
               @Override
               public void run() {
                 getHandler().execute(myEditor, myCharTyped, myDataContext);

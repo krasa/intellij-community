@@ -32,7 +32,7 @@ public class PreviousWordInDifferentHumpsModeWithSelectionAction  extends TextCo
   private static class Handler extends EditorActionHandler {
     @Override
     public void execute(Editor editor, DataContext dataContext) {
-      EditorActionUtil.moveCaretToPreviousWord(editor, dataContext, true, !editor.getSettings().isCamelWords());
+      EditorActionUtil.moveCaretToPreviousWord(editor, true, !editor.getSettings().isCamelWords());
     }
   }
 }

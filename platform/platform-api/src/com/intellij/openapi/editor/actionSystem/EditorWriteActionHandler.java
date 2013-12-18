@@ -51,7 +51,7 @@ public abstract class EditorWriteActionHandler extends EditorActionHandler {
 
         doc.startGuardedBlockChecking();
         try {
-          MultiEditAction.executeWithMultipleCursors(new Runnable() {
+          MultiEditAction.executeWithMultiEdit(new Runnable() {
             @Override
             public void run() {
               executeWriteAction(editor, dataContext);

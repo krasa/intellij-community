@@ -57,7 +57,7 @@ public abstract class LookupActionHandler extends EditorActionHandler {
       if (project != null) {
         LookupManager.getInstance(project).hideActiveLookup();
       }
-      MultiEditAction.executeWithMultipleCursors(new Runnable() {
+      MultiEditAction.executeWithMultiEdit(new Runnable() {
         @Override
         public void run() {
           myOriginalHandler.execute(editor, dataContext);
