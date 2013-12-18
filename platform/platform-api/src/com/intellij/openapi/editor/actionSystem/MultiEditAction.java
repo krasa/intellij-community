@@ -94,12 +94,7 @@ public class MultiEditAction extends AnAction {
           i++;
           range = new Range<Integer>(min(nextRange.getFrom(), range.getFrom()), range.getTo());
           if (direction == null && isCaret(nextRange)) {
-            if (nextRange.getFrom().equals(range.getFrom())) {
-              direction = Direction.LEFT;
-            }
-            else {
-              direction = Direction.RIGHT;
-            }
+            direction = determineDirection(range, nextRange);
           }
           nextRange = getNextRange(caretsAndSelections, i);
         }
@@ -126,13 +121,25 @@ public class MultiEditAction extends AnAction {
     }
   }
 
+  private static Direction determineDirection(Range<Integer> range, Range<Integer> nextRange) {
+    Direction direction = null;
+    final Integer caretOffset = nextRange.getFrom();
+    if (caretOffset.equals(range.getFrom())) {
+      direction = Direction.LEFT;
+    }
+    else if (caretOffset.equals(range.getTo())) {
+      direction = Direction.RIGHT;
+    }
+    return direction;
+  }
+
   /* move caret on the right place so that shift+arrow work properly */
   private static void moveCaretToOffset(CaretModel caretModel, Range<Integer> range, Direction direction) {
-    if (direction == Direction.RIGHT) {
-      caretModel.moveToOffset(range.getTo());
-    }
-    else {
+    if (direction == Direction.LEFT) {
       caretModel.moveToOffset(range.getFrom());
+    }
+    else {//default right
+      caretModel.moveToOffset(range.getTo());
     }
   }
 
