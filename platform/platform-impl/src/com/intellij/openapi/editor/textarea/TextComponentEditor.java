@@ -292,8 +292,4 @@ public class TextComponentEditor extends UserDataHolderBase implements Editor {
     return new EmptyIndentsModel();
   }
 
-  @Override
-  public void setMultiCaretsMode(boolean hasMultiCarets) {
-    throw new UnsupportedOperationException("Not implemented");
-  }
 }

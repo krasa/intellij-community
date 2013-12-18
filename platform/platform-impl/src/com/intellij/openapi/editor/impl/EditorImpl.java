@@ -169,7 +169,6 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
 
   private boolean myIsInsertMode = true;
 
-  private boolean myMultiCaretsMode = false;
   private final TIntObjectHashMap<CaretCursor> myAdditionalCarets = new TIntObjectHashMap<CaretCursor>();
 
   @NotNull private final CaretCursor myCaretCursor;
@@ -847,8 +846,8 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
       public void mouseClicked(EditorMouseEvent e) {
         final MouseEvent mouseEvent = e.getMouseEvent();
         if (!isMultiEditMode(mouseEvent)) {
-          getSelectionModel().removeMultiSelection();
-          getCaretModel().removeAdditionalCarets();
+          getSelectionModel().removeMultiSelections();
+          getCaretModel().removeMultiCarets();
         }
       }
     });
@@ -2917,13 +2916,14 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
   }
 
   private void paintAdditionalCarets(final Graphics g) {
-    if (!myMultiCaretsMode) {
+    if (!getCaretModel().hasMultiCarets()) {
       return;
     }
-    final Collection<Integer> offsets = myCaretModel.getAdditionalCaretsOffsets();
+    final Collection<Integer> offsets = myCaretModel.getMultiCaretsOffsets();
     if (offsets.isEmpty()) {
-      myMultiCaretsMode = false;
       myAdditionalCarets.clear();
+      //just for setting that flag to false
+      getCaretModel().removeMultiCarets();
     }
 
     for (Integer offset : offsets) {
@@ -6693,8 +6693,4 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     }
   }
 
-  @Override
-  public void setMultiCaretsMode(boolean multiCaretsMode) {
-    this.myMultiCaretsMode = multiCaretsMode;
-  }
 }

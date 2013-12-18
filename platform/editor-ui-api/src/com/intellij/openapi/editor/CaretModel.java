@@ -141,15 +141,15 @@ public interface CaretModel {
    */
   TextAttributes getTextAttributes();
 
-  void removeAdditionalCarets();
+  void removeMultiCarets();
 
-  boolean hasAdditionalCarets();
+  boolean hasMultiCarets();
 
-  void addOrRemoveAdditionalCaret(int offset);
+  void addOrRemoveMultiCaret(int offset);
 
-  void addAdditionalCaret(int offset);
+  void addMultiCaret(int offset);
 
-  Collection<Integer> getAdditionalCaretsOffsets();
+  Collection<Integer> getMultiCaretsOffsets();
 
-  Collection<Integer> getAdditionalCaretOffsetsAndRemoveThem();
+  Collection<Integer> getMultiCaretOffsetsAndRemoveThem();
 }

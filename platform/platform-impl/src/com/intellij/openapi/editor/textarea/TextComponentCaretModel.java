@@ -133,32 +133,32 @@ public class TextComponentCaretModel implements CaretModel {
   }
 
   @Override
-  public void removeAdditionalCarets() {
+  public void removeMultiCarets() {
     throw new UnsupportedOperationException("Not implemented");
   }
 
   @Override
-  public boolean hasAdditionalCarets() {
+  public boolean hasMultiCarets() {
     return false;
   }
 
   @Override
-  public void addOrRemoveAdditionalCaret(int offset) {
+  public void addOrRemoveMultiCaret(int offset) {
     throw new UnsupportedOperationException("Not implemented");
   }
 
   @Override
-  public void addAdditionalCaret(int offset) {
+  public void addMultiCaret(int offset) {
     throw new UnsupportedOperationException("Not implemented");
   }
 
   @Override
-  public Collection<Integer> getAdditionalCaretsOffsets() {
+  public Collection<Integer> getMultiCaretsOffsets() {
     return Collections.emptyList();
   }
 
   @Override
-  public Collection<Integer> getAdditionalCaretOffsetsAndRemoveThem() {
+  public Collection<Integer> getMultiCaretOffsetsAndRemoveThem() {
     return Collections.emptyList();
   }
 }

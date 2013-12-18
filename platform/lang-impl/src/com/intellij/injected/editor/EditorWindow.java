@@ -781,11 +781,6 @@ public class EditorWindow extends UserDataHolderBase implements EditorEx {
   }
 
   @Override
-  public void setMultiCaretsMode(boolean multiCaretsMode) {
-    
-  }
-
-  @Override
   public void setSoftWrapAppliancePlace(@NotNull SoftWrapAppliancePlaces place) {
     myDelegate.setSoftWrapAppliancePlace(place);
   }

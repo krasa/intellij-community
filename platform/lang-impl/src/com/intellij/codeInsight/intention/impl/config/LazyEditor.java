@@ -259,8 +259,4 @@ class LazyEditor extends UserDataHolderBase implements Editor {
     return getEditor().getIndentsModel();
   }
 
-  @Override
-  public void setMultiCaretsMode(boolean multiCaretsMode) {
-    
-  }
 }

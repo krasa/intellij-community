@@ -207,7 +207,7 @@ public class TextComponentSelectionModel implements SelectionModel {
   }
 
   @Override
-  public void removeMultiSelection() {
+  public void removeMultiSelections() {
     throw new UnsupportedOperationException("Not implemented");
   }
 }

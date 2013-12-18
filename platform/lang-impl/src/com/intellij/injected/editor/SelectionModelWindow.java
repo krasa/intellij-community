@@ -201,7 +201,7 @@ public class SelectionModelWindow implements SelectionModel {
   }
 
   @Override
-  public void removeMultiSelection() {
-    myHostModel.removeMultiSelection();
+  public void removeMultiSelections() {
+    myHostModel.removeMultiSelections();
   }
 }

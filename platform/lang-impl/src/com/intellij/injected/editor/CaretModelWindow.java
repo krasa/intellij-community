@@ -144,32 +144,32 @@ public class CaretModelWindow implements CaretModel {
   }
 
   @Override
-  public void removeAdditionalCarets() {
-    myDelegate.removeAdditionalCarets();
+  public void removeMultiCarets() {
+    myDelegate.removeMultiCarets();
   }
 
   @Override
-  public boolean hasAdditionalCarets() {
-    return myDelegate.hasAdditionalCarets();
+  public boolean hasMultiCarets() {
+    return myDelegate.hasMultiCarets();
   }
 
   @Override
-  public void addOrRemoveAdditionalCaret(int offset) {
-    myDelegate.addOrRemoveAdditionalCaret(offset);
+  public void addOrRemoveMultiCaret(int offset) {
+    myDelegate.addOrRemoveMultiCaret(offset);
   }
 
   @Override
-  public void addAdditionalCaret(int offset) {
-    myDelegate.addAdditionalCaret(offset);
+  public void addMultiCaret(int offset) {
+    myDelegate.addMultiCaret(offset);
   }
 
   @Override
-  public Collection<Integer> getAdditionalCaretsOffsets() {
-    return myDelegate.getAdditionalCaretsOffsets();
+  public Collection<Integer> getMultiCaretsOffsets() {
+    return myDelegate.getMultiCaretsOffsets();
   }
 
   @Override
-  public Collection<Integer> getAdditionalCaretOffsetsAndRemoveThem() {
-    return myDelegate.getAdditionalCaretOffsetsAndRemoveThem();
+  public Collection<Integer> getMultiCaretOffsetsAndRemoveThem() {
+    return myDelegate.getMultiCaretOffsetsAndRemoveThem();
   }
 }

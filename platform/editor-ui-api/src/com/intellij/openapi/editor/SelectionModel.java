@@ -255,5 +255,5 @@ public interface SelectionModel {
 
   void addMultiSelection(int selectionStart, int selectionEnd);
 
-  void removeMultiSelection();
+  void removeMultiSelections();
 }

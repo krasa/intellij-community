@@ -77,6 +77,7 @@ public class CaretModelImpl implements CaretModel, PrioritizedDocumentListener, 
   private RangeMarker savedBeforeBulkCaretMarker;
   private boolean myIgnoreWrongMoves = false;
   private boolean mySkipChangeRequests;
+  private boolean myHasMultiCarets;
 
   /**
    * We check that caret is located at the target offset at the end of {@link #moveToOffset(int, boolean)} method. However,
@@ -859,76 +860,71 @@ public class CaretModelImpl implements CaretModel, PrioritizedDocumentListener, 
       this.height = height;
     }
   }
-  
-  
+
   @Override
-  public  void removeAdditionalCarets() {
-     for (RangeHighlighter rangeHighlighter : myEditor.getMarkupModel().getAllHighlighters()) {
-       if (rangeHighlighter.getLayer() == HighlighterLayer.MULTI_EDIT_CARET) {
-         myEditor.getMarkupModel().removeHighlighter(rangeHighlighter);
-       }
-     }
-   }
- 
-   @Override
-   public  boolean hasAdditionalCarets() {
-     for (RangeHighlighter rangeHighlighter : myEditor.getMarkupModel().getAllHighlighters()) {
-       if (rangeHighlighter.getLayer() == HighlighterLayer.MULTI_EDIT_CARET) {
-         return true;
-       }
-     }
-     return false;
-   }
- 
-   @Override
-   public  void addOrRemoveAdditionalCaret(int offset) {
-     final RangeHighlighter[] allHighlighters = myEditor.getMarkupModel().getAllHighlighters();
-     boolean existed = false;
-     for (RangeHighlighter highlighter : allHighlighters) {
-       if (highlighter.getLayer() == HighlighterLayer.MULTI_EDIT_CARET && offset == highlighter.getStartOffset()) {
-         existed = true;
-         myEditor.getMarkupModel().removeHighlighter(highlighter);
-       }
-     }
-     if (!existed) {
-       addAdditionalCaret(offset);
-       myEditor.setMultiCaretsMode(true);
-     }
-   }
- 
-   @Override
-   public  void addAdditionalCaret(int offset) {
-     if (myEditor.getDocument().getTextLength() < offset) {
-       return;
-     }
-     myEditor.getMarkupModel()
-       .addRangeHighlighter(offset, offset, HighlighterLayer.MULTI_EDIT_CARET, TEXT_ATTRIBUTES, HighlighterTargetArea.EXACT_RANGE);
-     myEditor.setMultiCaretsMode(true);
-   }
- 
-   @Override
-   public  Collection<Integer> getAdditionalCaretsOffsets() {
-     final RangeHighlighter[] allHighlighters = myEditor.getMarkupModel().getAllHighlighters();
-     Set<Integer> offsets = new HashSet<Integer>();
-     for (RangeHighlighter highlighter : allHighlighters) {
-       if (highlighter.getLayer() == HighlighterLayer.MULTI_EDIT_CARET) {
-         offsets.add(highlighter.getStartOffset());
-       }
-     }
-     return offsets;
-   }
- 
-   @Override
-   public  Collection<Integer> getAdditionalCaretOffsetsAndRemoveThem() {
-     final RangeHighlighter[] allHighlighters = myEditor.getMarkupModel().getAllHighlighters();
-     Set<Integer> offsets = new HashSet<Integer>();
-     for (RangeHighlighter highlighter : allHighlighters) {
-       if (highlighter.getLayer() == HighlighterLayer.MULTI_EDIT_CARET) {
-         offsets.add(highlighter.getStartOffset());
-         myEditor.getMarkupModel().removeHighlighter(highlighter);
-       }
-     }
-     return offsets;
-   }
+  public void removeMultiCarets() {
+    for (RangeHighlighter rangeHighlighter : myEditor.getMarkupModel().getAllHighlighters()) {
+      if (rangeHighlighter.getLayer() == HighlighterLayer.MULTI_EDIT_CARET) {
+        myEditor.getMarkupModel().removeHighlighter(rangeHighlighter);
+      }
+    }
+    myHasMultiCarets = false;
+  }
+
+  @Override
+  public boolean hasMultiCarets() {
+    return myHasMultiCarets;
+  }
+
+  @Override
+  public void addOrRemoveMultiCaret(int offset) {
+    final RangeHighlighter[] allHighlighters = myEditor.getMarkupModel().getAllHighlighters();
+    boolean existed = false;
+    for (RangeHighlighter highlighter : allHighlighters) {
+      if (highlighter.getLayer() == HighlighterLayer.MULTI_EDIT_CARET && offset == highlighter.getStartOffset()) {
+        existed = true;
+        myEditor.getMarkupModel().removeHighlighter(highlighter);
+      }
+    }
+    if (!existed) {
+      addMultiCaret(offset);
+    }
+  }
+
+  @Override
+  public void addMultiCaret(int offset) {
+    if (myEditor.getDocument().getTextLength() < offset) {
+      return;
+    }
+    myEditor.getMarkupModel()
+      .addRangeHighlighter(offset, offset, HighlighterLayer.MULTI_EDIT_CARET, TEXT_ATTRIBUTES, HighlighterTargetArea.EXACT_RANGE);
+    myHasMultiCarets = true;
+  }
+
+  @Override
+  public Collection<Integer> getMultiCaretsOffsets() {
+    final RangeHighlighter[] allHighlighters = myEditor.getMarkupModel().getAllHighlighters();
+    Set<Integer> offsets = new HashSet<Integer>();
+    for (RangeHighlighter highlighter : allHighlighters) {
+      if (highlighter.getLayer() == HighlighterLayer.MULTI_EDIT_CARET) {
+        offsets.add(highlighter.getStartOffset());
+      }
+    }
+    return offsets;
+  }
+
+  @Override
+  public Collection<Integer> getMultiCaretOffsetsAndRemoveThem() {
+    final RangeHighlighter[] allHighlighters = myEditor.getMarkupModel().getAllHighlighters();
+    Set<Integer> offsets = new HashSet<Integer>();
+    for (RangeHighlighter highlighter : allHighlighters) {
+      if (highlighter.getLayer() == HighlighterLayer.MULTI_EDIT_CARET) {
+        offsets.add(highlighter.getStartOffset());
+        myEditor.getMarkupModel().removeHighlighter(highlighter);
+      }
+    }
+    myHasMultiCarets = false;
+    return offsets;
+  }
   
 }

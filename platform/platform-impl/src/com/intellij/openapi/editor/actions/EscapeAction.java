@@ -43,15 +43,15 @@ public class EscapeAction extends EditorAction {
       }
 
       editor.getSelectionModel().removeSelection();
-      editor.getSelectionModel().removeMultiSelection();
-      editor.getCaretModel().removeAdditionalCarets();
+      editor.getSelectionModel().removeMultiSelections();
+      editor.getCaretModel().removeMultiCarets();
     }
 
     @Override
     public boolean isEnabled(Editor editor, DataContext dataContext) {
       SelectionModel selectionModel = editor.getSelectionModel();
       return //PlatformDataKeys.IS_MODAL_CONTEXT.getData(dataContext) != Boolean.TRUE &&
-        (selectionModel.hasSelection() || selectionModel.hasBlockSelection() || editor.getCaretModel().hasAdditionalCarets());
+        (selectionModel.hasSelection() || selectionModel.hasBlockSelection() || editor.getCaretModel().hasMultiCarets());
     }
   }
 }

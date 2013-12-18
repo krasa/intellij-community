@@ -52,7 +52,7 @@ public class MultiEditAction extends AnAction {
       return;
     }
     final CaretModel caretModel = editor.getCaretModel();
-    caretModel.addOrRemoveAdditionalCaret(caretModel.getOffset());
+    caretModel.addOrRemoveMultiCaret(caretModel.getOffset());
   }
 
 
@@ -74,7 +74,7 @@ public class MultiEditAction extends AnAction {
 
 
     final List<Range<Integer>> multiSelects = getMultiSelectsAndRemoveThem(editor);
-    List<Integer> carets = new ArrayList<Integer>(caretModel.getAdditionalCaretOffsetsAndRemoveThem());
+    List<Integer> carets = new ArrayList<Integer>(caretModel.getMultiCaretOffsetsAndRemoveThem());
 
     if (carets.isEmpty() && multiSelects.isEmpty()) {
       executeHandler.run();
@@ -111,11 +111,11 @@ public class MultiEditAction extends AnAction {
         executeHandler.run();
 
         if (selectionModel.hasSelection()) {
-          caretModel.addAdditionalCaret(caretModel.getOffset());
+          caretModel.addMultiCaret(caretModel.getOffset());
           selectionModel.addMultiSelection(selectionModel.getSelectionStart(), selectionModel.getSelectionEnd());
         }
         else {
-          caretModel.addAdditionalCaret(caretModel.getOffset());
+          caretModel.addMultiCaret(caretModel.getOffset());
         }
       }
     }

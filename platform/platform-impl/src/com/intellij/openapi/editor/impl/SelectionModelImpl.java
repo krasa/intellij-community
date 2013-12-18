@@ -36,18 +36,16 @@ import com.intellij.openapi.editor.colors.EditorColorsScheme;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.editor.event.SelectionEvent;
 import com.intellij.openapi.editor.event.SelectionListener;
-import com.intellij.openapi.editor.ex.DocumentEx;
-import com.intellij.openapi.editor.ex.FoldingModelEx;
-import com.intellij.openapi.editor.ex.PrioritizedDocumentListener;
+import com.intellij.openapi.editor.ex.*;
 import com.intellij.openapi.editor.ex.util.EditorUtil;
-import com.intellij.openapi.editor.markup.HighlighterLayer;
-import com.intellij.openapi.editor.markup.HighlighterTargetArea;
-import com.intellij.openapi.editor.markup.RangeHighlighter;
-import com.intellij.openapi.editor.markup.TextAttributes;
+import com.intellij.openapi.editor.markup.*;
 import com.intellij.openapi.ide.CopyPasteManager;
+import com.intellij.openapi.util.Condition;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.util.ArrayUtil;
+import com.intellij.util.FilteringProcessor;
+import com.intellij.util.Processor;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.ui.EmptyClipboardOwner;
 import gnu.trove.TIntArrayList;
@@ -57,7 +55,11 @@ import org.jetbrains.annotations.Nullable;
 import java.awt.*;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
+import java.util.ArrayList;
 import java.util.List;
+
+import static java.lang.Math.max;
+import static java.lang.Math.min;
 
 public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentListener {
   private static final Logger LOG = Logger.getInstance("#com.intellij.openapi.editor.impl.SelectionModelImpl");
@@ -464,8 +466,8 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
   }
 
   private void repaintBySelectionChange(int oldSelectionStart, int startOffset, int oldSelectionEnd, int endOffset) {
-    myEditor.repaint(Math.min(oldSelectionStart, startOffset), Math.max(oldSelectionStart, startOffset));
-    myEditor.repaint(Math.min(oldSelectionEnd, endOffset), Math.max(oldSelectionEnd, endOffset));
+    myEditor.repaint(min(oldSelectionStart, startOffset), max(oldSelectionStart, startOffset));
+    myEditor.repaint(min(oldSelectionEnd, endOffset), max(oldSelectionEnd, endOffset));
   }
 
   @Override
@@ -494,7 +496,7 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
       newEndLine = t;
     }
 
-    myEditor.repaintLines(Math.min(oldStartLine, newStartLine), Math.max(newEndLine, oldEndLine));
+    myEditor.repaintLines(min(oldStartLine, newStartLine), max(newEndLine, oldEndLine));
 
     final int[] oldStarts = getBlockSelectionStarts();
     final int[] oldEnds = getBlockSelectionEnds();
@@ -605,10 +607,10 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
   private void recalculateBlockOffsets() {
     TIntArrayList startOffsets = new TIntArrayList();
     TIntArrayList endOffsets = new TIntArrayList();
-    final int startLine = Math.min(myBlockStart.line, myBlockEnd.line);
-    final int endLine = Math.max(myBlockStart.line, myBlockEnd.line);
-    final int startColumn = Math.min(myBlockStart.column, myBlockEnd.column);
-    final int endColumn = Math.max(myBlockStart.column, myBlockEnd.column);
+    final int startLine = min(myBlockStart.line, myBlockEnd.line);
+    final int endLine = max(myBlockStart.line, myBlockEnd.line);
+    final int startColumn = min(myBlockStart.column, myBlockEnd.column);
+    final int endColumn = max(myBlockStart.column, myBlockEnd.column);
     FoldingModelImpl foldingModel = myEditor.getFoldingModel();
     DocumentEx document = myEditor.getDocument();
     boolean insideFoldRegion = false;
@@ -627,20 +629,20 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
       }
       else if (startInsideFold && endInsideFold) {
         if (insideFoldRegion) {
-          startOffsets.add(Math.max(document.getLineStartOffset(line), startRegion.getStartOffset()));
-          endOffsets.add(Math.min(document.getLineEndOffset(line), endRegion.getEndOffset()));
+          startOffsets.add(max(document.getLineStartOffset(line), startRegion.getStartOffset()));
+          endOffsets.add(min(document.getLineEndOffset(line), endRegion.getEndOffset()));
         }
       }
       else if (startInsideFold && !endInsideFold) {
         if (startRegion.getEndOffset() < endOffset) {
-          startOffsets.add(Math.max(document.getLineStartOffset(line), startRegion.getStartOffset()));
+          startOffsets.add(max(document.getLineStartOffset(line), startRegion.getStartOffset()));
           endOffsets.add(endOffset);
         }
         insideFoldRegion = false;
       }
       else {
         startOffsets.add(startOffset);
-        endOffsets.add(Math.min(document.getLineEndOffset(line), endRegion.getEndOffset()));
+        endOffsets.add(min(document.getLineEndOffset(line), endRegion.getEndOffset()));
         insideFoldRegion = true;
       }
     }
@@ -894,18 +896,62 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
 
   @Override
   public void addMultiSelection(int selectionStart, int selectionEnd) {
-    //TODO removing carets within selection would be nice
-    final TextAttributes textAttributes = myEditor.getSelectionModel().getTextAttributes();
-    myEditor.getMarkupModel()
-      .addRangeHighlighter(selectionStart, selectionEnd,
-                           HighlighterLayer.MULTI_EDIT_SELECTION, textAttributes, HighlighterTargetArea.EXACT_RANGE);
+    boolean putCursorOnStart = selectionStart == myEditor.getCaretModel().getOffset();
+    final EditorMarkupModelImpl markupModel = (EditorMarkupModelImpl)myEditor.getMarkupModel();
+
+    final RangeHighlighterExProcessor processor = processOverlappingHighlighters(selectionStart, selectionEnd);
+
+    final int mergedStartOffset = min(selectionStart, processor.startOffset);
+    final int mergedEndOffset = max(selectionEnd, processor.endOffset);
+    markupModel.addRangeHighlighter(mergedStartOffset, mergedEndOffset, HighlighterLayer.MULTI_EDIT_SELECTION, getTextAttributes(),
+                                    HighlighterTargetArea.EXACT_RANGE);
+
+    for (RangeHighlighterEx rangeHighlighterEx : processor.myList) {
+      markupModel.removeHighlighter(rangeHighlighterEx);
+    } 
+
     //we need to add caret on the end or start of selection, so that shift+arrow works
-    myEditor.getCaretModel().addAdditionalCaret(myEditor.getCaretModel().getOffset());
+    myEditor.getCaretModel().addMultiCaret(putCursorOnStart ? mergedStartOffset : mergedEndOffset);
+    myEditor.getCaretModel().moveToOffset(putCursorOnStart ? mergedStartOffset : mergedEndOffset);
     myHasMultiSelection = true;
+  }
+
+  private RangeHighlighterExProcessor processOverlappingHighlighters(int selectionStart, int selectionEnd) {
+    final RangeHighlighterExProcessor processor = new RangeHighlighterExProcessor(selectionStart, selectionEnd);
+    final Condition<RangeHighlighterEx> condition = new Condition<RangeHighlighterEx>() {
+      @Override
+      public boolean value(RangeHighlighterEx rangeHighlighterEx) {
+        return rangeHighlighterEx.getLayer() == HighlighterLayer.MULTI_EDIT_SELECTION ||
+               rangeHighlighterEx.getLayer() == HighlighterLayer.MULTI_EDIT_CARET;
+      }
+    };
+    final FilteringProcessor<RangeHighlighterEx> filteringProcessor = new FilteringProcessor<RangeHighlighterEx>(condition, processor);
+    final EditorMarkupModelImpl markupModel = (EditorMarkupModelImpl)myEditor.getMarkupModel();
+    markupModel.processRangeHighlightersOverlappingWith(selectionStart, selectionEnd, filteringProcessor);
+    return processor;
+  }
+
+  private static class RangeHighlighterExProcessor implements Processor<RangeHighlighterEx> {
+    int startOffset;
+    int endOffset;
+    List<RangeHighlighterEx> myList = new ArrayList<RangeHighlighterEx>();
+
+    private RangeHighlighterExProcessor(int startOffset, int endOffset) {
+      this.startOffset = startOffset;
+      this.endOffset = endOffset;
+    }
+
+    @Override
+    public boolean process(RangeHighlighterEx rangeHighlighterEx) {
+      myList.add(rangeHighlighterEx);
+      startOffset = min(startOffset, rangeHighlighterEx.getStartOffset());
+      endOffset = max(endOffset, rangeHighlighterEx.getEndOffset());
+      return true;
+    }
   }
   
   @Override
-  public void removeMultiSelection() {
+  public void removeMultiSelections() {
     if (myHasMultiSelection) {
       for (RangeHighlighter rangeHighlighter : myEditor.getMarkupModel().getAllHighlighters()) {
         if (rangeHighlighter.getLayer() == HighlighterLayer.MULTI_EDIT_SELECTION) {
