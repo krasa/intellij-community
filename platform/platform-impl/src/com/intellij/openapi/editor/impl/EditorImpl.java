@@ -432,18 +432,8 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
 
       @Override
       public void recalculationEnds() {
-        if (myCaretModel.isUpToDate()
-            // There is a possible sequence of actions:
-            //   1. Caret is inside expanded fold region;
-            //   2. The region is collapsed;
-            //   3. Soft wrap model is notified on fold model state change;
-            //   4. This method is called on soft wrap recalculation end;
-            //   5. Caret is moved to the current offset (which is inside fold region);
-            //   6. The fold region is automatically expanded;
-            // That's why we don't refresh caret position if it's inside collapsed fold region.
-            && myFoldingModel.getCollapsedRegionAtOffset(myCaretModel.getOffset()) == null)
-        {
-          myCaretModel.moveToOffset(myCaretModel.getOffset());
+        if (myCaretModel.isUpToDate()) {
+          myCaretModel.updateVisualPosition();
           myScrollingModel.scrollToCaret(ScrollType.RELATIVE);
         }
       }
@@ -1653,6 +1643,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
 
     stopOptimizedScrolling();
     mySelectionModel.removeBlockSelection();
+    setMouseSelectionState(MOUSE_SELECTION_STATE_NONE);
 
     mySizeContainer.reset();
     validateSize();
@@ -1687,6 +1678,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     clearTextWidthCache();
     stopOptimizedScrolling();
     mySelectionModel.removeBlockSelection();
+    setMouseSelectionState(MOUSE_SELECTION_STATE_NONE);
 
     // We assume that size container is already notified with the visual line widths during soft wraps processing
     if (!mySoftWrapModel.isSoftWrappingEnabled()) {
@@ -2199,7 +2191,6 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     myLastBackgroundPosition = null;
     myLastBackgroundColor = null;
 
-    boolean locateBeforeSoftWrap = !SoftWrapHelper.isCaretAfterSoftWrap(this);
     int start = clipStartOffset;
     int end = clipEndOffset;
     if (!myPurePaintingMode) {
@@ -2349,9 +2340,6 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
       // Repaint gutter at all space that is located after active clip in order to ensure that line numbers are correctly redrawn
       // in accordance with the newly introduced soft wrap(s).
       myGutterComponent.repaint(0, clip.y, myGutterComponent.getWidth(), myGutterComponent.getHeight() - clip.y);
-
-      // Ask caret model to update visual caret position.
-      getCaretModel().moveToOffset(getCaretModel().getOffset(), locateBeforeSoftWrap);
     }
   }
 
