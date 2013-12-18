@@ -57,7 +57,7 @@ public class MultiEditAction extends AnAction {
 
 
   public static void executeWithMultiEdit(Runnable executeHandler, Editor editor, DataContext dataContext) {
-    //e.g. backspace workaround
+    //running that multiEdit logic twice is bad.
     if (dataContext instanceof UserDataHolder) {
       final UserDataHolder userDataHolder = (UserDataHolder)dataContext;
       if (userDataHolder.getUserData(ALREADY_PROCESSING) != null) {
@@ -68,21 +68,19 @@ public class MultiEditAction extends AnAction {
         userDataHolder.putUserData(ALREADY_PROCESSING, "1");
       }
     }
+
     final SelectionModel selectionModel = editor.getSelectionModel();
     CaretModel caretModel = editor.getCaretModel();
 
 
-    final List<Range<Integer>> multiSelects = getMultiSelects(editor);
-    List<Integer> offsets = new ArrayList<Integer>(caretModel.getAdditionalCaretOffsetsAndRemoveThem());
+    final List<Range<Integer>> multiSelects = getMultiSelectsAndRemoveThem(editor);
+    List<Integer> carets = new ArrayList<Integer>(caretModel.getAdditionalCaretOffsetsAndRemoveThem());
 
-    if (offsets.isEmpty() && multiSelects.isEmpty()) {
+    if (carets.isEmpty() && multiSelects.isEmpty()) {
       executeHandler.run();
     }
     else {
-      if (selectionModel.hasBlockSelection()) {
-        selectionModel.removeBlockSelection();
-      }
-      final List<Range<Integer>> caretsAndSelections = merge(offsets, multiSelects);
+      final List<Range<Integer>> caretsAndSelections = merge(carets, multiSelects);
 
       for (int i = 0; i < caretsAndSelections.size(); i++) {
         Range<Integer> range = caretsAndSelections.get(i);
@@ -90,6 +88,7 @@ public class MultiEditAction extends AnAction {
         if (isCaret(range)) {
           direction = Direction.RIGHT;
         }
+        //merge overlapping selections and carets
         Range<Integer> nextRange = getNextRange(caretsAndSelections, i);
         while (nextRange != null && nextRange.getTo() >= range.getFrom()) {
           i++;
@@ -105,16 +104,17 @@ public class MultiEditAction extends AnAction {
           nextRange = getNextRange(caretsAndSelections, i);
         }
 
-
         if (isCaret(range)) {
           selectionModel.removeSelection();
           caretModel.moveToOffset(range.getFrom());
         }
         else {
           selectionModel.setSelection(range.getFrom(), range.getTo());
-          setCaret(caretModel, range, direction);
+          moveCaretToOffset(caretModel, range, direction);
         }
+
         executeHandler.run();
+
         if (selectionModel.hasSelection()) {
           caretModel.addAdditionalCaret(caretModel.getOffset());
           selectionModel.addMultiSelection(selectionModel.getSelectionStart(), selectionModel.getSelectionEnd());
@@ -126,8 +126,8 @@ public class MultiEditAction extends AnAction {
     }
   }
 
-  /* set caret on the right place so that shift+arrow work properly */
-  private static void setCaret(CaretModel caretModel, Range<Integer> range, Direction direction) {
+  /* move caret on the right place so that shift+arrow work properly */
+  private static void moveCaretToOffset(CaretModel caretModel, Range<Integer> range, Direction direction) {
     if (direction == Direction.RIGHT) {
       caretModel.moveToOffset(range.getTo());
     }
@@ -148,11 +148,11 @@ public class MultiEditAction extends AnAction {
     return caretsOrSelection.getFrom().equals(caretsOrSelection.getTo());
   }
 
-  private static List<Range<Integer>> merge(List<Integer> offsets, List<Range<Integer>> caretModel) {
-    final ArrayList<Range<Integer>> merge = new ArrayList<Range<Integer>>(offsets.size() + caretModel.size());
+  private static List<Range<Integer>> merge(List<Integer> carets, List<Range<Integer>> caretModel) {
+    final ArrayList<Range<Integer>> merge = new ArrayList<Range<Integer>>(carets.size() + caretModel.size());
     merge.addAll(caretModel);
-    for (Integer offset : offsets) {
-      merge.add(new Range<Integer>(offset, offset));
+    for (Integer caretOffset : carets) {
+      merge.add(new Range<Integer>(caretOffset, caretOffset));
     }
     Collections.sort(merge, RANGE_COMPARATOR);
     return merge;
@@ -178,7 +178,7 @@ public class MultiEditAction extends AnAction {
     LEFT, RIGHT
   }
 
-  private static List<Range<Integer>> getMultiSelects(Editor editor) {
+  private static List<Range<Integer>> getMultiSelectsAndRemoveThem(Editor editor) {
     List<Range<Integer>> rangeHighlighters = new ArrayList<Range<Integer>>();
     final MarkupModel markupModel = editor.getMarkupModel();
     for (RangeHighlighter rangeHighlighter : markupModel.getAllHighlighters()) {
