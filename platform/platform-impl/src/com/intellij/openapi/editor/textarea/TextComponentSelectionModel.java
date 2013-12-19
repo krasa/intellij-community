@@ -26,10 +26,12 @@ import com.intellij.openapi.editor.actionSystem.EditorActionManager;
 import com.intellij.openapi.editor.event.SelectionListener;
 import com.intellij.openapi.editor.impl.SelectionModelImpl;
 import com.intellij.openapi.editor.markup.TextAttributes;
+import com.intellij.util.Range;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.text.JTextComponent;
+import java.util.List;
 
 /**
  * @author yole
@@ -208,6 +210,11 @@ public class TextComponentSelectionModel implements SelectionModel {
 
   @Override
   public void removeMultiSelections() {
+    throw new UnsupportedOperationException("Not implemented");
+  }
+
+  @Override
+  public List<Range<Integer>> getMultiSelectionsAndRemoveThem() {
     throw new UnsupportedOperationException("Not implemented");
   }
 }

@@ -46,6 +46,7 @@ import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.util.ArrayUtil;
 import com.intellij.util.FilteringProcessor;
 import com.intellij.util.Processor;
+import com.intellij.util.Range;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.ui.EmptyClipboardOwner;
 import gnu.trove.TIntArrayList;
@@ -961,8 +962,20 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
       myHasMultiSelection = false;
     }
   }
-  
 
+  @Override
+  public List<Range<Integer>> getMultiSelectionsAndRemoveThem() {
+    List<Range<Integer>> selections = new ArrayList<Range<Integer>>();
+    final MarkupModel markupModel = myEditor.getMarkupModel();
+    for (RangeHighlighter rangeHighlighter : markupModel.getAllHighlighters()) {
+      if (rangeHighlighter.getLayer() == HighlighterLayer.MULTI_EDIT_SELECTION) {
+        selections.add(new Range<Integer>(rangeHighlighter.getStartOffset(), rangeHighlighter.getEndOffset()));
+        markupModel.removeHighlighter(rangeHighlighter);
+      }
+    }
+    return selections;
+  }
+  
   public void reinitSettings() {
     myTextAttributes = null;
   }

@@ -17,8 +17,11 @@ package com.intellij.openapi.editor;
 
 import com.intellij.openapi.editor.event.SelectionListener;
 import com.intellij.openapi.editor.markup.TextAttributes;
+import com.intellij.util.Range;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
 
 /**
  * Provides services for selecting text in the IDEA text editor and retrieving information
@@ -256,4 +259,6 @@ public interface SelectionModel {
   void addMultiSelection(int selectionStart, int selectionEnd);
 
   void removeMultiSelections();
+
+  List<Range<Integer>> getMultiSelectionsAndRemoveThem();
 }

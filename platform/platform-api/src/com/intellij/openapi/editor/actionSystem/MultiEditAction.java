@@ -22,9 +22,6 @@ import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.editor.CaretModel;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.SelectionModel;
-import com.intellij.openapi.editor.markup.HighlighterLayer;
-import com.intellij.openapi.editor.markup.MarkupModel;
-import com.intellij.openapi.editor.markup.RangeHighlighter;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.UserDataHolder;
 import com.intellij.util.Range;
@@ -73,7 +70,7 @@ public class MultiEditAction extends AnAction {
     CaretModel caretModel = editor.getCaretModel();
 
 
-    final List<Range<Integer>> multiSelects = getMultiSelectsAndRemoveThem(editor);
+    final List<Range<Integer>> multiSelects = selectionModel.getMultiSelectionsAndRemoveThem();
     List<Integer> carets = new ArrayList<Integer>(caretModel.getMultiCaretOffsetsAndRemoveThem());
 
     if (carets.isEmpty() && multiSelects.isEmpty()) {
@@ -183,18 +180,6 @@ public class MultiEditAction extends AnAction {
 
   enum Direction {
     LEFT, RIGHT
-  }
-
-  private static List<Range<Integer>> getMultiSelectsAndRemoveThem(Editor editor) {
-    List<Range<Integer>> rangeHighlighters = new ArrayList<Range<Integer>>();
-    final MarkupModel markupModel = editor.getMarkupModel();
-    for (RangeHighlighter rangeHighlighter : markupModel.getAllHighlighters()) {
-      if (rangeHighlighter.getLayer() == HighlighterLayer.MULTI_EDIT_SELECTION) {
-        rangeHighlighters.add(new Range<Integer>(rangeHighlighter.getStartOffset(), rangeHighlighter.getEndOffset()));
-        markupModel.removeHighlighter(rangeHighlighter);
-      }
-    }
-    return rangeHighlighters;
   }
 
 
