@@ -131,6 +131,8 @@ import java.util.List;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import static javax.swing.SwingUtilities.isLeftMouseButton;
+
 public final class EditorImpl extends UserDataHolderBase implements EditorEx, HighlighterClient, Queryable, Dumpable {
   private static final boolean isOracleRetina = UIUtil.isRetina() && SystemInfo.isOracleJvm;
   private static final int MIN_FONT_SIZE = 8;
@@ -3985,10 +3987,6 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
       myGutterComponent.mouseReleased(e);
     }
 
-    if (getMouseEventArea(e) != EditorMouseEventArea.EDITING_AREA || e.getY() < 0 || e.getX() < 0) {
-      return;
-    }
-
 //    if (myMousePressedInsideSelection) getSelectionModel().removeSelection();
     final FoldRegion region = getFoldingModel().getFoldingPlaceholderAt(e.getPoint());
     if (e.getX() >= 0 && e.getY() >= 0 && region != null && region == myMouseSelectedRegion) {
@@ -4011,9 +4009,15 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     if (myMousePressedEvent != null && myMousePressedEvent.getClickCount() == 1 && myMousePressedInsideSelection
         && !myMousePressedEvent.isShiftDown() && !myMousePressedEvent.isPopupTrigger()) {
       getSelectionModel().removeSelection();
+    } else if (isMultiEditMode(e) && getSelectionModel().hasBlockSelection()) {
+      final int[] blockSelectionStarts = getSelectionModel().getBlockSelectionStarts();
+      final int[] blockSelectionEnds = getSelectionModel().getBlockSelectionEnds();
+      mySelectionModel.removeBlockSelection();
+      for (int i = 0; i < blockSelectionStarts.length; i++) {
+        mySelectionModel.addMultiSelection(blockSelectionStarts[i], blockSelectionEnds[i]);
+      }
     }
-    
-    if (isMultiEditMode(e)) {
+    else if (isMultiEditMode(e)) {
       mySelectionModel.addMultiSelection(getSelectionModel().getSelectionStart(), getSelectionModel().getSelectionEnd());
     }
   }
@@ -4182,7 +4186,8 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
         selectionModel.setSelection(oldSelectionStart, newCaretOffset);
       }
       else {
-        if (isColumnMode() || (e.isAltDown() && !e.isShiftDown())) {
+        //#isMiddleMouseButton do not work properly, therefor !isLeftMouseButton(e)
+        if (isColumnMode() || (e.isAltDown() && !e.isShiftDown()) || (isMultiEditMode(e) && !isLeftMouseButton(e))) {
           final LogicalPosition blockStart = selectionModel.hasBlockSelection() ? selectionModel.getBlockStart() : oldLogicalCaret;
           selectionModel.setBlockSelection(blockStart, getCaretModel().getLogicalPosition());
         }

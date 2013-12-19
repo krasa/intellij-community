@@ -904,16 +904,22 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
 
     final int mergedStartOffset = min(selectionStart, processor.startOffset);
     final int mergedEndOffset = max(selectionEnd, processor.endOffset);
-    markupModel.addRangeHighlighter(mergedStartOffset, mergedEndOffset, HighlighterLayer.MULTI_EDIT_SELECTION, getTextAttributes(),
-                                    HighlighterTargetArea.EXACT_RANGE);
-
+    final RangeHighlighter rangeHighlighter = markupModel
+      .addRangeHighlighter(mergedStartOffset, mergedEndOffset, HighlighterLayer.MULTI_EDIT_SELECTION, getTextAttributes(),
+                           HighlighterTargetArea.EXACT_RANGE);
+   
     for (RangeHighlighterEx rangeHighlighterEx : processor.myList) {
       markupModel.removeHighlighter(rangeHighlighterEx);
     } 
 
-    //we need to add caret on the end or start of selection, so that shift+arrow works
-    myEditor.getCaretModel().addMultiCaret(putCursorOnStart ? mergedStartOffset : mergedEndOffset);
-    myEditor.getCaretModel().moveToOffset(putCursorOnStart ? mergedStartOffset : mergedEndOffset);
+    if (rangeHighlighter.getStartOffset() == rangeHighlighter.getEndOffset()) {
+      markupModel.removeHighlighter(rangeHighlighter);
+    }
+    else {
+      //we need to add caret on the end or start of selection, so that shift+arrow works
+      myEditor.getCaretModel().addMultiCaret(putCursorOnStart ? mergedStartOffset : mergedEndOffset);
+      myEditor.getCaretModel().moveToOffset(putCursorOnStart ? mergedStartOffset : mergedEndOffset);
+    } 
     myHasMultiSelection = true;
   }
 
