@@ -4038,8 +4038,11 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     else if (isMultiEditMode(e)) {
       final boolean putCursorOnStart = getSelectionModel().getSelectionStart() == getCaretModel().getOffset();
       final SelectionModel.Direction direction = SelectionModel.Direction.getDirection(putCursorOnStart);
-      mySelectionModel.addMultiSelection(getSelectionModel().getSelectionStart(), getSelectionModel().getSelectionEnd(), direction,
-                                         true);
+      mySelectionModel.addMultiSelection(getSelectionModel().getSelectionStart(), getSelectionModel().getSelectionEnd(), direction, true);
+    }
+    else {
+      getSelectionModel().removeMultiSelections();
+      getCaretModel().removeMultiCarets();
     }
   }
 
