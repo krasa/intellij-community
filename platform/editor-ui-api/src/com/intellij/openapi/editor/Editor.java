@@ -21,6 +21,7 @@ import com.intellij.openapi.editor.event.EditorMouseListener;
 import com.intellij.openapi.editor.event.EditorMouseMotionListener;
 import com.intellij.openapi.editor.markup.MarkupModel;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.UserDataHolder;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
@@ -39,6 +40,7 @@ import java.awt.event.MouseEvent;
  */
 public interface Editor extends UserDataHolder {
   Editor[] EMPTY_ARRAY = new Editor[0];
+  Key<Object> SHOWING_LOOKUP = Key.create("SHOWING_LOOKUP");
 
   /**
    * Returns the document edited or viewed in the editor.

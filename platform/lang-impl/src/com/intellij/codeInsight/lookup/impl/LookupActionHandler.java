@@ -57,6 +57,7 @@ public abstract class LookupActionHandler extends EditorActionHandler {
       if (project != null) {
         LookupManager.getInstance(project).hideActiveLookup();
       }
+      //TODO maybe remove it?
       MultiEditAction.executeWithMultiEdit(new Runnable() {
         @Override
         public void run() {

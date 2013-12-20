@@ -57,7 +57,8 @@ public class MultiEditAction extends AnAction {
     //running that multiEdit logic twice is bad.
     if (dataContext instanceof UserDataHolder) {
       final UserDataHolder userDataHolder = (UserDataHolder)dataContext;
-      if (userDataHolder.getUserData(ALREADY_PROCESSING) != null) {
+      //TODO maybe there is better how to find out if there is lookup
+      if (userDataHolder.getUserData(ALREADY_PROCESSING) != null || Editor.SHOWING_LOOKUP.get(editor) != null) {
         executeHandler.run();
         return;
       }
@@ -109,8 +110,8 @@ public class MultiEditAction extends AnAction {
 
         if (selectionModel.hasSelection()) {
           boolean putCursorOnStart = selectionModel.getSelectionStart() == caretModel.getOffset();
-          selectionModel.addMultiSelection(selectionModel.getSelectionStart(), selectionModel.getSelectionEnd(), SelectionModel.Direction.getDirection(putCursorOnStart),
-                                           true);
+          selectionModel.addMultiSelection(selectionModel.getSelectionStart(), selectionModel.getSelectionEnd(),
+                                           SelectionModel.Direction.getDirection(putCursorOnStart), true);
         }
         else {
           caretModel.addMultiCaret(caretModel.getOffset());
