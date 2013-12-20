@@ -545,6 +545,8 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
     }
     if (removeMultiSelections) {
       removeMultiSelections();
+      //too much work pasting this everywhere and there is no case when you do not want selections but want carets anyway
+      myEditor.getCaretModel().removeMultiCarets();
     }
   }
 
