@@ -76,18 +76,17 @@ public class MultiEditAction extends AnAction {
       }
     }
 
-    final SelectionModel selectionModel = editor.getSelectionModel();
+
+
+
+    SelectionModel selectionModel = editor.getSelectionModel();
     CaretModel caretModel = editor.getCaretModel();
-
-
-    final List<Range<Integer>> multiSelects = selectionModel.getMultiSelectionsAndRemoveThem();
-    List<Integer> carets = new ArrayList<Integer>(caretModel.getMultiCaretOffsetsAndRemoveThem());
-
-    if (carets.isEmpty() && multiSelects.isEmpty()) {
+    final List<Range<Integer>> caretsAndSelections = getMultiEditRanges(editor);
+    
+    if (caretsAndSelections.isEmpty()) {
       executeHandler.run();
     }
     else {
-      final List<Range<Integer>> caretsAndSelections = merge(carets, multiSelects);
 
       for (int i = 0; i < caretsAndSelections.size(); i++) {
         Range<Integer> range = caretsAndSelections.get(i);
@@ -127,6 +126,16 @@ public class MultiEditAction extends AnAction {
         }
       }
     }
+  }
+
+  public static List<Range<Integer>> getMultiEditRanges(Editor editor) {
+    SelectionModel selectionModel = editor.getSelectionModel();
+    CaretModel caretModel = editor.getCaretModel();
+
+
+    final List<Range<Integer>> multiSelects = selectionModel.getMultiSelectionsAndRemoveThem();
+    List<Integer> carets = new ArrayList<Integer>(caretModel.getMultiCaretOffsetsAndRemoveThem());
+    return merge(carets, multiSelects);
   }
 
   private static SelectionModel.Direction determineDirection(Range<Integer> range, Range<Integer> nextRange) {

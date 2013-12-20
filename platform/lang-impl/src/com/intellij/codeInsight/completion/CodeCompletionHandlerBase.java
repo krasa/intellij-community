@@ -61,6 +61,7 @@ import com.intellij.psi.impl.source.tree.injected.InjectedLanguageUtil;
 import com.intellij.psi.util.PsiUtilBase;
 import com.intellij.psi.util.PsiUtilCore;
 import com.intellij.reference.SoftReference;
+import com.intellij.util.Range;
 import com.intellij.util.ThreeState;
 import com.intellij.util.concurrency.Semaphore;
 import org.jetbrains.annotations.NotNull;
@@ -583,22 +584,22 @@ public class CodeCompletionHandlerBase {
 
   }
 
-  
+
   private static CompletionAssertions.WatchingInsertionContext insertItemHonorBlockSelection(final CompletionProgressIndicator indicator,
-                                                                        final LookupElement item,
-                                                                        final char completionChar,
-                                                                        final List<LookupElement> items,
-                                                                        final CompletionLookupArranger.StatisticsUpdate update) {
+                                                                                             final LookupElement item,
+                                                                                             final char completionChar,
+                                                                                             final List<LookupElement> items,
+                                                                                             final CompletionLookupArranger.StatisticsUpdate update) {
     final Editor editor = indicator.getEditor();
     CompletionAssertions.WatchingInsertionContext context = null;
+ 
+    final int caretOffset = editor.getCaretModel().getOffset();
+    int idEndOffset = indicator.getIdentifierEndOffset();
+    if (idEndOffset < 0) {
+      idEndOffset = CompletionInitializationContext.calcDefaultIdentifierEnd(editor, caretOffset);
+    }
 
     if (editor.getSelectionModel().hasBlockSelection() && editor.getSelectionModel().getBlockSelectionEnds().length > 0) {
-      final int caretOffset = editor.getCaretModel().getOffset();
-      int idEndOffset = indicator.getIdentifierEndOffset();
-      if (idEndOffset < 0) {
-        idEndOffset = CompletionInitializationContext.calcDefaultIdentifierEnd(editor, caretOffset);
-      }
-      
       List<RangeMarker> insertionPoints = new ArrayList<RangeMarker>();
       int idDelta = 0;
       Document document = editor.getDocument();
@@ -630,28 +631,26 @@ public class CodeCompletionHandlerBase {
       for (RangeMarker marker : caretsAfter) {
         marker.dispose();
       }
-
     }
     else {
-      final ResultWrapper resultWrapper = new ResultWrapper();
-      MultiEditAction.executeWithMultiEdit(new Runnable() {
-        @Override
-        public void run() {
-          final int caretOffset = editor.getCaretModel().getOffset();
-          int idEndOffset = indicator.getIdentifierEndOffset();
-          if (idEndOffset < 0) {
-            idEndOffset = CompletionInitializationContext.calcDefaultIdentifierEnd(editor, caretOffset);
-          }
-          resultWrapper.myContext = insertItem(indicator, item, completionChar, items, update, editor, caretOffset, idEndOffset);
+      final List<Range<Integer>> multiEditRanges = MultiEditAction.getMultiEditRanges(editor);
+      if (multiEditRanges.isEmpty()) {
+        context = insertItem(indicator, item, completionChar, items, update, editor, caretOffset, idEndOffset);
+      }
+      else {
+        //new  multi edit code
+        //TODO it is not very reliable
+        for (Range<Integer> multiEditRange : multiEditRanges) {
+          int insertionPoint = multiEditRange.getFrom();
+          final int delta = idEndOffset - caretOffset;
+          context = insertItem(indicator, item, completionChar, items, update, editor, insertionPoint, multiEditRange.getTo() + delta);
+          int offset = editor.getCaretModel().getOffset();
+          editor.getCaretModel().addMultiCaret(offset);
         }
-      }, editor, null);
-      context = resultWrapper.myContext;
+      }
     }
-    return context;
-  }
 
-  private static class ResultWrapper {
-    CompletionAssertions.WatchingInsertionContext myContext;
+    return context;
   }
 
   private static void afterItemInsertion(final CompletionProgressIndicator indicator, final Runnable laterRunnable) {
