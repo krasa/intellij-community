@@ -204,7 +204,10 @@ public class TextComponentSelectionModel implements SelectionModel {
   }
 
   @Override
-  public void addMultiSelection(int selectionStart, int selectionEnd) {
+  public void addMultiSelection(int selectionStart,
+                                int selectionEnd,
+                                final Direction direction,
+                                final boolean putCaretOnAllLinesWithZeroWidthSelection) {
     throw new UnsupportedOperationException("Not implemented");
   }
 

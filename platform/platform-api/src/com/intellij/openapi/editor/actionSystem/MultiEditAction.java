@@ -81,9 +81,9 @@ public class MultiEditAction extends AnAction {
 
       for (int i = 0; i < caretsAndSelections.size(); i++) {
         Range<Integer> range = caretsAndSelections.get(i);
-        Direction direction = null;
+        SelectionModel.Direction direction = null;
         if (isCaret(range)) {
-          direction = Direction.RIGHT;
+          direction = SelectionModel.Direction.RIGHT;
         }
         //merge overlapping selections and carets
         Range<Integer> nextRange = getNextRange(caretsAndSelections, i);
@@ -108,8 +108,9 @@ public class MultiEditAction extends AnAction {
         executeHandler.run();
 
         if (selectionModel.hasSelection()) {
-          caretModel.addMultiCaret(caretModel.getOffset());
-          selectionModel.addMultiSelection(selectionModel.getSelectionStart(), selectionModel.getSelectionEnd());
+          boolean putCursorOnStart = selectionModel.getSelectionStart() == caretModel.getOffset();
+          selectionModel.addMultiSelection(selectionModel.getSelectionStart(), selectionModel.getSelectionEnd(), SelectionModel.Direction.getDirection(putCursorOnStart),
+                                           true);
         }
         else {
           caretModel.addMultiCaret(caretModel.getOffset());
@@ -118,21 +119,21 @@ public class MultiEditAction extends AnAction {
     }
   }
 
-  private static Direction determineDirection(Range<Integer> range, Range<Integer> nextRange) {
-    Direction direction = null;
+  private static SelectionModel.Direction determineDirection(Range<Integer> range, Range<Integer> nextRange) {
+    SelectionModel.Direction direction = null;
     final Integer caretOffset = nextRange.getFrom();
     if (caretOffset.equals(range.getFrom())) {
-      direction = Direction.LEFT;
+      direction = SelectionModel.Direction.LEFT;
     }
     else if (caretOffset.equals(range.getTo())) {
-      direction = Direction.RIGHT;
+      direction = SelectionModel.Direction.RIGHT;
     }
     return direction;
   }
 
   /* move caret on the right place so that shift+arrow work properly */
-  private static void moveCaretToOffset(CaretModel caretModel, Range<Integer> range, Direction direction) {
-    if (direction == Direction.LEFT) {
+  private static void moveCaretToOffset(CaretModel caretModel, Range<Integer> range, SelectionModel.Direction direction) {
+    if (direction == SelectionModel.Direction.LEFT) {
       caretModel.moveToOffset(range.getFrom());
     }
     else {//default right
@@ -177,10 +178,6 @@ public class MultiEditAction extends AnAction {
       return i;
     }
   };
-
-  enum Direction {
-    LEFT, RIGHT
-  }
 
 
 }

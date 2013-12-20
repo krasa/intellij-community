@@ -2918,6 +2918,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
   }
 
   private void paintAdditionalCarets(final Graphics g) {
+    //final long l = System.nanoTime();
     if (!getCaretModel().hasMultiCarets()) {
       return;
     }
@@ -2927,8 +2928,8 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
       //just for setting that flag to false
       getCaretModel().removeMultiCarets();
     }
-
     for (Integer offset : offsets) {
+      //TODO this is wrong, after some action visual possition differs but offset is the same
       //I guess it is better to cache instances than calculating visual position every time, but it is possible as well(but without calling #repaint which eats cpu)
       if (myAdditionalCarets.get(offset) == null) {
         final CaretCursor caretCursor = new CaretCursor();
@@ -2951,6 +2952,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
         return true;
       }
     });
+    //System.err.println((System.nanoTime()-l)/1000);
   }
 
   private void paintLineMarkersSeparators(@NotNull final Graphics g,
@@ -4012,13 +4014,28 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     } else if (isMultiEditMode(e) && getSelectionModel().hasBlockSelection()) {
       final int[] blockSelectionStarts = getSelectionModel().getBlockSelectionStarts();
       final int[] blockSelectionEnds = getSelectionModel().getBlockSelectionEnds();
+      boolean putCaretForZeroForSelection = true;
+      for (int i = 0; i < blockSelectionEnds.length; i++) {
+        int blockSelectionEnd = blockSelectionEnds[i];
+        int blockSelectionStart = blockSelectionStarts[i];
+        if (blockSelectionEnd != blockSelectionStart) {
+          putCaretForZeroForSelection = false;
+          break;
+        }
+      }
+      boolean putCursorOnStart = blockSelectionStarts[blockSelectionStarts.length-1] == getCaretModel().getOffset() || blockSelectionStarts[0] == getCaretModel().getOffset();
+      final SelectionModel.Direction direction = SelectionModel.Direction.getDirection(putCursorOnStart);
+
       mySelectionModel.removeBlockSelection();
       for (int i = 0; i < blockSelectionStarts.length; i++) {
-        mySelectionModel.addMultiSelection(blockSelectionStarts[i], blockSelectionEnds[i]);
+        mySelectionModel.addMultiSelection(blockSelectionStarts[i], blockSelectionEnds[i], direction, putCaretForZeroForSelection);
       }
     }
     else if (isMultiEditMode(e)) {
-      mySelectionModel.addMultiSelection(getSelectionModel().getSelectionStart(), getSelectionModel().getSelectionEnd());
+      final boolean putCursorOnStart = getSelectionModel().getSelectionStart() == getCaretModel().getOffset();
+      final SelectionModel.Direction direction = SelectionModel.Direction.getDirection(putCursorOnStart);
+      mySelectionModel.addMultiSelection(getSelectionModel().getSelectionStart(), getSelectionModel().getSelectionEnd(), direction,
+                                         true);
     }
   }
 

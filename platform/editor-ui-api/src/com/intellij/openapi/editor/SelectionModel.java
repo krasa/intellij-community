@@ -256,9 +256,20 @@ public interface SelectionModel {
   TextAttributes getTextAttributes();
 
 
-  void addMultiSelection(int selectionStart, int selectionEnd);
+  void addMultiSelection(int selectionStart,
+                         int selectionEnd,
+                         final Direction direction,
+                         final boolean putCaretForZeroForSelection);
 
   void removeMultiSelections();
 
   List<Range<Integer>> getMultiSelectionsAndRemoveThem();
+
+  enum Direction {
+    LEFT, RIGHT;
+
+    public static Direction getDirection(boolean putCursorOnStart) {
+      return putCursorOnStart? LEFT : RIGHT;
+    }
+  }
 }

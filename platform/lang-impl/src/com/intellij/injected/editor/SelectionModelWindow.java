@@ -199,8 +199,11 @@ public class SelectionModelWindow implements SelectionModel {
   }
 
   @Override
-  public void addMultiSelection(int selectionStart, int selectionEnd) {
-    myHostModel.addMultiSelection(selectionStart, selectionEnd);
+  public void addMultiSelection(int selectionStart,
+                                int selectionEnd,
+                                final Direction direction,
+                                final boolean putCaretOnAllLinesWithZeroWidthSelection) {
+    myHostModel.addMultiSelection(selectionStart, selectionEnd, direction, putCaretOnAllLinesWithZeroWidthSelection);
   }
 
   @Override
