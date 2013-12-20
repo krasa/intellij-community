@@ -77,6 +77,7 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
   private int[] myBlockSelectionEnds;
   private boolean myUnknownDirection;
   private boolean myHasMultiSelection;
+  private Direction blockSelectionDirection;
 
   private class MyRangeMarker extends RangeMarkerImpl {
     private VisualPosition myStartPosition;
@@ -486,6 +487,13 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
         oldStartLine = oldEndLine;
         oldEndLine = t;
       }
+    }
+
+    if (blockStart.column > blockEnd.column) {
+      blockSelectionDirection = Direction.LEFT;
+    }
+    else {
+      blockSelectionDirection = Direction.RIGHT;
     }
 
     int newStartLine = blockStart.line;
@@ -995,7 +1003,11 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
     }
     return selections;
   }
-  
+
+  public Direction getBlockSelectionDirection() {
+    return blockSelectionDirection;
+  }
+
   public void reinitSettings() {
     myTextAttributes = null;
   }

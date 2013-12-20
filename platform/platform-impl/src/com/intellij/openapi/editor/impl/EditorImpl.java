@@ -2916,10 +2916,10 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     // We check if that's the case and ask caret model to recalculate visual position if necessary.
 
     myCaretCursor.paint(g);
-    paintAdditionalCarets(g);
+    paintMultiCarets(g);
   }
 
-  private void paintAdditionalCarets(final Graphics g) {
+  private void paintMultiCarets(final Graphics g) {
     //final long l = System.nanoTime();
     if (!getCaretModel().hasMultiCarets()) {
       return;
@@ -2927,7 +2927,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     final Collection<Integer> offsets = myCaretModel.getMultiCaretOffsets();
     if (offsets.isEmpty()) {
       myMultiCarets.clear();
-      //just for setting that flag to false
+      //just to set that flag to false
       getCaretModel().removeMultiCarets();
     }
     for (Integer offset : offsets) {
@@ -4015,26 +4015,16 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     if (myMousePressedEvent != null && myMousePressedEvent.getClickCount() == 1 && myMousePressedInsideSelection
         && !myMousePressedEvent.isShiftDown() && !myMousePressedEvent.isPopupTrigger()) {
       getSelectionModel().removeSelection();
-    } else if (isMultiEditMode(e) && getSelectionModel().hasBlockSelection()) {
+    }
+    else if (isMultiEditMode(e) && getSelectionModel().hasBlockSelection()) {
       final int[] blockSelectionStarts = getSelectionModel().getBlockSelectionStarts();
       final int[] blockSelectionEnds = getSelectionModel().getBlockSelectionEnds();
-      boolean isZeroWidthSelection = true;
-      for (int i = 0; i < blockSelectionEnds.length; i++) {
-        int blockSelectionEnd = blockSelectionEnds[i];
-        int blockSelectionStart = blockSelectionStarts[i];
-        if (blockSelectionEnd != blockSelectionStart) {
-          isZeroWidthSelection = false;
-          break;
-        }
-      }
-      final boolean cursorIsInLeftDownCorner = blockSelectionStarts[blockSelectionStarts.length - 1] == getCaretModel().getOffset();
-      final boolean cursorIsInLeftTopCorner = blockSelectionStarts[0] == getCaretModel().getOffset();
-      boolean putCursorLeft = cursorIsInLeftDownCorner || cursorIsInLeftTopCorner;
-      final SelectionModel.Direction direction = SelectionModel.Direction.getDirection(putCursorLeft && !isZeroWidthSelection);
-
+      final boolean zeroWidthBlockSelection = isZeroWidthBlockSelection(blockSelectionStarts, blockSelectionEnds);
+      
       mySelectionModel.removeBlockSelection();
       for (int i = 0; i < blockSelectionStarts.length; i++) {
-        mySelectionModel.addMultiSelection(blockSelectionStarts[i], blockSelectionEnds[i], direction, isZeroWidthSelection);
+        mySelectionModel.addMultiSelection(blockSelectionStarts[i], blockSelectionEnds[i], mySelectionModel.getBlockSelectionDirection(),
+                                           zeroWidthBlockSelection);
       }
     }
     else if (isMultiEditMode(e)) {
@@ -4046,6 +4036,19 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
       getSelectionModel().removeMultiSelections();
       getCaretModel().removeMultiCarets();
     }
+  }
+
+  private boolean isZeroWidthBlockSelection(int[] blockSelectionStarts, int[] blockSelectionEnds) {
+    boolean isZeroWidthSelection = true;
+    for (int i = 0; i < blockSelectionEnds.length; i++) {
+      int blockSelectionEnd = blockSelectionEnds[i];
+      int blockSelectionStart = blockSelectionStarts[i];
+      if (blockSelectionEnd != blockSelectionStart) {
+        isZeroWidthSelection = false;
+        break;
+      }
+    }
+    return isZeroWidthSelection;
   }
 
   private boolean isMultiEditMode(MouseEvent e) {
