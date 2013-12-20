@@ -650,16 +650,12 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable 
     }
 
     myFinishing = true;
-    ApplicationManager.getApplication().runWriteAction(new Runnable() {
+    ApplicationManager.getApplication().runWriteAction(MultiEditAction.wrapRunnable(new Runnable() {
+      @Override
       public void run() {
-        MultiEditAction.executeWithMultiEdit(new Runnable() {
-          @Override
-          public void run() {
-            insertLookupString(item, getPrefixLength(item));
-          }
-        }, myEditor, null);
+        insertLookupString(item, getPrefixLength(item));
       }
-    });
+    }, myEditor, null));
 
     if (myDisposed) { // any document listeners could close us
       return;

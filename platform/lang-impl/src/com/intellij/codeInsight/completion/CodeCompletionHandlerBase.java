@@ -37,6 +37,7 @@ import com.intellij.openapi.command.CommandProcessor;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.*;
 import com.intellij.openapi.editor.actionSystem.EditorActionManager;
+import com.intellij.openapi.editor.actionSystem.MultiEditAction;
 import com.intellij.openapi.editor.ex.DocumentEx;
 import com.intellij.openapi.editor.ex.util.EditorUtil;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
@@ -582,21 +583,22 @@ public class CodeCompletionHandlerBase {
 
   }
 
-  private static CompletionAssertions.WatchingInsertionContext insertItemHonorBlockSelection(CompletionProgressIndicator indicator,
-                                                                        LookupElement item,
-                                                                        char completionChar,
-                                                                        List<LookupElement> items,
-                                                                        CompletionLookupArranger.StatisticsUpdate update) {
+  
+  private static CompletionAssertions.WatchingInsertionContext insertItemHonorBlockSelection(final CompletionProgressIndicator indicator,
+                                                                        final LookupElement item,
+                                                                        final char completionChar,
+                                                                        final List<LookupElement> items,
+                                                                        final CompletionLookupArranger.StatisticsUpdate update) {
     final Editor editor = indicator.getEditor();
-
-    final int caretOffset = editor.getCaretModel().getOffset();
-    int idEndOffset = indicator.getIdentifierEndOffset();
-    if (idEndOffset < 0) {
-      idEndOffset = CompletionInitializationContext.calcDefaultIdentifierEnd(editor, caretOffset);
-    }
-
     CompletionAssertions.WatchingInsertionContext context = null;
+
     if (editor.getSelectionModel().hasBlockSelection() && editor.getSelectionModel().getBlockSelectionEnds().length > 0) {
+      final int caretOffset = editor.getCaretModel().getOffset();
+      int idEndOffset = indicator.getIdentifierEndOffset();
+      if (idEndOffset < 0) {
+        idEndOffset = CompletionInitializationContext.calcDefaultIdentifierEnd(editor, caretOffset);
+      }
+      
       List<RangeMarker> insertionPoints = new ArrayList<RangeMarker>();
       int idDelta = 0;
       Document document = editor.getDocument();
@@ -629,10 +631,27 @@ public class CodeCompletionHandlerBase {
         marker.dispose();
       }
 
-    } else {
-      context = insertItem(indicator, item, completionChar, items, update, editor, caretOffset, idEndOffset);
+    }
+    else {
+      final ResultWrapper resultWrapper = new ResultWrapper();
+      MultiEditAction.executeWithMultiEdit(new Runnable() {
+        @Override
+        public void run() {
+          final int caretOffset = editor.getCaretModel().getOffset();
+          int idEndOffset = indicator.getIdentifierEndOffset();
+          if (idEndOffset < 0) {
+            idEndOffset = CompletionInitializationContext.calcDefaultIdentifierEnd(editor, caretOffset);
+          }
+          resultWrapper.myContext = insertItem(indicator, item, completionChar, items, update, editor, caretOffset, idEndOffset);
+        }
+      }, editor, null);
+      context = resultWrapper.myContext;
     }
     return context;
+  }
+
+  private static class ResultWrapper {
+    CompletionAssertions.WatchingInsertionContext myContext;
   }
 
   private static void afterItemInsertion(final CompletionProgressIndicator indicator, final Runnable laterRunnable) {
