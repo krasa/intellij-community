@@ -375,7 +375,7 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
 
     myLastSelectionStart = startOffset;
     if (!visualPositionAware && startOffset == endOffset) {
-      removeSelection();
+      removeSelection(false);
       return;
     }
 
@@ -437,6 +437,7 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
     updateSystemSelection();
   }
 
+
   private void updateSystemSelection() {
     if (GraphicsEnvironment.isHeadless()) return;
 
@@ -474,7 +475,7 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
 
   @Override
   public void setBlockSelection(LogicalPosition blockStart, LogicalPosition blockEnd) {
-    removeSelection();
+    removeSelection(false);
 
     int oldStartLine = 0;
     int oldEndLine = 0;
@@ -522,6 +523,10 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
 
   @Override
   public void removeSelection() {
+    removeSelection(true);
+  }
+
+  private void removeSelection(boolean removeMultiSelections) {
     if (myEditor.isStickySelection()) {
       // Most of our 'change caret position' actions (like move caret to word start/end etc) remove active selection.
       // However, we don't want to do that for 'sticky selection'.
@@ -537,6 +542,9 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
       marker.release();
       mySelectionMarker = null;
       fireSelectionChanged(startOffset, endOffset, myLastSelectionStart, myLastSelectionStart);
+    }
+    if (removeMultiSelections) {
+      removeMultiSelections();
     }
   }
 

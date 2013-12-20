@@ -132,7 +132,6 @@ public class MultiEditAction extends AnAction {
     SelectionModel selectionModel = editor.getSelectionModel();
     CaretModel caretModel = editor.getCaretModel();
 
-
     final List<Range<Integer>> multiSelects = selectionModel.getMultiSelectionsAndRemoveThem();
     List<Integer> carets = new ArrayList<Integer>(caretModel.getMultiCaretOffsetsAndRemoveThem());
     return merge(carets, multiSelects);

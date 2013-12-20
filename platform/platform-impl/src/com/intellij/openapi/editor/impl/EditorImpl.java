@@ -842,17 +842,6 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     MyMouseMotionListener mouseMotionListener = new MyMouseMotionListener();
     myEditorComponent.addMouseMotionListener(mouseMotionListener);
     myGutterComponent.addMouseMotionListener(mouseMotionListener);
-
-    this.addEditorMouseListener(new EditorMouseAdapter() {
-      @Override
-      public void mouseClicked(EditorMouseEvent e) {
-        final MouseEvent mouseEvent = e.getMouseEvent();
-        if (!isMultiEditMode(mouseEvent)) {
-          getSelectionModel().removeMultiSelections();
-          getCaretModel().removeMultiCarets();
-        }
-      }
-    });
     
     myEditorComponent.addFocusListener(new FocusAdapter() {
       @Override
