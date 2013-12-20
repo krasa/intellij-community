@@ -4028,7 +4028,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
         }
       }
       boolean putCursorOnStart = blockSelectionStarts[blockSelectionStarts.length-1] == getCaretModel().getOffset() || blockSelectionStarts[0] == getCaretModel().getOffset();
-      final SelectionModel.Direction direction = SelectionModel.Direction.getDirection(putCursorOnStart);
+      final SelectionModel.Direction direction = SelectionModel.Direction.getDirection(putCursorOnStart && !putCaretForZeroForSelection);
 
       mySelectionModel.removeBlockSelection();
       for (int i = 0; i < blockSelectionStarts.length; i++) {
