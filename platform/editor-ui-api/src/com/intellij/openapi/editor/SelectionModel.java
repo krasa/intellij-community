@@ -268,8 +268,8 @@ public interface SelectionModel {
   enum Direction {
     LEFT, RIGHT;
 
-    public static Direction getDirection(boolean putCursorOnStart) {
-      return putCursorOnStart? LEFT : RIGHT;
+    public static Direction getDirection(boolean left) {
+      return left ? LEFT : RIGHT;
     }
   }
 }

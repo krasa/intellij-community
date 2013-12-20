@@ -4018,21 +4018,23 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     } else if (isMultiEditMode(e) && getSelectionModel().hasBlockSelection()) {
       final int[] blockSelectionStarts = getSelectionModel().getBlockSelectionStarts();
       final int[] blockSelectionEnds = getSelectionModel().getBlockSelectionEnds();
-      boolean putCaretForZeroForSelection = true;
+      boolean isZeroWidthSelection = true;
       for (int i = 0; i < blockSelectionEnds.length; i++) {
         int blockSelectionEnd = blockSelectionEnds[i];
         int blockSelectionStart = blockSelectionStarts[i];
         if (blockSelectionEnd != blockSelectionStart) {
-          putCaretForZeroForSelection = false;
+          isZeroWidthSelection = false;
           break;
         }
       }
-      boolean putCursorOnStart = blockSelectionStarts[blockSelectionStarts.length-1] == getCaretModel().getOffset() || blockSelectionStarts[0] == getCaretModel().getOffset();
-      final SelectionModel.Direction direction = SelectionModel.Direction.getDirection(putCursorOnStart && !putCaretForZeroForSelection);
+      final boolean cursorIsInLeftTopCorner = blockSelectionStarts[blockSelectionStarts.length - 1] == getCaretModel().getOffset();
+      final boolean cursorIsInLeftDownCorner = blockSelectionStarts[0] == getCaretModel().getOffset();
+      boolean putCursorLeft = cursorIsInLeftTopCorner || cursorIsInLeftDownCorner;
+      final SelectionModel.Direction direction = SelectionModel.Direction.getDirection(putCursorLeft && !isZeroWidthSelection);
 
       mySelectionModel.removeBlockSelection();
       for (int i = 0; i < blockSelectionStarts.length; i++) {
-        mySelectionModel.addMultiSelection(blockSelectionStarts[i], blockSelectionEnds[i], direction, putCaretForZeroForSelection);
+        mySelectionModel.addMultiSelection(blockSelectionStarts[i], blockSelectionEnds[i], direction, isZeroWidthSelection);
       }
     }
     else if (isMultiEditMode(e)) {
