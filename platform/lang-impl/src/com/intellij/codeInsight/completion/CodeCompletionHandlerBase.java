@@ -640,9 +640,16 @@ public class CodeCompletionHandlerBase {
       else {
         //new  multi edit code
         //TODO it is not very reliable
+        int delta = idEndOffset - caretOffset;
+        Document document = editor.getDocument();
+        for (Range<Integer> point : multiEditRanges) {
+          if (document.getLineNumber(point.getFrom()) == document.getLineNumber(idEndOffset)) {
+            delta = idEndOffset - point.getFrom();
+          }
+        }
+
         for (Range<Integer> multiEditRange : multiEditRanges) {
           int insertionPoint = multiEditRange.getFrom();
-          final int delta = idEndOffset - caretOffset;
           context = insertItem(indicator, item, completionChar, items, update, editor, insertionPoint, multiEditRange.getTo() + delta);
           int offset = editor.getCaretModel().getOffset();
           editor.getCaretModel().addMultiCaret(offset);
