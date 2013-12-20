@@ -4027,9 +4027,9 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
           break;
         }
       }
-      final boolean cursorIsInLeftTopCorner = blockSelectionStarts[blockSelectionStarts.length - 1] == getCaretModel().getOffset();
-      final boolean cursorIsInLeftDownCorner = blockSelectionStarts[0] == getCaretModel().getOffset();
-      boolean putCursorLeft = cursorIsInLeftTopCorner || cursorIsInLeftDownCorner;
+      final boolean cursorIsInLeftDownCorner = blockSelectionStarts[blockSelectionStarts.length - 1] == getCaretModel().getOffset();
+      final boolean cursorIsInLeftTopCorner = blockSelectionStarts[0] == getCaretModel().getOffset();
+      boolean putCursorLeft = cursorIsInLeftDownCorner || cursorIsInLeftTopCorner;
       final SelectionModel.Direction direction = SelectionModel.Direction.getDirection(putCursorLeft && !isZeroWidthSelection);
 
       mySelectionModel.removeBlockSelection();
