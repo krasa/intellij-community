@@ -153,7 +153,7 @@ public class TextComponentCaretModel implements CaretModel {
   }
 
   @Override
-  public Collection<Integer> getMultiCaretsOffsets() {
+  public Collection<Integer> getMultiCaretOffsets() {
     return Collections.emptyList();
   }
 

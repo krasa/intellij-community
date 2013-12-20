@@ -149,7 +149,7 @@ public interface CaretModel {
 
   void addMultiCaret(int offset);
 
-  Collection<Integer> getMultiCaretsOffsets();
+  Collection<Integer> getMultiCaretOffsets();
 
   Collection<Integer> getMultiCaretOffsetsAndRemoveThem();
 }

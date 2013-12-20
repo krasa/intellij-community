@@ -171,7 +171,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
 
   private boolean myIsInsertMode = true;
 
-  private final TIntObjectHashMap<CaretCursor> myAdditionalCarets = new TIntObjectHashMap<CaretCursor>();
+  private final TIntObjectHashMap<CaretCursor> myMultiCarets = new TIntObjectHashMap<CaretCursor>();
 
   @NotNull private final CaretCursor myCaretCursor;
   private final ScrollingTimer myScrollingTimer = new ScrollingTimer();
@@ -333,7 +333,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
       myConnection = project.getMessageBus().connect();
       myConnection.subscribe(DocumentBulkUpdateListener.TOPIC, new EditorDocumentBulkUpdateAdapter());
     }
-
+   
     MarkupModelListener markupModelListener = new MarkupModelListener() {
       private boolean areRenderersInvolved(@NotNull RangeHighlighterEx highlighter) {
         return highlighter.getCustomRenderer() != null ||
@@ -1713,6 +1713,8 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     int scrollOffset = caretLocation.y - myCaretUpdateVShift;
     getScrollingModel().scrollVertically(scrollOffset);
     updateHasTabsFlag(e.getNewFragment());
+  
+    myMultiCarets.clear();
   }
 
   private void updateHasTabsFlag(CharSequence newChars) {
@@ -2922,37 +2924,39 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     if (!getCaretModel().hasMultiCarets()) {
       return;
     }
-    final Collection<Integer> offsets = myCaretModel.getMultiCaretsOffsets();
+    final Collection<Integer> offsets = myCaretModel.getMultiCaretOffsets();
     if (offsets.isEmpty()) {
-      myAdditionalCarets.clear();
+      myMultiCarets.clear();
       //just for setting that flag to false
       getCaretModel().removeMultiCarets();
     }
     for (Integer offset : offsets) {
-      //TODO this is wrong, after some action visual possition differs but offset is the same
-      //I guess it is better to cache instances than calculating visual position every time, but it is possible as well(but without calling #repaint which eats cpu)
-      if (myAdditionalCarets.get(offset) == null) {
-        final CaretCursor caretCursor = new CaretCursor();
-        final VisualPosition visualPosition = offsetToVisualPosition(offset);
-        Point pos1 = visualPositionToXY(visualPosition);
-        Point pos2 = visualPositionToXY(new VisualPosition(visualPosition.line, visualPosition.column + 1));
-        caretCursor.setPosition(pos1, pos2.x - pos1.x);
-        myAdditionalCarets.put(offset, caretCursor);
+      if (myMultiCarets.get(offset) == null) {
+        myMultiCarets.put(offset, createCaretCursor(offset));
       }
     }
-    myAdditionalCarets.forEachEntry(new TIntObjectProcedure<CaretCursor>() {
+    myMultiCarets.forEachEntry(new TIntObjectProcedure<CaretCursor>() {
       @Override
       public boolean execute(int key, CaretCursor cursor) {
         if (offsets.contains(key)) {
           cursor.paint(g);
         }
         else {
-          myAdditionalCarets.remove(key);
+          myMultiCarets.remove(key);
         }
         return true;
       }
     });
     //System.err.println((System.nanoTime()-l)/1000);
+  }
+
+  private CaretCursor createCaretCursor(Integer offset) {
+    final CaretCursor caretCursor = new CaretCursor();
+    final VisualPosition visualPosition = offsetToVisualPosition(offset);
+    Point pos1 = visualPositionToXY(visualPosition);
+    Point pos2 = visualPositionToXY(new VisualPosition(visualPosition.line, visualPosition.column + 1));
+    caretCursor.setPosition(pos1, pos2.x - pos1.x);
+    return caretCursor;
   }
 
   private void paintLineMarkersSeparators(@NotNull final Graphics g,

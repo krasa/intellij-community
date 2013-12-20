@@ -164,8 +164,8 @@ public class CaretModelWindow implements CaretModel {
   }
 
   @Override
-  public Collection<Integer> getMultiCaretsOffsets() {
-    return myDelegate.getMultiCaretsOffsets();
+  public Collection<Integer> getMultiCaretOffsets() {
+    return myDelegate.getMultiCaretOffsets();
   }
 
   @Override
