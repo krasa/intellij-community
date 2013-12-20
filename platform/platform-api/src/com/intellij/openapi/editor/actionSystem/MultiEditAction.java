@@ -53,11 +53,20 @@ public class MultiEditAction extends AnAction {
   }
 
 
+  public static Runnable wrapRunnable(final Runnable executeHandler, final Editor editor, final DataContext dataContext) {
+    return new Runnable() {
+      @Override
+      public void run() {
+        executeWithMultiEdit(executeHandler, editor, dataContext);
+      }
+    };
+  }
+
   public static void executeWithMultiEdit(Runnable executeHandler, Editor editor, DataContext dataContext) {
     //running that multiEdit logic twice is bad.
     if (dataContext instanceof UserDataHolder) {
       final UserDataHolder userDataHolder = (UserDataHolder)dataContext;
-      //TODO maybe there is better how to find out if there is lookup
+      //TODO maybe there is better how to find out if there is lookup, I just do not see com.intellij.codeInsight.lookup.LookupManager#getActiveLookup
       if (userDataHolder.getUserData(ALREADY_PROCESSING) != null || Editor.SHOWING_LOOKUP.get(editor) != null) {
         executeHandler.run();
         return;

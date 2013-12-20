@@ -34,6 +34,7 @@ import com.intellij.ide.DataManager;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.EditorModificationUtil;
+import com.intellij.openapi.editor.actionSystem.MultiEditAction;
 import com.intellij.openapi.extensions.Extensions;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.project.Project;
@@ -65,24 +66,25 @@ public class LookupTypedHandler extends TypedHandlerDelegate {
       return Result.CONTINUE;
     }
 
-    if (!lookup.performGuardedChange(new Runnable() {
+    if (!lookup.performGuardedChange(MultiEditAction.wrapRunnable(new Runnable() {
       @Override
       public void run() {
         EditorModificationUtil.deleteSelectedText(editor);
       }
-    })) {
+    }, editor, null))) {
       return Result.STOP;
     }
     if (result == CharFilter.Result.ADD_TO_PREFIX) {
       Document document = editor.getDocument();
       long modificationStamp = document.getModificationStamp();
 
-      if (!lookup.performGuardedChange(new Runnable() {
+      if (!lookup.performGuardedChange(MultiEditAction.wrapRunnable(new Runnable() {
         @Override
         public void run() {
           EditorModificationUtil.typeInStringAtCaretHonorBlockSelection(editor, String.valueOf(charTyped), true);
         }
-      })) {
+      }, editor, null))) {
+
         return Result.STOP;
       }
       lookup.appendPrefix(charTyped);
