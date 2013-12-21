@@ -74,8 +74,8 @@ public class MultiEditAction extends AnAction {
         return;
       }
       else {
-        editor.putUserData(ALREADY_PROCESSING, "1");
         //todo SmartEnter dirty fix, those processors do not use action's datacontext... see com.intellij.codeInsight.editorActions.smartEnter.JavaSmartEnterProcessor.plainEnter()
+        editor.putUserData(ALREADY_PROCESSING, "1");
         userDataHolder.putUserData(ALREADY_PROCESSING, "1");
       }
     }
