@@ -29,6 +29,7 @@ import com.intellij.openapi.application.Result;
 import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.editor.actionSystem.MultiEditAction;
 import com.intellij.openapi.editor.ex.util.EditorUtil;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.project.Project;
@@ -177,7 +178,12 @@ public class ListTemplatesHandler implements CodeInsightActionHandler {
         new WriteCommandAction(myProject) {
           @Override
           protected void run(Result result) throws Throwable {
-            ((TemplateManagerImpl)TemplateManager.getInstance(myProject)).startTemplateWithPrefix(myEditor, template, null, argument);
+            MultiEditAction.executeWithMultiEdit(new Runnable() {
+              @Override
+              public void run() {
+                ((TemplateManagerImpl)TemplateManager.getInstance(myProject)).startTemplateWithPrefix(myEditor, template, null, argument);
+              }
+            }, myEditor, null);
           }
         }.execute();
       }
