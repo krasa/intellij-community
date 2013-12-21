@@ -37,7 +37,6 @@ import com.intellij.openapi.command.CommandProcessor;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.*;
 import com.intellij.openapi.editor.actionSystem.EditorActionManager;
-import com.intellij.openapi.editor.actionSystem.MultiEditAction;
 import com.intellij.openapi.editor.ex.DocumentEx;
 import com.intellij.openapi.editor.ex.util.EditorUtil;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
@@ -61,14 +60,15 @@ import com.intellij.psi.impl.source.tree.injected.InjectedLanguageUtil;
 import com.intellij.psi.util.PsiUtilBase;
 import com.intellij.psi.util.PsiUtilCore;
 import com.intellij.reference.SoftReference;
-import com.intellij.util.Range;
 import com.intellij.util.ThreeState;
 import com.intellij.util.concurrency.Semaphore;
+import org.apache.commons.lang.ArrayUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -591,21 +591,30 @@ public class CodeCompletionHandlerBase {
                                                                                              final List<LookupElement> items,
                                                                                              final CompletionLookupArranger.StatisticsUpdate update) {
     final Editor editor = indicator.getEditor();
-    CompletionAssertions.WatchingInsertionContext context = null;
- 
+    
     final int caretOffset = editor.getCaretModel().getOffset();
     int idEndOffset = indicator.getIdentifierEndOffset();
     if (idEndOffset < 0) {
       idEndOffset = CompletionInitializationContext.calcDefaultIdentifierEnd(editor, caretOffset);
     }
-
-    if (editor.getSelectionModel().hasBlockSelection() && editor.getSelectionModel().getBlockSelectionEnds().length > 0) {
+    
+    final Collection<Integer> multiCaretOffsets1 = editor.getCaretModel().getMultiCaretOffsetsAndRemoveThem();
+    final Integer[] multiCaretOffsets = multiCaretOffsets1.toArray(new Integer[multiCaretOffsets1.size()]);
+    final boolean isMultiEdit = multiCaretOffsets.length > 0;
+    
+    CompletionAssertions.WatchingInsertionContext context = null;
+    if ((editor.getSelectionModel().hasBlockSelection() && editor.getSelectionModel().getBlockSelectionEnds().length > 0) || isMultiEdit) {
       List<RangeMarker> insertionPoints = new ArrayList<RangeMarker>();
       int idDelta = 0;
       Document document = editor.getDocument();
       int caretLine = document.getLineNumber(editor.getCaretModel().getOffset());
-
-      for (int point : editor.getSelectionModel().getBlockSelectionEnds()) {
+      
+     int[] selectionEnds = editor.getSelectionModel().getBlockSelectionEnds();
+      if (isMultiEdit) {
+        selectionEnds = ArrayUtils.toPrimitive(multiCaretOffsets);
+      }
+      for (int point : selectionEnds) {
+        //need to track position when e.g imports are added
         insertionPoints.add(document.createRangeMarker(point, point));
         if (document.getLineNumber(point) == document.getLineNumber(idEndOffset)) {
           idDelta = idEndOffset - point;
@@ -623,7 +632,12 @@ public class CodeCompletionHandlerBase {
       }
       assert context != null;
 
-      restoreBlockSelection(editor, caretsAfter, caretLine);
+      if (!isMultiEdit) {
+        restoreBlockSelection(editor, caretsAfter, caretLine);
+      }
+      else {
+        restoreMultiCarets(editor, caretsAfter);
+      } 
 
       for (RangeMarker insertionPoint : insertionPoints) {
         insertionPoint.dispose();
@@ -631,33 +645,19 @@ public class CodeCompletionHandlerBase {
       for (RangeMarker marker : caretsAfter) {
         marker.dispose();
       }
-    }
-    else {
-      final List<Range<Integer>> multiEditRanges = MultiEditAction.getMultiEditRanges(editor);
-      if (multiEditRanges.isEmpty()) {
-        context = insertItem(indicator, item, completionChar, items, update, editor, caretOffset, idEndOffset);
-      }
-      else {
-        //new  multi edit code
-        //TODO it is not very reliable
-        int delta = idEndOffset - caretOffset;
-        Document document = editor.getDocument();
-        for (Range<Integer> point : multiEditRanges) {
-          if (document.getLineNumber(point.getFrom()) == document.getLineNumber(idEndOffset)) {
-            delta = idEndOffset - point.getFrom();
-          }
-        }
 
-        for (Range<Integer> multiEditRange : multiEditRanges) {
-          int insertionPoint = multiEditRange.getFrom();
-          context = insertItem(indicator, item, completionChar, items, update, editor, insertionPoint, multiEditRange.getTo() + delta);
-          int offset = editor.getCaretModel().getOffset();
-          editor.getCaretModel().addMultiCaret(offset);
-        }
-      }
+    } else {
+      context = insertItem(indicator, item, completionChar, items, update, editor, caretOffset, idEndOffset);
     }
-
     return context;
+  }
+
+  private static void restoreMultiCarets(Editor editor, List<RangeMarker> caretsAfter) {
+    for (RangeMarker marker : caretsAfter) {
+      if (marker.isValid()) {
+        editor.getCaretModel().addMultiCaret(marker.getStartOffset());
+      }
+    }
   }
 
   private static void afterItemInsertion(final CompletionProgressIndicator indicator, final Runnable laterRunnable) {
