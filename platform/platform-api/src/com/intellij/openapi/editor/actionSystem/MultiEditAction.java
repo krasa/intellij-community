@@ -66,65 +66,70 @@ public class MultiEditAction extends AnAction {
     //running that multiEdit logic twice is bad.
     if (dataContext instanceof UserDataHolder) {
       final UserDataHolder userDataHolder = (UserDataHolder)dataContext;
-      //TODO maybe there is better how to find out if there is lookup, I just do not see com.intellij.codeInsight.lookup.LookupManager#getActiveLookup
-      if (userDataHolder.getUserData(ALREADY_PROCESSING) != null || Editor.SHOWING_LOOKUP.get(editor) != null) {
+      //TODO maybe there is a better way how to find out if there is lookup, I just do not see com.intellij.codeInsight.lookup.LookupManager#getActiveLookup
+      if (userDataHolder.getUserData(ALREADY_PROCESSING) != null ||
+          Editor.SHOWING_LOOKUP.get(editor) != null ||
+          editor.getUserData(ALREADY_PROCESSING) != null) {
         executeHandler.run();
         return;
       }
       else {
+        editor.putUserData(ALREADY_PROCESSING, "1");
+        //todo SmartEnter dirty fix, those processors do not use action's datacontext... see com.intellij.codeInsight.editorActions.smartEnter.JavaSmartEnterProcessor.plainEnter()
         userDataHolder.putUserData(ALREADY_PROCESSING, "1");
       }
     }
 
+    try {
+      SelectionModel selectionModel = editor.getSelectionModel();
+      CaretModel caretModel = editor.getCaretModel();
+      final List<Range<Integer>> caretsAndSelections = getMultiEditRanges(editor);
 
-
-
-    SelectionModel selectionModel = editor.getSelectionModel();
-    CaretModel caretModel = editor.getCaretModel();
-    final List<Range<Integer>> caretsAndSelections = getMultiEditRanges(editor);
-    
-    if (caretsAndSelections.isEmpty()) {
-      executeHandler.run();
-    }
-    else {
-
-      for (int i = 0; i < caretsAndSelections.size(); i++) {
-        Range<Integer> range = caretsAndSelections.get(i);
-        SelectionModel.Direction direction = null;
-        if (isCaret(range)) {
-          direction = SelectionModel.Direction.RIGHT;
-        }
-        //merge overlapping selections and carets
-        Range<Integer> nextRange = getNextRange(caretsAndSelections, i);
-        while (nextRange != null && nextRange.getTo() >= range.getFrom()) {
-          i++;
-          range = new Range<Integer>(min(nextRange.getFrom(), range.getFrom()), range.getTo());
-          if (direction == null && isCaret(nextRange)) {
-            direction = determineDirection(range, nextRange);
-          }
-          nextRange = getNextRange(caretsAndSelections, i);
-        }
-
-        if (isCaret(range)) {
-          selectionModel.removeSelection();
-          caretModel.moveToOffset(range.getFrom());
-        }
-        else {
-          selectionModel.setSelection(range.getFrom(), range.getTo());
-          moveCaretToOffset(caretModel, range, direction);
-        }
-
+      if (caretsAndSelections.isEmpty()) {
         executeHandler.run();
+      }
+      else {
+        for (int i = 0; i < caretsAndSelections.size(); i++) {
+          Range<Integer> range = caretsAndSelections.get(i);
+          SelectionModel.Direction direction = null;
+          if (isCaret(range)) {
+            direction = SelectionModel.Direction.RIGHT;
+          }
+          //merge overlapping selections and carets
+          Range<Integer> nextRange = getNextRange(caretsAndSelections, i);
+          while (nextRange != null && nextRange.getTo() >= range.getFrom()) {
+            i++;
+            range = new Range<Integer>(min(nextRange.getFrom(), range.getFrom()), range.getTo());
+            if (direction == null && isCaret(nextRange)) {
+              direction = determineDirection(range, nextRange);
+            }
+            nextRange = getNextRange(caretsAndSelections, i);
+          }
 
-        if (selectionModel.hasSelection()) {
-          boolean putCursorOnStart = selectionModel.getSelectionStart() == caretModel.getOffset();
-          selectionModel.addMultiSelection(selectionModel.getSelectionStart(), selectionModel.getSelectionEnd(),
-                                           SelectionModel.Direction.getDirection(putCursorOnStart), true);
-        }
-        else {
-          caretModel.addMultiCaret(caretModel.getOffset());
+          if (isCaret(range)) {
+            selectionModel.removeSelection();
+            caretModel.moveToOffset(range.getFrom());
+          }
+          else {
+            selectionModel.setSelection(range.getFrom(), range.getTo());
+            moveCaretToOffset(caretModel, range, direction);
+          }
+
+          executeHandler.run();
+
+          if (selectionModel.hasSelection()) {
+            boolean putCursorOnStart = selectionModel.getSelectionStart() == caretModel.getOffset();
+            selectionModel.addMultiSelection(selectionModel.getSelectionStart(), selectionModel.getSelectionEnd(),
+                                             SelectionModel.Direction.getDirection(putCursorOnStart), true);
+          }
+          else {
+            caretModel.addMultiCaret(caretModel.getOffset());
+          }
         }
       }
+    }
+    finally {
+      editor.putUserData(ALREADY_PROCESSING, null);
     }
   }
 
