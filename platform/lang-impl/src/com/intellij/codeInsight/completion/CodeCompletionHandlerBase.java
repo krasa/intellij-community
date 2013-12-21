@@ -591,25 +591,25 @@ public class CodeCompletionHandlerBase {
                                                                                              final List<LookupElement> items,
                                                                                              final CompletionLookupArranger.StatisticsUpdate update) {
     final Editor editor = indicator.getEditor();
-    
+
     final int caretOffset = editor.getCaretModel().getOffset();
     int idEndOffset = indicator.getIdentifierEndOffset();
     if (idEndOffset < 0) {
       idEndOffset = CompletionInitializationContext.calcDefaultIdentifierEnd(editor, caretOffset);
     }
-    
+
     final Collection<Integer> multiCaretOffsets1 = editor.getCaretModel().getMultiCaretOffsetsAndRemoveThem();
     final Integer[] multiCaretOffsets = multiCaretOffsets1.toArray(new Integer[multiCaretOffsets1.size()]);
     final boolean isMultiEdit = multiCaretOffsets.length > 0;
-    
+
     CompletionAssertions.WatchingInsertionContext context = null;
     if ((editor.getSelectionModel().hasBlockSelection() && editor.getSelectionModel().getBlockSelectionEnds().length > 0) || isMultiEdit) {
       List<RangeMarker> insertionPoints = new ArrayList<RangeMarker>();
       int idDelta = 0;
       Document document = editor.getDocument();
       int caretLine = document.getLineNumber(editor.getCaretModel().getOffset());
-      
-     int[] selectionEnds = editor.getSelectionModel().getBlockSelectionEnds();
+
+      int[] selectionEnds = editor.getSelectionModel().getBlockSelectionEnds();
       if (isMultiEdit) {
         selectionEnds = ArrayUtils.toPrimitive(multiCaretOffsets);
       }
@@ -637,7 +637,7 @@ public class CodeCompletionHandlerBase {
       }
       else {
         restoreMultiCarets(editor, caretsAfter);
-      } 
+      }
 
       for (RangeMarker insertionPoint : insertionPoints) {
         insertionPoint.dispose();
@@ -646,7 +646,8 @@ public class CodeCompletionHandlerBase {
         marker.dispose();
       }
 
-    } else {
+    }
+    else {
       context = insertItem(indicator, item, completionChar, items, update, editor, caretOffset, idEndOffset);
     }
     return context;
