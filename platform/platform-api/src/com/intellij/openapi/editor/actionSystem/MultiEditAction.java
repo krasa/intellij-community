@@ -63,7 +63,8 @@ public class MultiEditAction extends AnAction {
   }
 
   public static void executeWithMultiEdit(Runnable executeHandler, Editor editor, DataContext dataContext) {
-    //running that multiEdit logic twice is bad.
+    boolean clearEditorContext = false;
+    //running that multiEdit logic twice is bad, unless dataContext is null - it means that we should run it always 
     if (dataContext instanceof UserDataHolder) {
       final UserDataHolder userDataHolder = (UserDataHolder)dataContext;
       //TODO maybe there is a better way how to find out if there is lookup, I just do not see com.intellij.codeInsight.lookup.LookupManager#getActiveLookup
@@ -74,8 +75,9 @@ public class MultiEditAction extends AnAction {
         return;
       }
       else {
-        //todo SmartEnter dirty fix, those processors do not use action's datacontext... see com.intellij.codeInsight.editorActions.smartEnter.JavaSmartEnterProcessor.plainEnter()
+        //todo SmartEnter dirty fix, those processors do not use action's DataContext. see com.intellij.codeInsight.editorActions.smartEnter.JavaSmartEnterProcessor.plainEnter()
         editor.putUserData(ALREADY_PROCESSING, "1");
+        clearEditorContext = true;
         userDataHolder.putUserData(ALREADY_PROCESSING, "1");
       }
     }
@@ -129,7 +131,9 @@ public class MultiEditAction extends AnAction {
       }
     }
     finally {
-      editor.putUserData(ALREADY_PROCESSING, null);
+      if (clearEditorContext) {
+        editor.putUserData(ALREADY_PROCESSING, null);
+      }
     }
   }
 
