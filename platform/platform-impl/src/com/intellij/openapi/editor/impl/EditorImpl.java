@@ -4023,6 +4023,9 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
       
       mySelectionModel.removeBlockSelection();
       for (int i = 0; i < blockSelectionStarts.length; i++) {
+        if (!zeroWidthBlockSelection && blockSelectionStarts[i] == blockSelectionEnds[i]) {
+          continue;
+        }
         mySelectionModel.addMultiSelection(blockSelectionStarts[i], blockSelectionEnds[i], mySelectionModel.getBlockSelectionDirection(),
                                            zeroWidthBlockSelection);
       }
@@ -5604,9 +5607,15 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
       // are drawn) and annotations area. E.g. we don't want to change caret position if a user sets new break point (clicks
       // at 'line markers' area).
       if (e.getSource() != myGutterComponent
-          || (eventArea != EditorMouseEventArea.LINE_MARKERS_AREA && eventArea != EditorMouseEventArea.ANNOTATIONS_AREA))
-      {
+          || (eventArea != EditorMouseEventArea.LINE_MARKERS_AREA && eventArea != EditorMouseEventArea.ANNOTATIONS_AREA)) {
+        int previousOffset = getCaretModel().getOffset();
+
         moveCaretToScreenPos(x, y);
+
+        if (isMultiEditMode(e)) {
+            getCaretModel().addMultiCaret(previousOffset);
+            getCaretModel().addMultiCaret(getCaretModel().getOffset());
+        }
       }
 
       if (e.isPopupTrigger()) return isNavigation;

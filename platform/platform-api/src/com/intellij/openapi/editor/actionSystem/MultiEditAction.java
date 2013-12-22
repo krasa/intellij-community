@@ -38,19 +38,22 @@ import static java.lang.Math.min;
  *
  * @author Vojtech Krasa
  */
-public class MultiEditAction extends AnAction {
+public abstract class MultiEditAction  {
 
   public static final Key<Object> ALREADY_PROCESSING = Key.create("MultiEditAction.alreadyProcessing");
 
-  public void actionPerformed(AnActionEvent e) {
-    final DataContext dataContext = e.getDataContext();
-    final Editor editor = CommonDataKeys.EDITOR.getData(dataContext);
-    if (editor == null) {
-      return;
-    }
-    final CaretModel caretModel = editor.getCaretModel();
-    caretModel.addOrRemoveMultiCaret(caretModel.getOffset());
+  private MultiEditAction() {
   }
+
+//public void actionPerformed(AnActionEvent e) {
+    //final DataContext dataContext = e.getDataContext();
+    //final Editor editor = CommonDataKeys.EDITOR.getData(dataContext);
+    //if (editor == null) {
+    //  return;
+    //}
+    //final CaretModel caretModel = editor.getCaretModel();
+    //caretModel.addOrRemoveMultiCaret(caretModel.getOffset());
+  //}
 
 
   public static Runnable wrapRunnable(final Runnable executeHandler, final Editor editor, final DataContext dataContext) {

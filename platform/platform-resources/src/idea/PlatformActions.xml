@@ -58,9 +58,6 @@
       <action id="EditorPasteSimple" class="com.intellij.openapi.editor.actions.SimplePasteAction"/>
       <action id="EditorPasteFromX11" class="com.intellij.openapi.editor.actions.PasteFromX11Action"/>
       <action id="EditorDelete" class="com.intellij.openapi.editor.actions.DeleteAction" use-shortcut-of="$Delete"/>
-      <action id="EditorPlaceAdditionalCaret" class="com.intellij.openapi.editor.actionSystem.MultiEditAction">
-              <mouse-shortcut keymap="$default" keystroke="alt shift button1"/>
-      </action>
       <action id="EditorBackSpace" class="com.intellij.openapi.editor.actions.BackspaceAction"/>
       <action id="EditorHungryBackSpace" class="com.intellij.openapi.editor.actions.HungryBackspaceAction"/>
       <action id="EditorMoveToPageTop" class="com.intellij.openapi.editor.actions.PageTopAction"/>

@@ -143,7 +143,7 @@ public class TextComponentCaretModel implements CaretModel {
   }
 
   @Override
-  public void addOrRemoveMultiCaret(int offset) {
+  public boolean addOrRemoveMultiCaret(int offset) {
     throw new UnsupportedOperationException("Not implemented");
   }
 

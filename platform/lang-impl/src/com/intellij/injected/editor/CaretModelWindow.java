@@ -154,8 +154,8 @@ public class CaretModelWindow implements CaretModel {
   }
 
   @Override
-  public void addOrRemoveMultiCaret(int offset) {
-    myDelegate.addOrRemoveMultiCaret(offset);
+  public boolean addOrRemoveMultiCaret(int offset) {
+    return myDelegate.addOrRemoveMultiCaret(offset);
   }
 
   @Override

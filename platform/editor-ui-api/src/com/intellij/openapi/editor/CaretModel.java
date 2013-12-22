@@ -145,7 +145,7 @@ public interface CaretModel {
 
   boolean hasMultiCarets();
 
-  void addOrRemoveMultiCaret(int offset);
+  boolean addOrRemoveMultiCaret(int offset);
 
   void addMultiCaret(int offset);
 

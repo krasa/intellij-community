@@ -877,7 +877,7 @@ public class CaretModelImpl implements CaretModel, PrioritizedDocumentListener, 
   }
 
   @Override
-  public void addOrRemoveMultiCaret(int offset) {
+  public boolean addOrRemoveMultiCaret(int offset) {
     final RangeHighlighter[] allHighlighters = myEditor.getMarkupModel().getAllHighlighters();
     boolean existed = false;
     for (RangeHighlighter highlighter : allHighlighters) {
@@ -889,6 +889,7 @@ public class CaretModelImpl implements CaretModel, PrioritizedDocumentListener, 
     if (!existed) {
       addMultiCaret(offset);
     }
+    return !existed;
   }
 
   @Override
