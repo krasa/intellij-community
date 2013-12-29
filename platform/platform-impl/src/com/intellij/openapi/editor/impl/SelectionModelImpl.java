@@ -907,13 +907,13 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
   public void addMultiSelection(int selectionStart,
                                 int selectionEnd,
                                 final Direction direction,
-                                final boolean putCaretForZeroForSelection) {
+                                final boolean addCaretForZeroWidthSelection) {
     final EditorMarkupModelImpl markupModel = (EditorMarkupModelImpl)myEditor.getMarkupModel();
 
     RangeHighlighterExProcessor processor = processOverlappingHighlighters(selectionStart, selectionEnd);
     final int mergedStartOffset = processor.startOffset;
     final int mergedEndOffset = processor.endOffset;
-    
+
     //remove overlapping selections and carets
     for (RangeHighlighterEx rangeHighlighterEx : processor.myList) {
       markupModel.removeHighlighter(rangeHighlighterEx);
@@ -929,18 +929,17 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
                            HighlighterTargetArea.EXACT_RANGE);
 
 
-    if (putCaretForZeroForSelection && mergedStartOffset == mergedEndOffset) {
-      markupModel.removeHighlighter(rangeHighlighter);
-      myEditor.getCaretModel().addMultiCaret(direction == Direction.LEFT ? mergedStartOffset : mergedEndOffset);
-      myEditor.getCaretModel().moveToOffset(direction == Direction.LEFT ? mergedStartOffset : mergedEndOffset);
-    }
     if (mergedStartOffset == mergedEndOffset) {
+      //no need for keeping empty selection
       markupModel.removeHighlighter(rangeHighlighter);
     }
-    else {
-      //we need to add caret on the end or start of selection, so that shift+arrow works
-      myEditor.getCaretModel().addMultiCaret(direction == Direction.LEFT ? mergedStartOffset : mergedEndOffset);
-      myEditor.getCaretModel().moveToOffset(direction == Direction.LEFT ? mergedStartOffset : mergedEndOffset);
+
+    if (direction != null) {
+      if ((addCaretForZeroWidthSelection && mergedStartOffset == mergedEndOffset) || mergedStartOffset != mergedEndOffset) {
+         //we need to add caret on the end or start of selection, so that shift+arrow works
+        myEditor.getCaretModel().addMultiCaret(direction == Direction.LEFT ? mergedStartOffset : mergedEndOffset);
+        myEditor.getCaretModel().moveToOffset(direction == Direction.LEFT ? mergedStartOffset : mergedEndOffset);
+      }
     }
     myHasMultiSelection = true;
   }

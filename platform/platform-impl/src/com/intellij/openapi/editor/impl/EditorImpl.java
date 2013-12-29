@@ -843,17 +843,6 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     myEditorComponent.addMouseMotionListener(mouseMotionListener);
     myGutterComponent.addMouseMotionListener(mouseMotionListener);
 
-    this.addEditorMouseListener(new EditorMouseAdapter() {
-      @Override
-      public void mouseClicked(EditorMouseEvent e) {
-        final MouseEvent mouseEvent = e.getMouseEvent();
-        if (!isMultiEditMode(mouseEvent)) {
-          getSelectionModel().removeMultiSelections();
-          getCaretModel().removeMultiCarets();
-        }
-      }
-    });
-    
     myEditorComponent.addFocusListener(new FocusAdapter() {
       @Override
       public void focusGained(FocusEvent e) {
@@ -4017,18 +4006,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
       getSelectionModel().removeSelection();
     }
     else if (isMultiEditMode(e) && getSelectionModel().hasBlockSelection()) {
-      final int[] blockSelectionStarts = getSelectionModel().getBlockSelectionStarts();
-      final int[] blockSelectionEnds = getSelectionModel().getBlockSelectionEnds();
-      final boolean zeroWidthBlockSelection = isZeroWidthBlockSelection(blockSelectionStarts, blockSelectionEnds);
-      
-      mySelectionModel.removeBlockSelection();
-      for (int i = 0; i < blockSelectionStarts.length; i++) {
-        if (!zeroWidthBlockSelection && blockSelectionStarts[i] == blockSelectionEnds[i]) {
-          continue;
-        }
-        mySelectionModel.addMultiSelection(blockSelectionStarts[i], blockSelectionEnds[i], mySelectionModel.getBlockSelectionDirection(),
-                                           zeroWidthBlockSelection);
-      }
+      addBlockMultiSelection();
     }
     else if (isMultiEditMode(e)) {
       final boolean putCursorOnStart = getSelectionModel().getSelectionStart() == getCaretModel().getOffset();
@@ -5606,15 +5584,23 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
       // Don't move caret on mouse press above gutter line markers area (a place where break points, 'override', 'implements' etc icons
       // are drawn) and annotations area. E.g. we don't want to change caret position if a user sets new break point (clicks
       // at 'line markers' area).
-      if (e.getSource() != myGutterComponent
-          || (eventArea != EditorMouseEventArea.LINE_MARKERS_AREA && eventArea != EditorMouseEventArea.ANNOTATIONS_AREA)) {
-        int previousOffset = getCaretModel().getOffset();
+      if (e.getSource() != myGutterComponent ||
+          (eventArea != EditorMouseEventArea.LINE_MARKERS_AREA && eventArea != EditorMouseEventArea.ANNOTATIONS_AREA)) {
+
+        if (isMultiEditMode(e)) {
+          if (oldStart != oldEnd) {
+            getSelectionModel().addMultiSelection(oldStart, oldEnd, null, false);
+          }
+          if (getSelectionModel().hasBlockSelection()) {
+            addBlockMultiSelection();
+          }
+          getCaretModel().addMultiCaret(getCaretModel().getOffset());
+        }
 
         moveCaretToScreenPos(x, y);
 
         if (isMultiEditMode(e)) {
-            getCaretModel().addMultiCaret(previousOffset);
-            getCaretModel().addMultiCaret(getCaretModel().getOffset());
+          getCaretModel().addMultiCaret(getCaretModel().getOffset());
         }
       }
 
@@ -5707,6 +5693,21 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
       }
 
       return isNavigation;
+    }
+  }
+
+  private void addBlockMultiSelection() {
+    final int[] blockSelectionStarts = getSelectionModel().getBlockSelectionStarts();
+    final int[] blockSelectionEnds = getSelectionModel().getBlockSelectionEnds();
+    final boolean zeroWidthBlockSelection = isZeroWidthBlockSelection(blockSelectionStarts, blockSelectionEnds);
+
+    mySelectionModel.removeBlockSelection();
+    for (int i = 0; i < blockSelectionStarts.length; i++) {
+      if (!zeroWidthBlockSelection && blockSelectionStarts[i] == blockSelectionEnds[i]) {
+        continue;
+      }
+      mySelectionModel.addMultiSelection(blockSelectionStarts[i], blockSelectionEnds[i], mySelectionModel.getBlockSelectionDirection(),
+                                         zeroWidthBlockSelection);
     }
   }
 

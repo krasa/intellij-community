@@ -259,7 +259,7 @@ public interface SelectionModel {
   void addMultiSelection(int selectionStart,
                          int selectionEnd,
                          final Direction direction,
-                         final boolean putCaretForZeroForSelection);
+                         final boolean addCaretForZeroWidthSelection);
 
   void removeMultiSelections();
 
