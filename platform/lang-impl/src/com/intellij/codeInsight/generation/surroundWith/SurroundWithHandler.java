@@ -41,6 +41,7 @@ import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.LogicalPosition;
 import com.intellij.openapi.editor.ScrollType;
 import com.intellij.openapi.editor.SelectionModel;
+import com.intellij.openapi.editor.actionSystem.MultiEditAction;
 import com.intellij.openapi.extensions.Extensions;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.options.ShowSettingsUtil;
@@ -140,7 +141,7 @@ public class SurroundWithHandler implements CodeInsightActionHandler {
       return null;
     }
 
-    Map<Surrounder, PsiElement[]> surrounders = ContainerUtil.newLinkedHashMap();
+    Map<SurroundDescriptor, PsiElement[]> surrounders = ContainerUtil.newLinkedHashMap();
     for (SurroundDescriptor descriptor : surroundDescriptors) {
       final PsiElement[] elements = descriptor.getElementsToSurround(file, startOffset, endOffset);
       if (elements.length > 0) {
@@ -148,9 +149,7 @@ public class SurroundWithHandler implements CodeInsightActionHandler {
           assert element != null : "descriptor " + descriptor + " returned null element";
           assert element.isValid() : descriptor;
         }
-        for (Surrounder s: descriptor.getSurrounders()) {
-          surrounders.put(s, elements);
-        }
+        surrounders.put(descriptor, elements);
       }
     }
     return doBuildSurroundActions(project, editor, file, surrounders);
@@ -213,33 +212,35 @@ public class SurroundWithHandler implements CodeInsightActionHandler {
 
   @Nullable
   private static List<AnAction> doBuildSurroundActions(Project project,
-                                                     Editor editor,
-                                                     PsiFile file,
-                                                     Map<Surrounder, PsiElement[]> surrounders) {
+                                                       Editor editor,
+                                                       PsiFile file,
+                                                       Map<SurroundDescriptor, PsiElement[]> surrounders) {
     final List<AnAction> applicable = new ArrayList<AnAction>();
     boolean hasEnabledSurrounders = false;
 
     Set<Character> usedMnemonicsSet = new HashSet<Character>();
 
     int index = 0;
-    for (Map.Entry<Surrounder, PsiElement[]> entry : surrounders.entrySet()) {
-      Surrounder surrounder = entry.getKey();
-      PsiElement[] elements = entry.getValue();
-      if (surrounder.isApplicable(elements)) {
-        char mnemonic;
-        if (index < 9) {
-          mnemonic = (char)('0' + index + 1);
+    for (Map.Entry<SurroundDescriptor, PsiElement[]> entry : surrounders.entrySet()) {
+      SurroundDescriptor surroundDescriptor = entry.getKey();
+      for (Surrounder surrounder : surroundDescriptor.getSurrounders()) {
+        PsiElement[] elements = entry.getValue();
+        if (surrounder.isApplicable(elements)) {
+          char mnemonic;
+          if (index < 9) {
+            mnemonic = (char)('0' + index + 1);
+          }
+          else if (index == 9) {
+            mnemonic = '0';
+          }
+          else {
+            mnemonic = (char)('A' + index - 10);
+          }
+          index++;
+          usedMnemonicsSet.add(Character.toUpperCase(mnemonic));
+          applicable.add(new InvokeSurrounderAction(surrounder, project, editor, surroundDescriptor, mnemonic));
+          hasEnabledSurrounders = true;
         }
-        else if (index == 9) {
-          mnemonic = '0';
-        }
-        else {
-          mnemonic = (char)('A' + index - 10);
-        }
-        index++;
-        usedMnemonicsSet.add(Character.toUpperCase(mnemonic));
-        applicable.add(new InvokeSurrounderAction(surrounder, project, editor, elements, mnemonic));
-        hasEnabledSurrounders = true;
       }
     }
 
@@ -271,14 +272,14 @@ public class SurroundWithHandler implements CodeInsightActionHandler {
     private final Surrounder mySurrounder;
     private final Project myProject;
     private final Editor myEditor;
-    private final PsiElement[] myElements;
+    private final SurroundDescriptor mySurroundDescriptor;
 
-    public InvokeSurrounderAction(Surrounder surrounder, Project project, Editor editor, PsiElement[] elements, char mnemonic) {
+    public InvokeSurrounderAction(Surrounder surrounder, Project project, Editor editor, SurroundDescriptor surroundDescriptor, char mnemonic) {
       super(UIUtil.MNEMONIC + String.valueOf(mnemonic) + ". " + surrounder.getTemplateDescription());
       mySurrounder = surrounder;
       myProject = project;
       myEditor = editor;
-      myElements = elements;
+      mySurroundDescriptor = surroundDescriptor;
     }
 
     @Override
@@ -286,7 +287,34 @@ public class SurroundWithHandler implements CodeInsightActionHandler {
       new WriteCommandAction(myProject) {
         @Override
         protected void run(Result result) throws Exception {
-          doSurround(myProject, myEditor, mySurrounder, myElements);
+          MultiEditAction.executeWithMultiEdit(new Runnable() {
+            @Override
+            public void run() {
+              PsiFile file = PsiDocumentManager.getInstance(myProject).getCachedPsiFile(myEditor.getDocument());
+              if (!myEditor.getSelectionModel().hasSelection()) {
+                return;
+              }
+              int startOffset = myEditor.getSelectionModel().getSelectionStart();
+              int endOffset = myEditor.getSelectionModel().getSelectionEnd();
+
+              //todo do we need it?
+              PsiElement element1 = file.findElementAt(startOffset);
+              PsiElement element2 = file.findElementAt(endOffset - 1);
+              if (element1 == null || element2 == null) return;
+
+              TextRange textRange = new TextRange(startOffset, endOffset);
+              for (SurroundWithRangeAdjuster adjuster : Extensions.getExtensions(SurroundWithRangeAdjuster.EP_NAME)) {
+                textRange = adjuster.adjustSurroundWithRange(file, textRange);
+                if (textRange == null) return;
+              }
+              startOffset = textRange.getStartOffset();
+              endOffset = textRange.getEndOffset();
+
+              final PsiElement[] elements = mySurroundDescriptor.getElementsToSurround(file, startOffset, endOffset);
+              //TODO krasa bug with try-catch template, some reformat or something screws up cursors, also some fix down the road will be needed
+              doSurround(myProject, myEditor, mySurrounder, elements);
+            }
+          }, myEditor, null);
         }
       }.execute();
     }

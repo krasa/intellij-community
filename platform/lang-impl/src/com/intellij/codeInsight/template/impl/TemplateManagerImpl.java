@@ -159,7 +159,7 @@ public class TemplateManagerImpl extends TemplateManager implements ProjectCompo
 
   @Override
   public void startTemplate(@NotNull Editor editor, String selectionString, @NotNull Template template) {
-    startTemplate(editor, selectionString, template, true, null, null, null);
+    startTemplate(editor, selectionString, template, false, null, null, null);
   }
 
   @Override
