@@ -4008,10 +4008,13 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     else if (isMultiEditMode(e) && getSelectionModel().hasBlockSelection()) {
       addBlockMultiSelection();
     }
-    else if (isMultiEditMode(e)) {
+    else if (isMultiEditMode(e) && getSelectionModel().hasSelection()) {
       final boolean putCursorOnStart = getSelectionModel().getSelectionStart() == getCaretModel().getOffset();
       final SelectionModel.Direction direction = SelectionModel.Direction.getDirection(putCursorOnStart);
       mySelectionModel.addMultiSelection(getSelectionModel().getSelectionStart(), getSelectionModel().getSelectionEnd(), direction, true);
+    }
+    else if (isMultiEditMode(e) ) {
+      myCaretModel.addMultiCaret(myCaretModel.getOffset());
     }
     else {
       getSelectionModel().removeMultiSelections();
@@ -5598,10 +5601,6 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
         }
 
         moveCaretToScreenPos(x, y);
-
-        if (isMultiEditMode(e)) {
-          getCaretModel().addMultiCaret(getCaretModel().getOffset());
-        }
       }
 
       if (e.isPopupTrigger()) return isNavigation;
