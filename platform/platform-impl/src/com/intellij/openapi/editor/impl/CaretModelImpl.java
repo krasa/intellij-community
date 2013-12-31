@@ -924,7 +924,7 @@ public class CaretModelImpl implements CaretModel, PrioritizedDocumentListener, 
   }
 
   @Override
-  public Collection<Integer> getMultiCaretOffsetsAndRemoveThem() {
+  public Collection<Integer> getAndRemoveMultiCaretOffsets() {
     final RangeHighlighter[] allHighlighters = myEditor.getMarkupModel().getAllHighlighters();
     Set<Integer> offsets = new HashSet<Integer>();
     for (RangeHighlighter highlighter : allHighlighters) {

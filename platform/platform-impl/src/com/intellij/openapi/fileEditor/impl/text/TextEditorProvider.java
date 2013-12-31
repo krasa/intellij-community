@@ -39,6 +39,7 @@ import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.pom.Navigatable;
 import com.intellij.psi.SingleRootFileViewProvider;
+import com.intellij.util.Range;
 import org.jdom.Element;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
@@ -46,6 +47,7 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.beans.PropertyChangeListener;
+import java.util.List;
 
 /**
  * @author Anton Katilin
@@ -196,7 +198,9 @@ public class TextEditorProvider implements FileEditorProvider, DumbAware {
     state.COLUMN = editor.getCaretModel().getLogicalPosition().column;
     state.SELECTION_START = editor.getSelectionModel().getSelectionStart();
     state.SELECTION_END = editor.getSelectionModel().getSelectionEnd();
-
+    
+    state.setMultiEditState(new MultiEditState(editor.getSelectionModel().getMultiSelections(),editor.getCaretModel().getMultiCaretOffsets()));
+    
     // Saving scrolling proportion on UNDO may cause undesirable results of undo action fails to perform since
     // scrolling proportion restored slightly differs from what have been saved.
     state.VERTICAL_SCROLL_PROPORTION = level == FileEditorStateLevel.UNDO ? -1 : EditorUtil.calcVerticalScrollProportion(editor);
@@ -245,6 +249,22 @@ public class TextEditorProvider implements FileEditorProvider, DumbAware {
     }
     if (!preciselyScrollVertically) {
       editor.getScrollingModel().scrollToCaret(ScrollType.RELATIVE);
+    }
+    
+    final MultiEditState multiEditState = state.getMultiEditState();
+    if (multiEditState != null) {
+      final List<Range<Integer>> multiEditRanges = multiEditState.getMultiEditRanges();
+      editor.getCaretModel().removeMultiCarets();
+      editor.getSelectionModel().removeMultiSelections();
+      
+      for (Range<Integer> multiEditRange : multiEditRanges) {
+        if (multiEditRange.getFrom().equals(multiEditRange.getTo())) {
+          editor.getCaretModel().addMultiCaret(multiEditRange.getTo());
+        }
+        else {
+          editor.getSelectionModel().addMultiSelection(multiEditRange.getFrom(), multiEditRange.getTo(), null, false);
+        }
+      }
     }
   }
 

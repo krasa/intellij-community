@@ -15,9 +15,6 @@
  */
 package com.intellij.openapi.editor.actionSystem;
 
-import com.intellij.openapi.actionSystem.AnAction;
-import com.intellij.openapi.actionSystem.AnActionEvent;
-import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.editor.CaretModel;
 import com.intellij.openapi.editor.Editor;
@@ -88,7 +85,7 @@ public abstract class MultiEditAction  {
     try {
       SelectionModel selectionModel = editor.getSelectionModel();
       CaretModel caretModel = editor.getCaretModel();
-      final List<Range<Integer>> caretsAndSelections = getMultiEditRanges(editor);
+      final List<Range<Integer>> caretsAndSelections = getAndRemoveMultiEditRanges(editor);
 
       if (caretsAndSelections.isEmpty()) {
         executeHandler.run();
@@ -140,13 +137,13 @@ public abstract class MultiEditAction  {
     }
   }
 
-  public static List<Range<Integer>> getMultiEditRanges(Editor editor) {
+  public static List<Range<Integer>> getAndRemoveMultiEditRanges(Editor editor) {
     SelectionModel selectionModel = editor.getSelectionModel();
     CaretModel caretModel = editor.getCaretModel();
 
 
-    final List<Range<Integer>> multiSelects = selectionModel.getMultiSelectionsAndRemoveThem();
-    List<Integer> carets = new ArrayList<Integer>(caretModel.getMultiCaretOffsetsAndRemoveThem());
+    final List<Range<Integer>> multiSelects = selectionModel.getAndRemoveMultiSelections();
+    List<Integer> carets = new ArrayList<Integer>(caretModel.getAndRemoveMultiCaretOffsets());
     return merge(carets, multiSelects);
   }
 

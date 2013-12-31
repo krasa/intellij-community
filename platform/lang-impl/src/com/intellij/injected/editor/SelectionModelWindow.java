@@ -212,7 +212,12 @@ public class SelectionModelWindow implements SelectionModel {
   }
 
   @Override
-  public List<Range<Integer>> getMultiSelectionsAndRemoveThem() {
-    return myHostModel.getMultiSelectionsAndRemoveThem();
+  public List<Range<Integer>> getAndRemoveMultiSelections() {
+    return myHostModel.getAndRemoveMultiSelections();
+  }
+
+  @Override
+  public List<Range<Integer>> getMultiSelections() {
+    return myHostModel.getMultiSelections();
   }
 }

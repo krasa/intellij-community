@@ -991,13 +991,25 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
   }
 
   @Override
-  public List<Range<Integer>> getMultiSelectionsAndRemoveThem() {
+  public List<Range<Integer>> getAndRemoveMultiSelections() {
     List<Range<Integer>> selections = new ArrayList<Range<Integer>>();
     final MarkupModel markupModel = myEditor.getMarkupModel();
     for (RangeHighlighter rangeHighlighter : markupModel.getAllHighlighters()) {
       if (rangeHighlighter.getLayer() == HighlighterLayer.MULTI_EDIT_SELECTION) {
         selections.add(new Range<Integer>(rangeHighlighter.getStartOffset(), rangeHighlighter.getEndOffset()));
         markupModel.removeHighlighter(rangeHighlighter);
+      }
+    }
+    return selections;
+  }
+
+  @Override
+  public List<Range<Integer>> getMultiSelections() {
+    List<Range<Integer>> selections = new ArrayList<Range<Integer>>();
+    final MarkupModel markupModel = myEditor.getMarkupModel();
+    for (RangeHighlighter rangeHighlighter : markupModel.getAllHighlighters()) {
+      if (rangeHighlighter.getLayer() == HighlighterLayer.MULTI_EDIT_SELECTION) {
+        selections.add(new Range<Integer>(rangeHighlighter.getStartOffset(), rangeHighlighter.getEndOffset()));
       }
     }
     return selections;

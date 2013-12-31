@@ -217,7 +217,12 @@ public class TextComponentSelectionModel implements SelectionModel {
   }
 
   @Override
-  public List<Range<Integer>> getMultiSelectionsAndRemoveThem() {
+  public List<Range<Integer>> getAndRemoveMultiSelections() {
+    throw new UnsupportedOperationException("Not implemented");
+  }
+
+  @Override
+  public List<Range<Integer>> getMultiSelections() {
     throw new UnsupportedOperationException("Not implemented");
   }
 }

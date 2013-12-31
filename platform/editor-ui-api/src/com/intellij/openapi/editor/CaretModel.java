@@ -151,5 +151,5 @@ public interface CaretModel {
 
   Collection<Integer> getMultiCaretOffsets();
 
-  Collection<Integer> getMultiCaretOffsetsAndRemoveThem();
+  Collection<Integer> getAndRemoveMultiCaretOffsets();
 }

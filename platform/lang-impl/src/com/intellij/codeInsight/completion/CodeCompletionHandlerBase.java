@@ -598,7 +598,7 @@ public class CodeCompletionHandlerBase {
       idEndOffset = CompletionInitializationContext.calcDefaultIdentifierEnd(editor, caretOffset);
     }
 
-    final Collection<Integer> multiCaretOffsets1 = editor.getCaretModel().getMultiCaretOffsetsAndRemoveThem();
+    final Collection<Integer> multiCaretOffsets1 = editor.getCaretModel().getAndRemoveMultiCaretOffsets();
     final Integer[] multiCaretOffsets = multiCaretOffsets1.toArray(new Integer[multiCaretOffsets1.size()]);
     final boolean isMultiEdit = multiCaretOffsets.length > 0;
 
