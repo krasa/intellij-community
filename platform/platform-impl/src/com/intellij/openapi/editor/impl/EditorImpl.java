@@ -434,7 +434,6 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
       public void recalculationEnds() {
         if (myCaretModel.isUpToDate()) {
           myCaretModel.updateVisualPosition();
-          myScrollingModel.scrollToCaret(ScrollType.RELATIVE);
         }
       }
 
@@ -901,12 +900,39 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
 
   @Override
   public void setFontSize(final int fontSize) {
+    setFontSize(fontSize, null);
+  }
+
+  /**
+   * Changes editor font size, attempting to keep a given point unmoved. If point is not given, top left screen corner is assumed.
+   *
+   * @param fontSize new font size
+   * @param zoomCenter zoom point, relative to viewport
+   */
+  private void setFontSize(final int fontSize, @Nullable Point zoomCenter) {
     int oldFontSize = myScheme.getEditorFontSize();
+
+    Rectangle visibleArea = myScrollingModel.getVisibleArea();
+    Point zoomCenterRelative = zoomCenter == null ? new Point() : zoomCenter;
+    Point zoomCenterAbsolute = new Point(visibleArea.x + zoomCenterRelative.x, visibleArea.y + zoomCenterRelative.y);
+    LogicalPosition zoomCenterLogical = xyToLogicalPosition(zoomCenterAbsolute).withoutVisualPositionInfo();
+    int oldLineHeight = getLineHeight();
+    int intraLineOffset = zoomCenterAbsolute.y % oldLineHeight;
+
     myScheme.setEditorFontSize(fontSize);
     myPropertyChangeSupport.firePropertyChange(PROP_FONT_SIZE, oldFontSize, fontSize);
     // Update vertical scroll bar bounds if necessary (we had a problem that use increased editor font size and it was not possible
     // to scroll to the bottom of the document).
     myScrollPane.getViewport().invalidate();
+
+    Point shiftedZoomCenterAbsolute = logicalPositionToXY(zoomCenterLogical);
+    myScrollingModel.disableAnimation();
+    try {
+      myScrollingModel.scrollToOffsets(visibleArea.x == 0 ? 0 : shiftedZoomCenterAbsolute.x - zoomCenterRelative.x, // stick to left border if it's visible
+                                       shiftedZoomCenterAbsolute.y - zoomCenterRelative.y + (intraLineOffset * getLineHeight() + oldLineHeight / 2) / oldLineHeight);
+    } finally {
+      myScrollingModel.enableAnimation();
+    }
   }
 
   public int getFontSize() {
@@ -1173,10 +1199,10 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
         else {
           prevX = x;
           c = text.charAt(offset);
-          charWidth = charToVisibleWidth(c, fontType, x);
-          if (charWidth == 0) {
+          if (c == '\n') {
             break;
           }
+          charWidth = charToVisibleWidth(c, fontType, x);
           x += charWidth;
 
           if (x >= px) {
@@ -1279,11 +1305,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
   public int offsetToVisualLine(int offset) {
     int textLength = getDocument().getTextLength();
     if (offset >= textLength) {
-      int result = Math.max(0, getVisibleLineCount() - 1); // lines are 0 based
-      if (textLength > 0 && getDocument().getCharsSequence().charAt(textLength - 1) == '\n') {
-        result++;
-      }
-      return result;
+      return Math.max(0, getVisibleLineCount() - 1); // lines are 0 based
     }
     int line = offsetToLogicalLine(offset);
     int lineStartOffset = line >= myDocument.getLineCount() ? myDocument.getTextLength() : myDocument.getLineStartOffset(line);
@@ -4146,7 +4168,8 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
       // further dragging (if any).
       if (myDragOnGutterSelectionStartLine >= 0) {
         mySelectionModel.removeSelection();
-        myCaretModel.moveToOffset(myDocument.getLineStartOffset(myDragOnGutterSelectionStartLine));
+        myCaretModel.moveToOffset(myDragOnGutterSelectionStartLine < myDocument.getLineCount()
+                                  ? myDocument.getLineStartOffset(myDragOnGutterSelectionStartLine) : myDocument.getTextLength());
       }
       myDragOnGutterSelectionStartLine = - 1;
     }
@@ -5560,6 +5583,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
           y = myGutterComponent.getHeadCenterY(range);
           getScrollingModel().scrollVertically(y - scrollShift);
           myGutterComponent.updateSize();
+          validateMousePointer(e);
           return isNavigation;
         }
       }
@@ -6596,8 +6620,6 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
   }
 
   private class MyScrollPane extends JBScrollPane {
-
-
     private MyScrollPane() {
       setViewportBorder(new EmptyBorder(0, 0, 0, 0));
     }
@@ -6608,7 +6630,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
         if (EditorUtil.isChangeFontSize(e)) {
           int size = myScheme.getEditorFontSize() - e.getWheelRotation();
           if (size >= MIN_FONT_SIZE) {
-            setFontSize(size);
+            setFontSize(size, SwingUtilities.convertPoint(this, e.getPoint(), getViewport()));
           }
           return;
         }
