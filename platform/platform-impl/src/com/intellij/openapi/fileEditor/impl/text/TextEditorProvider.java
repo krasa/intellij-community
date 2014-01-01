@@ -47,6 +47,7 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.beans.PropertyChangeListener;
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -198,8 +199,10 @@ public class TextEditorProvider implements FileEditorProvider, DumbAware {
     state.COLUMN = editor.getCaretModel().getLogicalPosition().column;
     state.SELECTION_START = editor.getSelectionModel().getSelectionStart();
     state.SELECTION_END = editor.getSelectionModel().getSelectionEnd();
-    
-    state.setMultiEditState(new MultiEditState(editor.getSelectionModel().getMultiSelections(),editor.getCaretModel().getMultiCaretOffsets()));
+
+    final List<Range<Integer>> multiSelections = editor.getSelectionModel().getMultiSelections();
+    final Collection<Integer> multiCaretOffsets = editor.getCaretModel().getMultiCaretOffsets();
+    state.setMultiEditState(new MultiEditState(multiSelections, multiCaretOffsets));
     
     // Saving scrolling proportion on UNDO may cause undesirable results of undo action fails to perform since
     // scrolling proportion restored slightly differs from what have been saved.
@@ -253,17 +256,14 @@ public class TextEditorProvider implements FileEditorProvider, DumbAware {
     
     final MultiEditState multiEditState = state.getMultiEditState();
     if (multiEditState != null) {
-      final List<Range<Integer>> multiEditRanges = multiEditState.getMultiEditRanges();
       editor.getCaretModel().removeMultiCarets();
       editor.getSelectionModel().removeMultiSelections();
-      
-      for (Range<Integer> multiEditRange : multiEditRanges) {
-        if (multiEditRange.getFrom().equals(multiEditRange.getTo())) {
-          editor.getCaretModel().addMultiCaret(multiEditRange.getTo());
-        }
-        else {
-          editor.getSelectionModel().addMultiSelection(multiEditRange.getFrom(), multiEditRange.getTo(), null, false);
-        }
+
+      for (Range<Integer> multiEditRange : multiEditState.getMultiEditSelections()) {
+        editor.getSelectionModel().addMultiSelection(multiEditRange.getFrom(), multiEditRange.getTo(), null, false);
+      }
+      for (Integer offset : multiEditState.getMultiCaretOffsets()) {
+        editor.getCaretModel().addMultiCaret(offset);
       }
     }
   }

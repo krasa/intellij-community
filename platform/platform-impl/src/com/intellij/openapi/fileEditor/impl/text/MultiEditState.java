@@ -1,7 +1,6 @@
 package com.intellij.openapi.fileEditor.impl.text;
 
 import com.intellij.util.Range;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
 import java.util.List;
@@ -10,19 +9,20 @@ import java.util.List;
  * @author Vojtech Krasa
  */
 public class MultiEditState {
-  @NotNull
-  private final List<Range<Integer>> myMultiEditRanges;
+  private final List<Range<Integer>> myMultiEditSelections;
+  private final Collection<Integer> myMultiCaretOffsets;
 
-  public MultiEditState(@NotNull List<Range<Integer>> multiEditRanges, Collection<Integer> multiCaretOffsets) {
-    for (Integer caretOffset : multiCaretOffsets) {
-      multiEditRanges.add(new Range<Integer>(caretOffset, caretOffset));
-    }
-    myMultiEditRanges = multiEditRanges;
+  public MultiEditState( List<Range<Integer>> selections, Collection<Integer> multiCaretOffsets) {
+    myMultiEditSelections = selections;
+    myMultiCaretOffsets = multiCaretOffsets;
   }
 
-  @NotNull
-  public List<Range<Integer>> getMultiEditRanges() {
-    return myMultiEditRanges;
+  public List<Range<Integer>> getMultiEditSelections() {
+    return myMultiEditSelections;
+  }
+
+  public Collection<Integer> getMultiCaretOffsets() {
+    return myMultiCaretOffsets;
   }
 
   @Override
@@ -32,13 +32,17 @@ public class MultiEditState {
 
     MultiEditState that = (MultiEditState)o;
 
-    if (!myMultiEditRanges.equals(that.myMultiEditRanges)) return false;
+    if (myMultiCaretOffsets != null ? !myMultiCaretOffsets.equals(that.myMultiCaretOffsets) : that.myMultiCaretOffsets != null)
+      return false;
+    if (myMultiEditSelections != null ? !myMultiEditSelections.equals(that.myMultiEditSelections) : that.myMultiEditSelections != null) return false;
 
     return true;
   }
 
   @Override
   public int hashCode() {
-    return myMultiEditRanges.hashCode();
+    int result = myMultiEditSelections != null ? myMultiEditSelections.hashCode() : 0;
+    result = 31 * result + (myMultiCaretOffsets != null ? myMultiCaretOffsets.hashCode() : 0);
+    return result;
   }
 }
