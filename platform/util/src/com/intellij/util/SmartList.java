@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 package com.intellij.util;
 
 import com.intellij.util.containers.EmptyIterator;
+import com.intellij.util.containers.SingletonIteratorBase;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
@@ -208,8 +209,7 @@ public class SmartList<E> extends AbstractList<E> {
     return super.iterator();
   }
 
-  private class SingletonIterator implements Iterator<E> {
-    private boolean myVisited;
+  private class SingletonIterator extends SingletonIteratorBase<E> {
     private final int myInitialModCount;
 
     public SingletonIterator() {
@@ -217,25 +217,20 @@ public class SmartList<E> extends AbstractList<E> {
     }
 
     @Override
-    public boolean hasNext() {
-      return !myVisited;
-    }
-
-    @Override
-    public E next() {
-      if (myVisited) throw new NoSuchElementException();
-      myVisited = true;
-      if (modCount != myInitialModCount) {
-        throw new ConcurrentModificationException("ModCount: " + modCount + "; expected: " + myInitialModCount);
-      }
+    protected E getElement() {
       return (E)myElem;
     }
 
     @Override
-    public void remove() {
+    protected void checkCoModification() {
       if (modCount != myInitialModCount) {
         throw new ConcurrentModificationException("ModCount: " + modCount + "; expected: " + myInitialModCount);
       }
+    }
+
+    @Override
+    public void remove() {
+      checkCoModification();
       clear();
     }
   }
@@ -263,8 +258,21 @@ public class SmartList<E> extends AbstractList<E> {
         return a;
       }
     }
-    //noinspection SuspiciousToArrayCall
-    return super.toArray(a);
+
+    if (a.length < mySize) {
+      return (T[])Arrays.copyOf((E[])myElem, mySize, a.getClass());
+    }
+    else if (mySize == 0) {
+      return a;
+    }
+    else {
+      //noinspection SuspiciousSystemArraycopy
+      System.arraycopy(myElem, 0, a, 0, mySize);
+      if (a.length > mySize) {
+        a[mySize] = null;
+      }
+      return a;
+    }
   }
 
   /**
