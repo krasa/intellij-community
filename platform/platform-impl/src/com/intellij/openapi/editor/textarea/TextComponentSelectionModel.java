@@ -31,6 +31,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.text.JTextComponent;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -208,21 +209,19 @@ public class TextComponentSelectionModel implements SelectionModel {
                                 int selectionEnd,
                                 final Direction direction,
                                 final boolean putCaretOnAllLinesWithZeroWidthSelection) {
-    throw new UnsupportedOperationException("Not implemented");
   }
 
   @Override
   public void removeMultiSelections() {
-    throw new UnsupportedOperationException("Not implemented");
   }
 
   @Override
   public List<Range<Integer>> getAndRemoveMultiSelections() {
-    throw new UnsupportedOperationException("Not implemented");
+    return Collections.emptyList();
   }
 
   @Override
   public List<Range<Integer>> getMultiSelections() {
-    throw new UnsupportedOperationException("Not implemented");
+    return Collections.emptyList();
   }
 }
