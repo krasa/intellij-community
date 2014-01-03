@@ -36,18 +36,15 @@ import java.awt.event.ActionListener;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
-/**
- * @author spleaner
- */
 public class WebBrowsersPanel extends JPanel {
   private final JPanel mySettingsPanel;
   private Map<BrowsersConfiguration.BrowserFamily, Pair<JCheckBox, TextFieldWithBrowseButton>> myBrowserSettingsMap = new THashMap<BrowsersConfiguration.BrowserFamily, Pair<JCheckBox, TextFieldWithBrowseButton>>();
   private final WebBrowserManager myBrowserManager;
 
-  public WebBrowsersPanel(WebBrowserManager browserManager) {
+  public WebBrowsersPanel() {
     setLayout(new BorderLayout());
 
-    myBrowserManager = browserManager;
+    myBrowserManager = WebBrowserManager.getInstance();
 
     mySettingsPanel = new JPanel();
     mySettingsPanel.setLayout(new BoxLayout(mySettingsPanel, BoxLayout.Y_AXIS));
@@ -124,7 +121,7 @@ public class WebBrowsersPanel extends JPanel {
   }
 
   private void editSettings(BrowsersConfiguration.BrowserFamily family) {
-    BrowserSpecificSettings settings = myBrowserManager.getBrowserSettings(family).getBrowserSpecificSettings();
+    BrowserSpecificSettings settings = myBrowserManager.getBrowserSettings(family).getSpecificSettings();
     if (settings == null) {
       settings = family.createBrowserSpecificSettings();
     }

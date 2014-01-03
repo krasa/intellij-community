@@ -15,7 +15,6 @@
  */
 package com.intellij.ide.browsers;
 
-import com.intellij.ide.BrowserSettings;
 import com.intellij.openapi.options.ShowSettingsUtil;
 import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.util.IconLoader;
@@ -39,8 +38,7 @@ public class BrowserSelector {
     myBrowserComboWithBrowse.addActionListener(new ActionListener() {
       @Override
       public void actionPerformed(ActionEvent e) {
-        final ShowSettingsUtil util = ShowSettingsUtil.getInstance();
-        util.editConfigurable(myBrowserComboWithBrowse, new BrowserSettings());
+        ShowSettingsUtil.getInstance().editConfigurable(myBrowserComboWithBrowse, new BrowserSettings());
 
         WebBrowser selectedItem = getSelected();
         initBrowsersComboModel(allowDefaultBrowser);
