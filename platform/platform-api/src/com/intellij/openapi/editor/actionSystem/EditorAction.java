@@ -81,12 +81,17 @@ public abstract class EditorAction extends AnAction implements DumbAware {
       @Override
       public void run() {
         final DataContext projectAwareDataContext = getProjectAwareDataContext(editor, dataContext);
-        MultiEditAction.executeWithMultiEdit(new Runnable() {
-          @Override
-          public void run() {
-            handler.execute(editor, projectAwareDataContext);
-          }
-        }, editor, projectAwareDataContext);
+        if (useMultiEdit()) {
+          MultiEditAction.executeWithMultiEdit(new Runnable() {
+            @Override
+            public void run() {
+              handler.execute(editor, projectAwareDataContext);
+            }
+          }, editor, projectAwareDataContext);
+        }
+        else {
+          handler.execute(editor, projectAwareDataContext);
+        }
       }
     };
 
@@ -105,6 +110,10 @@ public abstract class EditorAction extends AnAction implements DumbAware {
                                                   editor.getDocument());
   }
 
+  protected boolean useMultiEdit() {
+    return true;
+  }
+  
   public void update(Editor editor, Presentation presentation, DataContext dataContext) {
     presentation.setEnabled(getHandler().isEnabled(editor, dataContext));
   }

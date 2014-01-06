@@ -112,6 +112,9 @@
   <action id="FindWordAtCaret">
     <keyboard-shortcut first-keystroke="control F3"/>
   </action>
+  <action id="SelectNextWordAtCaret">
+    <keyboard-shortcut first-keystroke="control D"/>
+  </action>
   <action id="GotoDeclaration">
     <keyboard-shortcut first-keystroke="control B"/>
     <mouse-shortcut keystroke="ctrl button1"/>
@@ -393,7 +396,7 @@
     <keyboard-shortcut first-keystroke="control shift L"/>
   </action>
   <action id="EditorDuplicate">
-    <keyboard-shortcut first-keystroke="control D"/>
+    <keyboard-shortcut first-keystroke="control shift D"/>
   </action>
   <action id="CompareTwoFiles">
     <keyboard-shortcut first-keystroke="control D"/>

@@ -181,7 +181,7 @@ public abstract class MultiEditAction  {
     return caretsOrSelection.getFrom().equals(caretsOrSelection.getTo());
   }
 
-  private static List<Range<Integer>> merge(List<Integer> carets, List<Range<Integer>> caretModel) {
+  public static List<Range<Integer>> merge(List<Integer> carets, List<Range<Integer>> caretModel) {
     final ArrayList<Range<Integer>> merge = new ArrayList<Range<Integer>>(carets.size() + caretModel.size());
     merge.addAll(caretModel);
     for (Integer caretOffset : carets) {

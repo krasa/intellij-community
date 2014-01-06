@@ -57,6 +57,7 @@ import java.awt.*;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import static java.lang.Math.max;
@@ -992,6 +993,9 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
 
   @Override
   public List<Range<Integer>> getAndRemoveMultiSelections() {
+    if (!myHasMultiSelection) {
+      return Collections.emptyList();
+    }
     List<Range<Integer>> selections = new ArrayList<Range<Integer>>();
     final MarkupModel markupModel = myEditor.getMarkupModel();
     for (RangeHighlighter rangeHighlighter : markupModel.getAllHighlighters()) {
@@ -1005,6 +1009,9 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
 
   @Override
   public List<Range<Integer>> getMultiSelections() {
+    if (!myHasMultiSelection) {
+      return Collections.emptyList();
+    }
     List<Range<Integer>> selections = new ArrayList<Range<Integer>>();
     final MarkupModel markupModel = myEditor.getMarkupModel();
     for (RangeHighlighter rangeHighlighter : markupModel.getAllHighlighters()) {

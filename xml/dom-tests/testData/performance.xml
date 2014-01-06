@@ -285,6 +285,7 @@
         <action id="FindNext" class="xcom.intellij.ide.actions.SearchAgainAction" text="Find _Next" description="Repeat the last Find/Replace operation"/>
         <action id="FindPrevious" class="xcom.intellij.ide.actions.SearchBackAction" text="Find Pre_vious" description="Repeat the last Find/Replace operation in reverse direction"/>
         <action id="FindWordAtCaret" class="xcom.intellij.openapi.editor.actions.FindWordAtCaretAction" text="Find _Word at Caret" description="Find next occurrence of the word at caret"/>
+        <action id="SelectNextWordAtCaret" class="xcom.intellij.openapi.editor.actions.SelectNextWordAtCaretAction" text="Select Next Occurrence" description="Select next occurrence of the word at caret"/>
         <action id="IncrementalSearch" class="xcom.intellij.codeInsight.navigation.actions.IncrementalSearchAction" text="Incrementa_l Search" description="Start incremental search (searches string as you type)"/>
         <separator/>
         <action id="FindUsages" class="xcom.intellij.find.actions.FindUsagesAction" text="Find _Usages..." description="Find usages of the symbol at caret"/>
