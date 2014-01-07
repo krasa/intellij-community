@@ -155,7 +155,7 @@ public class FindUtil {
     UP, DOWN
   }
 
-  public static void findWordAtCaret(Project project, Editor editor) {
+  public static @Nullable FindResult findWordAtCaret(Project project, Editor editor) {
     int caretOffset = editor.getCaretModel().getOffset();
     Document document = editor.getDocument();
     CharSequence text = document.getCharsSequence();
@@ -182,7 +182,7 @@ public class FindUtil {
       end = editor.getSelectionModel().getSelectionEnd();
     }
     if (start >= end) {
-      return;
+      return null;
     }
     FindManager findManager = FindManager.getInstance(project);
     String s = text.subSequence(start, end).toString();
@@ -202,7 +202,7 @@ public class FindUtil {
     }
 
     findManager.setFindNextModel(model);
-    doSearch(project, editor, caretOffset, true, model, true);
+   return doSearch(project, editor, caretOffset, true, model, true);
   }
 
   public static void find(@NotNull final Project project, @NotNull final Editor editor) {

@@ -16,22 +16,28 @@
 
 package com.intellij.openapi.editor.actions;
 
+import com.intellij.codeInsight.editorActions.SelectWordUtil;
+import com.intellij.find.FindResult;
 import com.intellij.find.FindUtil;
 import com.intellij.ide.DataManager;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.editor.CaretModel;
+import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.SelectionModel;
 import com.intellij.openapi.editor.actionSystem.EditorAction;
 import com.intellij.openapi.editor.actionSystem.EditorActionHandler;
 import com.intellij.openapi.editor.actionSystem.MultiEditAction;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.TextRange;
 import com.intellij.util.Range;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+
+import static com.intellij.openapi.editor.SelectionModel.Direction.getDirection;
 
 /**
  * @author Vojtech Krasa
@@ -49,12 +55,12 @@ public class SelectNextWordAtCaretAction extends EditorAction {
 
       //add normal selections/carets when multi edit is not used
       if (selectionModel.hasSelection() && multiSelections.isEmpty()) {
-        final SelectionModel.Direction direction =
-          SelectionModel.Direction.getDirection(selectionModel.getSelectionStart() == caretModel.getOffset());
-        selectionModel.addMultiSelection(selectionModel.getSelectionStart(), selectionModel.getSelectionEnd(), direction, false);
-        multiSelections.add(new Range<Integer>(selectionModel.getSelectionStart(), selectionModel.getSelectionEnd()));
-        caretModel.addMultiCaret(caretModel.getOffset());
-        carets.add(direction == SelectionModel.Direction.LEFT ? selectionModel.getSelectionStart() : selectionModel.getSelectionEnd());
+        final int selectionStart = selectionModel.getSelectionStart();
+        final SelectionModel.Direction direction = getDirection(selectionStart == caretModel.getOffset());
+        final int selectionEnd = selectionModel.getSelectionEnd();
+        selectionModel.addMultiSelection(selectionStart, selectionEnd, direction, false);
+        multiSelections.add(new Range<Integer>(selectionStart, selectionEnd));
+        carets.add(direction == SelectionModel.Direction.LEFT ? selectionStart : selectionEnd);
       }
       else if (carets.isEmpty()) {
         caretModel.addMultiCaret(caretModel.getOffset());
@@ -62,50 +68,39 @@ public class SelectNextWordAtCaretAction extends EditorAction {
       }
 
       final List<Range<Integer>> caretsAndSelections = MultiEditAction.merge(carets, multiSelections);
-      boolean hadSingleCarets = selectWordAtCarets(editor, dataContext, selectionModel, caretModel, multiSelections, caretsAndSelections);
+      boolean hadSingleCarets = selectWordAtCarets(editor, multiSelections, caretsAndSelections);
 
       if (!hadSingleCarets) {
-        selectNextOccupancy(editor, project, selectionModel, caretModel, multiSelections, dataContext);
+        selectNextOccurrence(editor, project, multiSelections, dataContext);
       }
     }
 
-    //TODO krasa whole words?
-    private void selectNextOccupancy(Editor editor,
-                                     Project project,
-                                     SelectionModel selectionModel,
-                                     CaretModel caretModel,
-                                     List<Range<Integer>> multiSelections,
-                                     DataContext dataContext) {
+    private void selectNextOccurrence(Editor editor, Project project, List<Range<Integer>> multiSelections, DataContext dataContext) {
+      final SelectionModel selectionModel = editor.getSelectionModel();
       Collections.sort(multiSelections, MultiEditAction.RANGE_COMPARATOR);
       for (int i = 0; i < multiSelections.size(); i++) {
-        Range<Integer> selection = multiSelections.get(i);
-        selectionModel.setSelection(selection.getFrom(), selection.getTo());
-        caretModel.moveToOffset(selection.getTo());
-
-        FindUtil.findWordAtCaret(project, editor);
-        if (selectionModel.hasSelection()) {
-          int startOffset = selectionModel.getSelectionStart();
-          int endOffset = selectionModel.getSelectionEnd();
-          editor.getSelectionModel().addMultiSelection(startOffset, endOffset, SelectionModel.Direction.RIGHT, false);
+        final FindResult wordAtCaret = FindUtil.findWordAtCaret(project, editor);
+        if (wordAtCaret != null && wordAtCaret.isStringFound()) {
+          int startOffset = wordAtCaret.getStartOffset();
+          int endOffset = wordAtCaret.getEndOffset();
+          selectionModel.addMultiSelection(startOffset, endOffset, SelectionModel.Direction.RIGHT, false);
         }
         else {
           FindUtil.searchAgain(project, editor, dataContext);
           if (selectionModel.hasSelection()) {
             int startOffset = selectionModel.getSelectionStart();
             int endOffset = selectionModel.getSelectionEnd();
-            editor.getSelectionModel().addMultiSelection(startOffset, endOffset, SelectionModel.Direction.RIGHT, false);
+            selectionModel.addMultiSelection(startOffset, endOffset, SelectionModel.Direction.RIGHT, false);
           }
         }
         break;
       }
     }
 
-    private boolean selectWordAtCarets(Editor editor,
-                                       DataContext dataContext,
-                                       SelectionModel selectionModel,
-                                       CaretModel caretModel,
-                                       List<Range<Integer>> multiSelections,
-                                       List<Range<Integer>> caretsAndSelections) {
+    private boolean selectWordAtCarets(Editor editor, List<Range<Integer>> multiSelections, List<Range<Integer>> caretsAndSelections) {
+      final SelectionModel selectionModel = editor.getSelectionModel();
+      final CaretModel caretModel = editor.getCaretModel();
+      
       boolean hadSingleCarets = false;
       for (int i = 0; i < caretsAndSelections.size(); i++) {
         Range<Integer> integerRange = caretsAndSelections.get(i);
@@ -125,17 +120,34 @@ public class SelectNextWordAtCaretAction extends EditorAction {
         if (selectionModel.hasSelection()) {
           selectionModel.removeSelection();
         }
-        selectWordAtCaret(editor, dataContext, selectionModel, multiSelections);
+        selectWordAtCaret(editor, multiSelections);
       }
       return hadSingleCarets;
     }
 
-    private void selectWordAtCaret(Editor editor,
-                                   DataContext dataContext,
-                                   SelectionModel selectionModel,
-                                   List<Range<Integer>> multiSelections) {
-      final SelectWordAtCaretAction selectWordAtCaretAction = new SelectWordAtCaretAction();
-      selectWordAtCaretAction.getHandler().execute(editor, dataContext);
+    private void selectWordAtCaret(Editor editor, List<Range<Integer>> multiSelections) {
+      final SelectionModel selectionModel = editor.getSelectionModel();
+
+      //copy paste from com.intellij.openapi.editor.actions.SelectWordAtCaretAction.DefaultHandler
+      Document document = editor.getDocument();
+      CharSequence text = document.getCharsSequence();
+      List<TextRange> ranges = new ArrayList<TextRange>();
+      final int cursorOffset = editor.getCaretModel().getOffset();
+
+      SelectWordUtil.addWordSelection(false, text, cursorOffset, ranges);
+
+      if (ranges.isEmpty()) return;
+
+      int startWordOffset = Math.max(0, ranges.get(0).getStartOffset());
+      int endWordOffset = Math.min(ranges.get(0).getEndOffset(), document.getTextLength());
+
+      if (startWordOffset >= selectionModel.getSelectionStart() &&
+          selectionModel.getSelectionEnd() >= endWordOffset &&
+          ranges.size() == 1) {
+        startWordOffset = 0;
+        endWordOffset = document.getTextLength();
+      }
+      selectionModel.setSelection(startWordOffset, endWordOffset);
       if (selectionModel.hasSelection()) {
         final int selectionStart = selectionModel.getSelectionStart();
         final int selectionEnd = selectionModel.getSelectionEnd();
