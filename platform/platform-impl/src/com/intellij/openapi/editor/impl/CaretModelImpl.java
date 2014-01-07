@@ -34,10 +34,7 @@ import com.intellij.openapi.editor.colors.EditorColors;
 import com.intellij.openapi.editor.event.CaretEvent;
 import com.intellij.openapi.editor.event.CaretListener;
 import com.intellij.openapi.editor.event.DocumentEvent;
-import com.intellij.openapi.editor.ex.DocumentBulkUpdateListener;
-import com.intellij.openapi.editor.ex.DocumentEx;
-import com.intellij.openapi.editor.ex.EditorGutterComponentEx;
-import com.intellij.openapi.editor.ex.PrioritizedDocumentListener;
+import com.intellij.openapi.editor.ex.*;
 import com.intellij.openapi.editor.ex.util.EditorUtil;
 import com.intellij.openapi.editor.impl.event.DocumentEventImpl;
 import com.intellij.openapi.editor.impl.softwrap.SoftWrapHelper;
@@ -46,8 +43,11 @@ import com.intellij.openapi.editor.markup.HighlighterTargetArea;
 import com.intellij.openapi.editor.markup.RangeHighlighter;
 import com.intellij.openapi.editor.markup.TextAttributes;
 import com.intellij.openapi.ide.CopyPasteManager;
+import com.intellij.openapi.util.Condition;
 import com.intellij.openapi.util.text.StringUtil;
+import com.intellij.util.CommonProcessors;
 import com.intellij.util.EventDispatcher;
+import com.intellij.util.FilteringProcessor;
 import com.intellij.util.containers.HashSet;
 import com.intellij.util.diff.FilesTooBigForDiffException;
 import com.intellij.util.text.CharArrayUtil;
@@ -906,10 +906,50 @@ public class CaretModelImpl implements CaretModel, PrioritizedDocumentListener, 
     if (myEditor.getDocument().getTextLength() < offset) {
       return;
     }
-    myEditor.getMarkupModel()
-      .addRangeHighlighter(offset, offset, HighlighterLayer.MULTI_EDIT_CARET, TEXT_ATTRIBUTES, HighlighterTargetArea.EXACT_RANGE);
-    myHasMultiCarets = true;
+    final RangeHighlighterEx selection = getOverlappingHighlighter(offset, offset, HighlighterLayer.MULTI_EDIT_SELECTION);
+    if (selection == null) {
+      myEditor.getMarkupModel()
+        .addRangeHighlighter(offset, offset, HighlighterLayer.MULTI_EDIT_CARET, TEXT_ATTRIBUTES, HighlighterTargetArea.EXACT_RANGE);
+      myHasMultiCarets = true;
+    }
+    else {
+      final RangeHighlighterEx caret =
+        getOverlappingHighlighter(selection.getStartOffset(), selection.getEndOffset(), HighlighterLayer.MULTI_EDIT_CARET);
+
+      if (selection.getStartOffset() == offset || selection.getEndOffset() == offset) {
+        if (caret != null && caret.getStartOffset() != offset) {
+          myEditor.getMarkupModel().removeHighlighter(caret);
+          myEditor.getMarkupModel()
+            .addRangeHighlighter(offset, offset, HighlighterLayer.MULTI_EDIT_CARET, TEXT_ATTRIBUTES, HighlighterTargetArea.EXACT_RANGE);
+        }
+        else if (caret == null) {
+          myEditor.getMarkupModel()
+            .addRangeHighlighter(offset, offset, HighlighterLayer.MULTI_EDIT_CARET, TEXT_ATTRIBUTES, HighlighterTargetArea.EXACT_RANGE);
+          myHasMultiCarets = true;
+        }
+      }
+      else if (caret != null) {
+        moveToOffset(caret.getStartOffset());
+      }
+    }
   }
+
+  private RangeHighlighterEx getOverlappingHighlighter(final int start, final int end, final int highlighterLayer) {
+    final Condition<RangeHighlighterEx> condition = new Condition<RangeHighlighterEx>() {
+      @Override
+      public boolean value(RangeHighlighterEx rangeHighlighterEx) {
+        return rangeHighlighterEx.getLayer() == highlighterLayer;
+      }
+    };
+    final CommonProcessors.FindFirstProcessor<RangeHighlighterEx> findFirstProcessor =
+      new CommonProcessors.FindFirstProcessor<RangeHighlighterEx>();
+    final FilteringProcessor<RangeHighlighterEx> filteringProcessor =
+      new FilteringProcessor<RangeHighlighterEx>(condition, findFirstProcessor);
+    final EditorMarkupModelImpl markupModel = (EditorMarkupModelImpl)myEditor.getMarkupModel();
+    markupModel.processRangeHighlightersOverlappingWith(start, end, filteringProcessor);
+    return findFirstProcessor.getFoundValue();
+  }
+
 
   @Override
   public Collection<Integer> getMultiCaretOffsets() {
