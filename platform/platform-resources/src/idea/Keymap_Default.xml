@@ -396,7 +396,7 @@
     <keyboard-shortcut first-keystroke="control shift L"/>
   </action>
   <action id="EditorDuplicate">
-    <keyboard-shortcut first-keystroke="control shift D"/>
+    <keyboard-shortcut first-keystroke="alt D"/>
   </action>
   <action id="CompareTwoFiles">
     <keyboard-shortcut first-keystroke="control D"/>
