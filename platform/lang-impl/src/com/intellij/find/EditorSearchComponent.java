@@ -27,6 +27,7 @@ import com.intellij.openapi.actionSystem.ex.CustomComponentAction;
 import com.intellij.openapi.actionSystem.impl.ActionToolbarImpl;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.editor.SelectionModel;
 import com.intellij.openapi.editor.event.SelectionEvent;
 import com.intellij.openapi.editor.event.SelectionListener;
 import com.intellij.openapi.editor.impl.EditorHeaderComponent;
@@ -54,7 +55,8 @@ import javax.swing.event.DocumentListener;
 import javax.swing.text.JTextComponent;
 import java.awt.*;
 import java.awt.event.*;
-import java.util.Arrays;
+import java.util.*;
+import java.util.List;
 import java.util.regex.Pattern;
 
 /**
@@ -366,6 +368,20 @@ public class EditorSearchComponent extends EditorHeaderComponent implements Data
     actionGroup.add(new ShowHistoryAction(mySearchFieldGetter, this));
     actionGroup.add(new PrevOccurrenceAction(this, mySearchFieldGetter));
     actionGroup.add(new NextOccurrenceAction(this, mySearchFieldGetter));
+    actionGroup.addAction(new SelectAllAction(this, mySearchFieldGetter) {
+      @Override
+      public void actionPerformed(AnActionEvent e) {
+        if (mySearchResults.getFindModel() != null) {
+          final List<FindResult> occurrences = mySearchResults.getOccurrences();
+          for (FindResult occurrence : occurrences) {
+            getEditor().getSelectionModel()
+              .addMultiSelection(occurrence.getStartOffset(), occurrence.getEndOffset(), SelectionModel.Direction.LEFT, false);
+          }
+          //todo krasa sometimes carets are not painted
+          close();
+        }
+      }
+    });
     actionGroup.add(new FindAllAction(this));
     actionGroup.add(new ToggleMultiline(this));
     actionGroup.add(new ToggleMatchCase(this));

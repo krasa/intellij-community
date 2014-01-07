@@ -81,4 +81,9 @@ public class IncrementalFindAction extends EditorAction {
   public IncrementalFindAction() {
     super(new Handler(false));
   }
+
+  @Override
+  protected boolean useMultiEdit() {
+    return false;
+  }
 }
