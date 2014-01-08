@@ -97,8 +97,10 @@ public abstract class BaseRefactoringAction extends AnAction {
       return;
     }
     
-    editor.getCaretModel().removeMultiCarets();
-    editor.getSelectionModel().removeMultiSelections();
+    if (editor != null) {
+      editor.getCaretModel().removeMultiCarets();
+      editor.getSelectionModel().removeMultiSelections();
+    }
     
     if (InplaceRefactoring.getActiveInplaceRenamer(editor) == null) {
       final LookupEx lookup = LookupManager.getActiveLookup(editor);
