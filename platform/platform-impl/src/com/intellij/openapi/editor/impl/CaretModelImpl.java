@@ -57,6 +57,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.awt.*;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -872,6 +873,10 @@ public class CaretModelImpl implements CaretModel, PrioritizedDocumentListener, 
 
   @Override
   public void removeMultiCarets() {
+    if (!myHasMultiCarets) {
+      return;
+    }
+
     for (RangeHighlighter rangeHighlighter : myEditor.getMarkupModel().getAllHighlighters()) {
       if (rangeHighlighter.getLayer() == HighlighterLayer.MULTI_EDIT_CARET) {
         myEditor.getMarkupModel().removeHighlighter(rangeHighlighter);
@@ -913,23 +918,23 @@ public class CaretModelImpl implements CaretModel, PrioritizedDocumentListener, 
       myHasMultiCarets = true;
     }
     else {
-      final RangeHighlighterEx caret =
+      final RangeHighlighterEx selectionCaret =
         getOverlappingHighlighter(selection.getStartOffset(), selection.getEndOffset(), HighlighterLayer.MULTI_EDIT_CARET);
 
       if (selection.getStartOffset() == offset || selection.getEndOffset() == offset) {
-        if (caret != null && caret.getStartOffset() != offset) {
-          myEditor.getMarkupModel().removeHighlighter(caret);
+        if (selectionCaret != null && selectionCaret.getStartOffset() != offset) {
+          myEditor.getMarkupModel().removeHighlighter(selectionCaret);
           myEditor.getMarkupModel()
             .addRangeHighlighter(offset, offset, HighlighterLayer.MULTI_EDIT_CARET, TEXT_ATTRIBUTES, HighlighterTargetArea.EXACT_RANGE);
         }
-        else if (caret == null) {
+        else if (selectionCaret == null) {
           myEditor.getMarkupModel()
             .addRangeHighlighter(offset, offset, HighlighterLayer.MULTI_EDIT_CARET, TEXT_ATTRIBUTES, HighlighterTargetArea.EXACT_RANGE);
           myHasMultiCarets = true;
         }
       }
-      else if (caret != null) {
-        moveToOffset(caret.getStartOffset());
+      else if (selectionCaret != null) {
+        moveToOffset(selectionCaret.getStartOffset());
       }
     }
   }
@@ -953,6 +958,10 @@ public class CaretModelImpl implements CaretModel, PrioritizedDocumentListener, 
 
   @Override
   public Collection<Integer> getMultiCaretOffsets() {
+    if (!myHasMultiCarets) {
+      return Collections.emptyList();
+    }
+
     final RangeHighlighter[] allHighlighters = myEditor.getMarkupModel().getAllHighlighters();
     Set<Integer> offsets = new HashSet<Integer>();
     for (RangeHighlighter highlighter : allHighlighters) {
@@ -960,11 +969,15 @@ public class CaretModelImpl implements CaretModel, PrioritizedDocumentListener, 
         offsets.add(highlighter.getStartOffset());
       }
     }
+
     return offsets;
   }
 
   @Override
   public Collection<Integer> getAndRemoveMultiCaretOffsets() {
+    if (!myHasMultiCarets) {
+      return Collections.emptyList();
+    }
     final RangeHighlighter[] allHighlighters = myEditor.getMarkupModel().getAllHighlighters();
     Set<Integer> offsets = new HashSet<Integer>();
     for (RangeHighlighter highlighter : allHighlighters) {
