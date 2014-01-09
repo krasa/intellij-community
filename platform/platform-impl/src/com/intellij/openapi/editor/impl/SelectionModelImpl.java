@@ -56,6 +56,7 @@ import org.jetbrains.annotations.Nullable;
 import java.awt.*;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
+import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -1007,6 +1008,10 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
     return selections;
   }
 
+  public boolean hasMultiSelections(MouseEvent e) {
+     return myHasMultiSelection;
+  }
+  
   @Override
   public List<Range<Integer>> getMultiSelections() {
     if (!myHasMultiSelection) {
