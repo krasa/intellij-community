@@ -47,6 +47,7 @@ import com.intellij.openapi.fileEditor.FileEditor;
 import com.intellij.openapi.fileEditor.TextEditor;
 import com.intellij.openapi.fileEditor.ex.IdeDocumentHistory;
 import com.intellij.openapi.keymap.KeymapUtil;
+import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.progress.Task;
@@ -73,6 +74,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.regex.PatternSyntaxException;
 
 public class FindUtil {
   private static final Key<Direction> KEY = Key.create("FindUtil.KEY");
@@ -149,6 +151,49 @@ public class FindUtil {
     model.setStringToFind(stringToFind);
     model.setGlobal(isGlobal);
     model.setPromptOnReplace(false);
+  }
+
+  public static void findInRange(TextRange r,
+                                 Editor editor,
+                                 final FindManager findManager,
+                                 FindModel findModel,
+                                 List<FindResult> results) {
+    VirtualFile virtualFile = FileDocumentManager.getInstance().getFile(editor.getDocument());
+
+    CharSequence charSequence = editor.getDocument().getCharsSequence();
+
+    int offset = r.getStartOffset();
+    int maxOffset = Math.min(r.getEndOffset(), charSequence.length());
+
+    while (true) {
+      FindResult result;
+      try {
+        CharSequence bombedCharSequence = StringUtil.newBombedCharSequence(charSequence, 3000);
+        result = findManager.findString(bombedCharSequence, offset, findModel, virtualFile);
+      }
+      catch (PatternSyntaxException e) {
+        result = null;
+      }
+      catch (ProcessCanceledException e) {
+        result = null;
+      }
+      if (result == null || !result.isStringFound()) break;
+      int newOffset = result.getEndOffset();
+      if (result.getEndOffset() > maxOffset) break;
+      if (offset == newOffset) {
+        if (offset < maxOffset - 1) {
+          offset++;
+        }
+        else {
+          results.add(result);
+          break;
+        }
+      }
+      else {
+        offset = newOffset;
+      }
+      results.add(result);
+    }
   }
 
   private enum Direction {
