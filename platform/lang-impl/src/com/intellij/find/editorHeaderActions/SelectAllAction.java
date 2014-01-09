@@ -24,7 +24,7 @@ public abstract class SelectAllAction extends EditorHeaderAction implements Dumb
     getTemplatePresentation().setText("Select All");
 
     ArrayList<Shortcut> shortcuts = new ArrayList<Shortcut>();
-    ContainerUtil.addAll(shortcuts, ActionManager.getInstance().getAction(IdeActions.ACTION_SELECT_NEXT_WORD_AT_CARET).getShortcutSet()
+    ContainerUtil.addAll(shortcuts, ActionManager.getInstance().getAction(IdeActions.ACTION_SELECT_NEXT_OCCURRENCE).getShortcutSet()
       .getShortcuts());
     registerShortcutsForComponent(shortcuts, editorTextField.get(), this);
   }

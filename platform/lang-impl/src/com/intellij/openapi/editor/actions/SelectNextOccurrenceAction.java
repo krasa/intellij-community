@@ -38,7 +38,7 @@ import static com.intellij.openapi.editor.SelectionModel.Direction.getDirection;
 /**
  * @author Vojtech Krasa
  */
-public class SelectNextWordAtCaretAction extends EditorAction {
+public class SelectNextOccurrenceAction extends EditorAction {
   private static class Handler extends EditorActionHandler {
     @Override
     public void execute(Editor editor, DataContext dataContext) {
@@ -171,7 +171,7 @@ public class SelectNextWordAtCaretAction extends EditorAction {
     }
   }
 
-  public SelectNextWordAtCaretAction() {
+  public SelectNextOccurrenceAction() {
     super(new Handler());
   }
 
