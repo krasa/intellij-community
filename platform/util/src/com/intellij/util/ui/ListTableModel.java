@@ -108,21 +108,18 @@ public class ListTableModel<Item> extends TableViewModel<Item> implements ItemRe
 
   @Override
   public Object getValueAt(int rowIndex, int columnIndex) {
-    return myColumnInfos[columnIndex].valueOf(myItems.get(rowIndex));
+    return myColumnInfos[columnIndex].valueOf(getItem(rowIndex));
   }
 
   @Override
   public void setValueAt(Object aValue, int rowIndex, int columnIndex) {
     if (rowIndex < myItems.size()) {
-      myColumnInfos[columnIndex].setValue(myItems.get(rowIndex), aValue);
+      myColumnInfos[columnIndex].setValue(getItem(rowIndex), aValue);
     }
   }
 
   /**
    * true if changed
-   *
-   * @param columnInfos
-   * @return
    */
   public boolean setColumnInfos(ColumnInfo[] columnInfos) {
     if (myColumnInfos != null && Arrays.equals(columnInfos, myColumnInfos)) {
@@ -202,7 +199,7 @@ public class ListTableModel<Item> extends TableViewModel<Item> implements ItemRe
     }
   }
 
-  public Object getItem(final int rowIndex) {
-    return getItems().get(rowIndex);
+  public Item getItem(final int rowIndex) {
+    return myItems.get(rowIndex);
   }
 }

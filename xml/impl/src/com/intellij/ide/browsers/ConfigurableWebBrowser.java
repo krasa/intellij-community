@@ -1,11 +1,14 @@
 package com.intellij.ide.browsers;
 
+import com.intellij.openapi.util.Comparing;
 import com.intellij.openapi.util.text.StringUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.util.UUID;
+
+import static com.intellij.ide.browsers.BrowsersConfiguration.BrowserFamily;
 
 final class ConfigurableWebBrowser extends WebBrowser {
   private boolean active;
@@ -14,12 +17,17 @@ final class ConfigurableWebBrowser extends WebBrowser {
 
   private BrowserSpecificSettings specificSettings;
 
-  public ConfigurableWebBrowser(@NotNull UUID id, @NotNull BrowsersConfiguration.BrowserFamily family) {
+  @SuppressWarnings("UnusedDeclaration")
+  public ConfigurableWebBrowser() {
+    this(UUID.randomUUID(), BrowserFamily.CHROME);
+  }
+
+  public ConfigurableWebBrowser(@NotNull UUID id, @NotNull BrowserFamily family) {
     this(id, family, family.getName(), family.getExecutionPath(), true, family.createBrowserSpecificSettings());
   }
 
   public ConfigurableWebBrowser(@NotNull UUID id,
-                                @NotNull BrowsersConfiguration.BrowserFamily family,
+                                @NotNull BrowserFamily family,
                                 @NotNull String name,
                                 @Nullable String path,
                                 boolean active,
@@ -27,7 +35,7 @@ final class ConfigurableWebBrowser extends WebBrowser {
     super(family, name);
 
     this.id = id;
-    this.path = path;
+    this.path = StringUtil.nullize(path);
     this.active = active;
     this.specificSettings = specificSettings;
   }
@@ -36,7 +44,7 @@ final class ConfigurableWebBrowser extends WebBrowser {
     name = value;
   }
 
-  public void setFamily(@NotNull BrowsersConfiguration.BrowserFamily value) {
+  public void setFamily(@NotNull BrowserFamily value) {
     family = value;
   }
 
@@ -53,7 +61,7 @@ final class ConfigurableWebBrowser extends WebBrowser {
   }
 
   public void setPath(@Nullable String value) {
-    path = value;
+    path = StringUtil.nullize(value);
   }
 
   @Override
@@ -82,5 +90,28 @@ final class ConfigurableWebBrowser extends WebBrowser {
 
   public boolean isChanged(@NotNull ConfigurableWebBrowser info) {
     return active != info.active || family != info.family || !StringUtil.equals(name, info.name) || !StringUtil.equals(path, info.path);
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof ConfigurableWebBrowser)) {
+      return false;
+    }
+
+    ConfigurableWebBrowser browser = (ConfigurableWebBrowser)o;
+    return id.equals(browser.id) &&
+           family.equals(browser.family) &&
+           active == browser.active &&
+           Comparing.strEqual(name, browser.name) &&
+           Comparing.equal(path, browser.path) &&
+           Comparing.equal(specificSettings, browser.specificSettings);
+  }
+
+  @Override
+  public int hashCode() {
+    return id.hashCode();
   }
 }

@@ -59,10 +59,6 @@
                      bundle="org.jetbrains.idea.devkit.DevKitBundle"
                      groupKey="inspections.group.name" enabledByDefault="true" level="WARNING"
                      implementationClass="org.jetbrains.idea.devkit.inspections.UseGrayInspection"/>
-    <localInspection language="JAVA" shortName="UseJBColor" displayName="Use Darcula aware JBColor"
-                     bundle="org.jetbrains.idea.devkit.DevKitBundle"
-                     groupKey="inspections.group.name" enabledByDefault="true" level="WARNING"
-                     implementationClass="org.jetbrains.idea.devkit.inspections.UseJBColorInspection"/>
     <localInspection language="JAVA" shortName="IntentionDescriptionNotFoundInspection" displayName="Intention Description Checker"
                      bundle="org.jetbrains.idea.devkit.DevKitBundle"
                      groupKey="inspections.group.name" enabledByDefault="true" level="WARNING"
@@ -94,6 +90,22 @@
                      level="WARNING"
                      implementationClass="org.jetbrains.idea.devkit.inspections.ExtensionPointBeanClassInspection"/>
 
+    <localInspection language="JAVA" shortName="UndesirableClassUsage" displayName="Undesirable class usage"
+                     groupName="IntelliJ IDEA Platform Inspections" enabledByDefault="true" level="WARNING"
+                     implementationClass="org.jetbrains.idea.devkit.inspections.internal.UndesirableClassUsageInspection"/>
+    <localInspection language="JAVA" shortName="FileEqualsUsage" displayName="File.equals() usage"
+                     groupName="IntelliJ IDEA Platform Inspections" enabledByDefault="true" level="WARNING"
+                     implementationClass="org.jetbrains.idea.devkit.inspections.internal.FileEqualsUsageInspection"/>
+    <localInspection language="JAVA" shortName="GtkPreferredJComboBoxRenderer" displayName="Preferred JComboBox renderer"
+                     groupName="IntelliJ IDEA Platform Inspections" enabledByDefault="true" level="WARNING"
+                     implementationClass="org.jetbrains.idea.devkit.inspections.internal.GtkPreferredJComboBoxRendererInspection"/>
+    <localInspection language="JAVA" shortName="UnsafeVfsRecursion" displayName="Unsafe VFS recursion"
+                     groupName="IntelliJ IDEA Platform Inspections" enabledByDefault="true" level="WARNING"
+                     implementationClass="org.jetbrains.idea.devkit.inspections.internal.UnsafeVfsRecursionInspection"/>
+    <localInspection language="JAVA" shortName="UseJBColor" displayName="Use Darcula aware JBColor"
+                     groupName="IntelliJ IDEA Platform Inspections" enabledByDefault="true" level="WARNING"
+                     implementationClass="org.jetbrains.idea.devkit.inspections.internal.UseJBColorInspection"/>
+
     <moduleConfigurationEditorProvider implementation="org.jetbrains.idea.devkit.module.PluginModuleEditorsProvider"/>
     <implicitUsageProvider implementation="org.jetbrains.idea.devkit.inspections.DevKitImplicitUsageProvider"/>
     <psi.referenceContributor implementation="org.jetbrains.idea.devkit.dom.impl.I18nReferenceContributor"/>
@@ -102,7 +114,6 @@
     <unusedDeclarationFixProvider implementation="org.jetbrains.idea.devkit.inspections.quickfix.RegisterExtensionFixProvider"/>
 
     <stacktrace.fold substring="at com.intellij.testFramework."/>
-
   </extensions>
 
   <module-components>

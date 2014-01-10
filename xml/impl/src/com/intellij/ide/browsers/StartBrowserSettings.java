@@ -1,5 +1,6 @@
 package com.intellij.ide.browsers;
 
+import com.intellij.openapi.util.JDOMUtil;
 import com.intellij.util.xmlb.SkipDefaultValuesSerializationFilters;
 import com.intellij.util.xmlb.XmlSerializer;
 import com.intellij.util.xmlb.annotations.Attribute;
@@ -36,7 +37,7 @@ public class StartBrowserSettings {
   }
 
   @Nullable
-  @Attribute("url")
+  @Attribute
   public String getUrl() {
     return myUrl;
   }
@@ -66,7 +67,7 @@ public class StartBrowserSettings {
 
   public void writeExternal(@NotNull Element parent) {
     Element state = XmlSerializer.serialize(this, new SkipDefaultValuesSerializationFilters());
-    if (!state.getAttributes().isEmpty() || !state.getContent().isEmpty()) {
+    if (!JDOMUtil.isEmpty(state)) {
       parent.addContent(state);
     }
   }
