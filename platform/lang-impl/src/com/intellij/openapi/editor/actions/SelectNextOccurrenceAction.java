@@ -31,6 +31,7 @@ import com.intellij.openapi.util.TextRange;
 import com.intellij.util.Range;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import static com.intellij.openapi.editor.SelectionModel.Direction.getDirection;
@@ -110,11 +111,15 @@ public class SelectNextOccurrenceAction extends EditorAction {
       final CaretModel caretModel = editor.getCaretModel();
 
       boolean hadSingleCarets = false;
+      Integer  bottomCaretOffset = null;
       for (int i = 0; i < caretsAndSelections.size(); i++) {
         Range<Integer> integerRange = caretsAndSelections.get(i);
-        if (integerRange.getFrom().equals(integerRange.getTo())) {
+        if (isCaret(integerRange)) {
           //continue if is part of selection
-          if (caretsAndSelections.size() > i + 1 && caretsAndSelections.get(i + 1).getTo() >= integerRange.getTo()) {
+          if (isSelectionCaret(caretsAndSelections, i, integerRange)) {
+            if (bottomCaretOffset == null) {
+              bottomCaretOffset = integerRange.getTo();
+            }
             continue;
           }
         }
@@ -124,13 +129,34 @@ public class SelectNextOccurrenceAction extends EditorAction {
         final Integer caretOffset = integerRange.getFrom();
         caretModel.moveToOffset(caretOffset);
         hadSingleCarets = true;
-
+      
         if (selectionModel.hasSelection()) {
           selectionModel.removeSelection();
         }
         selectWordAtCaret(editor, multiSelections);
+        if (bottomCaretOffset == null) {
+           bottomCaretOffset = caretModel.getOffset();
+         }
+      }
+      
+      //bottom selection should be the main one
+      if (hadSingleCarets) {
+        Collections.sort(multiSelections, MultiEditAction.RANGE_COMPARATOR);
+        final Range<Integer> integerRange = multiSelections.get(0);
+        selectionModel.setSelection(integerRange.getFrom(), integerRange.getTo());
+        caretModel.moveToOffset(bottomCaretOffset);
       }
       return hadSingleCarets;
+    }
+
+    private boolean isSelectionCaret(List<Range<Integer>> caretsAndSelections, int i, Range<Integer> caret) {
+      final boolean caretOnStartOfSelection = i > 0 && caretsAndSelections.get(i - 1).getFrom() .equals(caret.getTo());
+      final boolean caretOnEndOfSelection = caretsAndSelections.size() > i + 1 && caretsAndSelections.get(i + 1).getTo().equals(caret.getTo()) ;
+      return caretOnStartOfSelection||caretOnEndOfSelection;
+    }
+
+    private boolean isCaret(Range<Integer> integerRange) {
+      return integerRange.getFrom().equals(integerRange.getTo());
     }
 
     private void selectWordAtCaret(Editor editor, List<Range<Integer>> multiSelections) {
