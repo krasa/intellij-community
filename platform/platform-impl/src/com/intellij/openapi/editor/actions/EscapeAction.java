@@ -54,4 +54,9 @@ public class EscapeAction extends EditorAction {
         (selectionModel.hasSelection() || selectionModel.hasBlockSelection() || editor.getCaretModel().hasMultiCarets());
     }
   }
+
+  @Override
+  protected boolean useMultiEdit() {
+    return false;
+  }
 }

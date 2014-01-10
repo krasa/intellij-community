@@ -26,13 +26,9 @@ import com.intellij.openapi.editor.RangeMarker;
 import com.intellij.openapi.editor.SelectionModel;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.editor.event.DocumentListener;
-import com.intellij.openapi.fileEditor.FileDocumentManager;
-import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.TextRange;
-import com.intellij.openapi.util.text.StringUtil;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.concurrency.FutureResult;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.containers.HashSet;
@@ -46,7 +42,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
-import java.util.regex.PatternSyntaxException;
 
 public class SearchResults implements DocumentListener {
 
@@ -230,12 +225,13 @@ public class SearchResults implements DocumentListener {
           catch (ExecutionException ignore) {
           }
 
+          final FindManager findManager = FindManager.getInstance(SearchResults.this.getProject());
           if (starts.length == 0 || findModel.isGlobal()) {
-            findInRange(new TextRange(0, Integer.MAX_VALUE), editor, findModel, results);
+            FindUtil.findInRange(new TextRange(0, Integer.MAX_VALUE), editor, findManager, findModel, results);
           }
           else {
             for (int i = 0; i < starts.length; ++i) {
-              findInRange(new TextRange(starts[i], ends[i]), editor, findModel, results);
+              FindUtil.findInRange(new TextRange(starts[i], ends[i]), editor, findManager, findModel, results);
             }
           }
 
@@ -288,42 +284,6 @@ public class SearchResults implements DocumentListener {
       }
       catch (InvocationTargetException ignore) {
       }
-    }
-  }
-
-  private void findInRange(TextRange r, Editor editor, FindModel findModel, ArrayList<FindResult> results) {
-    VirtualFile virtualFile = FileDocumentManager.getInstance().getFile(editor.getDocument());
-
-    CharSequence charSequence = editor.getDocument().getCharsSequence();
-
-    int offset = r.getStartOffset();
-    int maxOffset = Math.min(r.getEndOffset(), charSequence.length());
-    FindManager findManager = FindManager.getInstance(getProject());
-
-    while (true) {
-      FindResult result;
-      try {
-        CharSequence bombedCharSequence = StringUtil.newBombedCharSequence(charSequence, 3000);
-        result = findManager.findString(bombedCharSequence, offset, findModel, virtualFile);
-      } catch(PatternSyntaxException e) {
-        result = null;
-      } catch (ProcessCanceledException e) {
-        result = null;
-      }
-      if (result == null || !result.isStringFound()) break;
-      int newOffset = result.getEndOffset();
-      if (result.getEndOffset() > maxOffset) break;
-      if (offset == newOffset) {
-        if (offset < maxOffset - 1) {
-          offset++;
-        } else {
-          results.add(result);
-          break;
-        }
-      } else {
-        offset = newOffset;
-      }
-      results.add(result);
     }
   }
 

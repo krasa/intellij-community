@@ -56,6 +56,7 @@ import org.jetbrains.annotations.Nullable;
 import java.awt.*;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
+import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -919,20 +920,16 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
     for (RangeHighlighterEx rangeHighlighterEx : processor.myList) {
       markupModel.removeHighlighter(rangeHighlighterEx);
     }
-    //when doing block selection, another sweep for caret on the ends is needed
+    //when doing block selection, another sweep for caret on the ends is needed - when selection goes from middle of another out
     processor = processOverlappingHighlighters(mergedStartOffset, mergedEndOffset);
     for (RangeHighlighterEx rangeHighlighterEx : processor.myList) {
       markupModel.removeHighlighter(rangeHighlighterEx);
     }
 
-    final RangeHighlighter rangeHighlighter = markupModel
-      .addRangeHighlighter(mergedStartOffset, mergedEndOffset, HighlighterLayer.MULTI_EDIT_SELECTION, getTextAttributes(),
-                           HighlighterTargetArea.EXACT_RANGE);
-
-
-    if (mergedStartOffset == mergedEndOffset) {
-      //no need for keeping empty selection
-      markupModel.removeHighlighter(rangeHighlighter);
+    if (mergedStartOffset != mergedEndOffset) {
+      markupModel
+        .addRangeHighlighter(mergedStartOffset, mergedEndOffset, HighlighterLayer.MULTI_EDIT_SELECTION, getTextAttributes(),
+                             HighlighterTargetArea.EXACT_RANGE);
     }
 
     if (direction != null) {
@@ -1007,6 +1004,10 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
     return selections;
   }
 
+  public boolean hasMultiSelections(MouseEvent e) {
+     return myHasMultiSelection;
+  }
+  
   @Override
   public List<Range<Integer>> getMultiSelections() {
     if (!myHasMultiSelection) {

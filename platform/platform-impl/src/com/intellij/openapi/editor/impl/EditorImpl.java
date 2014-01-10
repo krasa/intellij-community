@@ -5642,7 +5642,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
       }
 
       myMouseSelectedRegion = myFoldingModel.getFoldingPlaceholderAt(new Point(x, y));
-      myMousePressedInsideSelection = mySelectionModel.hasSelection() && caretOffset >= mySelectionModel.getSelectionStart() &&
+      myMousePressedInsideSelection = !mySelectionModel.hasMultiSelections(e) && mySelectionModel.hasSelection() && caretOffset >= mySelectionModel.getSelectionStart() &&
                                       caretOffset <= mySelectionModel.getSelectionEnd();
 
       if (!myMousePressedInsideSelection && mySelectionModel.hasBlockSelection()) {
