@@ -4004,8 +4004,13 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
       myGutterComponent.mouseReleased(e);
     }
 
+    Point point = e.getPoint();
+    if (getMouseEventArea(e) != EditorMouseEventArea.EDITING_AREA || e.getY() < 0 || e.getX() < 0) {
+      point = new Point(0, 0);
+    }
+
 //    if (myMousePressedInsideSelection) getSelectionModel().removeSelection();
-    final FoldRegion region = getFoldingModel().getFoldingPlaceholderAt(e.getPoint());
+    final FoldRegion region = getFoldingModel().getFoldingPlaceholderAt(point);
     if (e.getX() >= 0 && e.getY() >= 0 && region != null && region == myMouseSelectedRegion) {
       getFoldingModel().runBatchFoldingOperation(new Runnable() {
         @Override
@@ -5613,9 +5618,9 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
       // at 'line markers' area).
       if (e.getSource() != myGutterComponent ||
           (eventArea != EditorMouseEventArea.LINE_MARKERS_AREA && eventArea != EditorMouseEventArea.ANNOTATIONS_AREA)) {
-
-        if (isMultiEditMode(e)) {
-          if (oldStart != oldEnd) {
+        
+        if (isMultiEditMode(e) && !getSelectionModel().hasMultiSelections()  && !getCaretModel().hasMultiCarets() ) {
+          if (oldStart != oldEnd ) {
             getSelectionModel().addMultiSelection(oldStart, oldEnd, null, false);
           }
           if (getSelectionModel().hasBlockSelection()) {
@@ -5642,7 +5647,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
       }
 
       myMouseSelectedRegion = myFoldingModel.getFoldingPlaceholderAt(new Point(x, y));
-      myMousePressedInsideSelection = !mySelectionModel.hasMultiSelections(e) && mySelectionModel.hasSelection() && caretOffset >= mySelectionModel.getSelectionStart() &&
+      myMousePressedInsideSelection = !mySelectionModel.hasMultiSelections() && mySelectionModel.hasSelection() && caretOffset >= mySelectionModel.getSelectionStart() &&
                                       caretOffset <= mySelectionModel.getSelectionEnd();
 
       if (!myMousePressedInsideSelection && mySelectionModel.hasBlockSelection()) {

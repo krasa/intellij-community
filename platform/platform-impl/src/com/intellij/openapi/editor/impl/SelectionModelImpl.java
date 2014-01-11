@@ -1004,7 +1004,7 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
     return selections;
   }
 
-  public boolean hasMultiSelections(MouseEvent e) {
+  public boolean hasMultiSelections() {
      return myHasMultiSelection;
   }
   
