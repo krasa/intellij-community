@@ -200,7 +200,7 @@ public class FindUtil {
     UP, DOWN
   }
 
-  public static @Nullable FindResult findWordAtCaret(Project project, Editor editor) {
+  public static @Nullable FindResult findWordAtCaret(Project project, Editor editor, final boolean wholeWordsOnly) {
     int caretOffset = editor.getCaretModel().getOffset();
     Document document = editor.getDocument();
     CharSequence text = document.getCharsSequence();
@@ -238,7 +238,7 @@ public class FindUtil {
     FindModel model = new FindModel();
     model.setStringToFind(s);
     model.setCaseSensitive(true);
-    model.setWholeWordsOnly(!editor.getSelectionModel().hasSelection());
+    model.setWholeWordsOnly(wholeWordsOnly);
 
     final JComponent header = editor.getHeaderComponent();
     if (header instanceof EditorSearchComponent) {

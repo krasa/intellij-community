@@ -59,6 +59,7 @@ public class SelectAllOccurrencesAction extends EditorAction {
 
 
       final FindModel findModel = new FindModel();
+      findModel.setWholeWordsOnly(wholeWordsOnly());
       findModel.setCaseSensitive(true);
       findModel.setStringToFind(textToFind);
 
@@ -72,6 +73,10 @@ public class SelectAllOccurrencesAction extends EditorAction {
         int endOffset = result.getEndOffset();
         selectionModel.addMultiSelection(startOffset, endOffset, SelectionModel.Direction.RIGHT, false);
       }
+    }
+
+    protected boolean wholeWordsOnly() {
+      return false;
     }
 
     @Override

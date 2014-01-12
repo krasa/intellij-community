@@ -152,12 +152,12 @@ public class SelectNextOccurrenceAction extends EditorAction {
                                         List<Integer> carets) {
       final SelectionModel selectionModel = editor.getSelectionModel();
 
-      FindResult wordAtCaret = FindUtil.findWordAtCaret(project, editor);
+      FindResult wordAtCaret = FindUtil.findWordAtCaret(project, editor, wholeWordsOnly(editor));
       //find next if found one is already selected
       while (wordAtCaret != null &&
              wordAtCaret.isStringFound() &&
              multiSelections.contains(new Range<Integer>(wordAtCaret.getStartOffset(), wordAtCaret.getEndOffset()))) {
-        wordAtCaret = FindUtil.findWordAtCaret(project, editor);
+        wordAtCaret = FindUtil.findWordAtCaret(project, editor, wholeWordsOnly(editor));
       }
 
       if (wordAtCaret != null && wordAtCaret.isStringFound()) {
@@ -180,6 +180,10 @@ public class SelectNextOccurrenceAction extends EditorAction {
           }
         }
       }
+    }
+
+    protected boolean wholeWordsOnly(Editor editor) {
+      return !editor.getSelectionModel().hasSelection();
     }
 
     protected boolean isSelectionCaret(List<Range<Integer>> caretsAndSelections, int i, Range<Integer> caret) {
