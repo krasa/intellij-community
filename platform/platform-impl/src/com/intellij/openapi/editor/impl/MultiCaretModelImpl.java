@@ -178,7 +178,7 @@ public class MultiCaretModelImpl implements CaretModel, PrioritizedDocumentListe
     }
     carets.clear();
     carets.add(activeCaret);
-    myEditor.repaintCursors();
+    myEditor.caretsChanged();
   }
 
 

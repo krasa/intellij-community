@@ -842,6 +842,17 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     myEditorComponent.addFocusListener(new FocusAdapter() {
       @Override
       public void focusGained(FocusEvent e) {
+        repaintMultiCarets();
+      }
+
+      @Override
+      public void focusLost(FocusEvent e) {
+        repaintMultiCarets();
+      }
+    });
+    myEditorComponent.addFocusListener(new FocusAdapter() {
+      @Override
+      public void focusGained(FocusEvent e) {
         myCaretCursor.activate();
         int caretLine = getCaretModel().getLogicalPosition().line;
         repaintLines(caretLine, caretLine);
@@ -2916,6 +2927,11 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     myLastCache = null;
   }
 
+  private void repaintMultiCarets() {
+    for (CaretCursorImpl cursor : myCaretCursor.myCaretCursors) {
+       cursor.repaint();
+     }
+  }
   private void paintCaretCursor(@NotNull Graphics g) {
     // There is a possible case that visual caret position is changed because of newly added or removed soft wraps.
     // We check if that's the case and ask caret model to recalculate visual position if necessary.
@@ -4285,10 +4301,10 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
       @Override
       public void run() {
         if (myEditor != null) {
-          final List<CaretCursorImpl> caretCursors = myEditor.myCaretCursor.myCaretCursors;
-          for (CaretCursorImpl caretCursor : caretCursors) {
-            caretCursor.repaint();
-          }         
+          if (myEditor.myCaretCursor.myCaretCursors.size() > 1) {
+            return;
+          }
+          myEditor.myCaretCursor.myCaretCursors.get(0).repaint();
         }
       }
     }
@@ -4312,27 +4328,27 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     @Override
     public void run() {
       if (myEditor != null) {
-        final List<CaretCursorImpl> caretCursors = myEditor.myCaretCursor.myCaretCursors;
-        for (CaretCursorImpl activeCursor : caretCursors) {
-          if (activeCursor != null) {
-             long time = System.currentTimeMillis();
-             time -= activeCursor.myStartTime;
-   
-             if (time > mySleepTime) {
-               boolean toRepaint = true;
-               if (myIsBlinkCaret) {
-                 activeCursor.myIsShown = !activeCursor.myIsShown;
-               }
-               else {
-                 toRepaint = !activeCursor.myIsShown;
-                 activeCursor.myIsShown = true;
-               }
-   
-               if (toRepaint) {
-                 SwingUtilities.invokeLater(myRepaintRunnable);
-               }
-             }
-           }
+        if (myEditor.myCaretCursor.myCaretCursors.size() > 1) {
+          return;
+        }
+        final CaretCursorImpl activeCursor = myEditor.myCaretCursor.myCaretCursors.get(0);
+
+        long time = System.currentTimeMillis();
+        time -= activeCursor.myStartTime;
+
+        if (time > mySleepTime) {
+          boolean toRepaint = true;
+          if (myIsBlinkCaret) {
+            activeCursor.myIsShown = !activeCursor.myIsShown;
+          }
+          else {
+            toRepaint = !activeCursor.myIsShown;
+            activeCursor.myIsShown = true;
+          }
+
+          if (toRepaint) {
+            SwingUtilities.invokeLater(myRepaintRunnable);
+          }
         }
       }
     }
@@ -4375,8 +4391,9 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     setCursorPosition();
   }
 
-  public void repaintCursors() {
+  public void caretsChanged() {
     setCursorPosition();
+    repaintMultiCarets();
   }
 
   @Override
