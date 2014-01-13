@@ -841,7 +841,17 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     MyMouseMotionListener mouseMotionListener = new MyMouseMotionListener();
     myEditorComponent.addMouseMotionListener(mouseMotionListener);
     myGutterComponent.addMouseMotionListener(mouseMotionListener);
+    myEditorComponent.addFocusListener(new FocusAdapter() {
+      @Override
+      public void focusGained(FocusEvent e) {
+        repaintMultiCarets();
+      }
 
+      @Override
+      public void focusLost(FocusEvent e) {
+        repaintMultiCarets();
+      }
+    });
     myEditorComponent.addFocusListener(new FocusAdapter() {
       @Override
       public void focusGained(FocusEvent e) {
@@ -2930,8 +2940,11 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     paintMultiCarets(g);
   }
 
+  private void repaintMultiCarets() {
+    paintMultiCarets(null);
+  }
+
   private void paintMultiCarets(final Graphics g) {
-    //final long l = System.nanoTime();
     if (!getCaretModel().hasMultiCarets()) {
       return;
     }
@@ -2950,7 +2963,12 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
       @Override
       public boolean execute(int key, CaretCursor cursor) {
         if (offsets.contains(key)) {
-          cursor.paint(g);
+          if (g == null) {
+            cursor.repaint();
+          }
+          else {
+            cursor.paint(g);
+          } 
         }
         else {
           myMultiCarets.remove(key);
@@ -2958,7 +2976,6 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
         return true;
       }
     });
-    //System.err.println((System.nanoTime()-l)/1000);
   }
 
   private CaretCursor createCaretCursor(Integer offset) {
