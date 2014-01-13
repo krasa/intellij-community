@@ -189,13 +189,13 @@ public class MultiCaretModelImpl implements CaretModel, PrioritizedDocumentListe
 
 
   @Override
-  public void addMultiCaret(int offset) {
+  public CaretModel addMultiCaret(int offset) {
     if (myEditor.getDocument().getTextLength() < offset) {
-      return;
+      return null;
     }
     final RangeHighlighterEx selection = getOverlappingHighlighter(offset, offset, HighlighterLayer.MULTI_EDIT_SELECTION);
     if (selection == null) {
-      createCaret(offset);
+      return createCaret(offset);
     }
     else {
       final CaretModelImpl selectionCaret = getOverlappingCaret(selection.getStartOffset(), selection.getEndOffset());
@@ -205,7 +205,7 @@ public class MultiCaretModelImpl implements CaretModel, PrioritizedDocumentListe
           selectionCaret.moveToOffset(offset);
         }
         else if (selectionCaret == null) {
-          createCaret(offset);
+          return createCaret(offset);
         }
       }
       else if (selectionCaret != null) {
@@ -213,6 +213,7 @@ public class MultiCaretModelImpl implements CaretModel, PrioritizedDocumentListe
         setActiveCaret(selectionCaret);
       }
     }
+    return null;
   }
 
   private CaretModelImpl getOverlappingCaret(int startOffset, int endOffset) {
@@ -226,10 +227,11 @@ public class MultiCaretModelImpl implements CaretModel, PrioritizedDocumentListe
   }
 
 
-  private void createCaret(int offset) {
+  private CaretModelImpl createCaret(int offset) {
     CaretModelImpl e = new CaretModelImpl(myEditor, this);
     e.moveToOffset(offset);
     carets.add(e);
+    return e;
   }
 
   private RangeHighlighterEx getOverlappingHighlighter(final int start, final int end, final int highlighterLayer) {
@@ -306,6 +308,10 @@ public class MultiCaretModelImpl implements CaretModel, PrioritizedDocumentListe
     if (!(caretModel instanceof CaretModelImpl)) {
       throw new IllegalArgumentException("caretModel must be instance of CaretModelImpl");
     }
+    if (!carets.contains(caretModel)) {
+      throw new IllegalArgumentException("Caret was already removed");
+    }
+
     activeCaret = (CaretModelImpl)caretModel;
   }
 
@@ -345,8 +351,14 @@ public class MultiCaretModelImpl implements CaretModel, PrioritizedDocumentListe
   }
 
   public void removeCaret(CaretModel multiCaret) {
+    if (carets.size() == 1) {
+      throw new IllegalStateException("trying to remove the last caret");
+    }
+
     final CaretModelImpl caretImpl = (CaretModelImpl)multiCaret;
     carets.remove(caretImpl);
+    caretImpl.dispose();
+    
     myEditor.caretRemoved(multiCaret);
     if (activeCaret == multiCaret) {
       activeCaret = carets.get(0);

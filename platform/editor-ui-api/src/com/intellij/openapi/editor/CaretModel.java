@@ -147,7 +147,7 @@ public interface CaretModel {
 
   boolean hasMultiCarets();
 
-  void addMultiCaret(int offset);
+  CaretModel addMultiCaret(int offset);
 
   Collection<Integer> getMultiCaretOffsets();
 

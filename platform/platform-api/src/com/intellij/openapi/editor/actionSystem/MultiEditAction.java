@@ -155,7 +155,7 @@ public abstract class MultiEditAction  {
    public CaretModel myCaretModel;
    public Range<Integer> selection;
 
-    CaretModelWithSelection(CaretModel caretModel, Range<Integer> selection) {
+    public CaretModelWithSelection(CaretModel caretModel, Range<Integer> selection) {
       myCaretModel = caretModel;
       this.selection = selection;
     }

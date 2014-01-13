@@ -844,7 +844,7 @@ public class CaretModelImpl implements CaretModel,  Disposable {
 
 
   @Override
-  public void addMultiCaret(int offset) {
+  public CaretModel addMultiCaret(int offset) {
     throw new IllegalStateException();
   }
 

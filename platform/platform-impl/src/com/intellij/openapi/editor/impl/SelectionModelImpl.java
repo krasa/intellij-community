@@ -915,7 +915,7 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
     final int mergedEndOffset = processor.endOffset;
 
     addMergedSelection(processor, mergedStartOffset, mergedEndOffset);
-    removeCaretsInTheMiddle(mergedStartOffset, mergedEndOffset);
+    removeExcessCarets(mergedStartOffset, mergedEndOffset);
 
     if (direction != null) {
       if ((addCaretForZeroWidthSelection && mergedStartOffset == mergedEndOffset) || mergedStartOffset != mergedEndOffset) {
@@ -926,13 +926,29 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
     myHasMultiSelection = true;
   }
 
-  private void removeCaretsInTheMiddle(int mergedStartOffset, int mergedEndOffset) {
+  private void removeExcessCarets(int mergedStartOffset, int mergedEndOffset) {
     final List<CaretModel> multiCarets = myEditor.getCaretModel().getMultiCarets();
     final MultiCaretModelImpl caretModel = myEditor.getCaretModel();
+    boolean hasCaretOnEnd = false;
     for (CaretModel multiCaret : multiCarets) {
       final int offset = multiCaret.getOffset();
-      if(offset>mergedStartOffset && offset<mergedEndOffset)
-      caretModel.removeCaret(multiCaret);
+      if ( offset == mergedEndOffset) {
+        hasCaretOnEnd = true;
+      }
+    }
+    
+    for (CaretModel multiCaret : multiCarets) {
+      final int offset = multiCaret.getOffset();
+      if (offset >= mergedStartOffset && offset < mergedEndOffset) {
+        //delete carets in the middle or on start
+        if (hasCaretOnEnd) {
+          caretModel.removeCaret(multiCaret);
+        }//or move one on the end
+        else {
+          multiCaret.moveToOffset(mergedEndOffset);
+          hasCaretOnEnd = true;
+        }
+      }
     }
   }
 
