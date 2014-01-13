@@ -38,17 +38,9 @@ import com.intellij.openapi.editor.ex.*;
 import com.intellij.openapi.editor.ex.util.EditorUtil;
 import com.intellij.openapi.editor.impl.event.DocumentEventImpl;
 import com.intellij.openapi.editor.impl.softwrap.SoftWrapHelper;
-import com.intellij.openapi.editor.markup.HighlighterLayer;
-import com.intellij.openapi.editor.markup.HighlighterTargetArea;
-import com.intellij.openapi.editor.markup.RangeHighlighter;
 import com.intellij.openapi.editor.markup.TextAttributes;
 import com.intellij.openapi.ide.CopyPasteManager;
-import com.intellij.openapi.util.Condition;
 import com.intellij.openapi.util.text.StringUtil;
-import com.intellij.util.CommonProcessors;
-import com.intellij.util.EventDispatcher;
-import com.intellij.util.FilteringProcessor;
-import com.intellij.util.containers.HashSet;
 import com.intellij.util.diff.FilesTooBigForDiffException;
 import com.intellij.util.text.CharArrayUtil;
 import org.jetbrains.annotations.NonNls;
@@ -57,16 +49,15 @@ import org.jetbrains.annotations.Nullable;
 
 import java.awt.*;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 
-public class CaretModelImpl implements CaretModel, PrioritizedDocumentListener, Disposable {
+public class CaretModelImpl implements CaretModel,  Disposable {
   public static final TextAttributes TEXT_ATTRIBUTES = new TextAttributes();
   private static final Logger LOG = Logger.getInstance("#com.intellij.openapi.editor.impl.CaretModelImpl");
 
   private final EditorImpl myEditor;
-  private final EventDispatcher<CaretListener> myCaretListeners = EventDispatcher.create(CaretListener.class);
+  final MultiCaretModelImpl myMultiCaretModel;
+  
   private LogicalPosition myLogicalCaret;
   private VerticalInfo myCaretInfo;
   private VisualPosition myVisibleCaret;
@@ -74,12 +65,9 @@ public class CaretModelImpl implements CaretModel, PrioritizedDocumentListener, 
   private int myVisualLineStart;
   private int myVisualLineEnd;
   private TextAttributes myTextAttributes;
-  private boolean myIsInUpdate;
-  private boolean isDocumentChanged;
   private RangeMarker savedBeforeBulkCaretMarker;
   private boolean myIgnoreWrongMoves = false;
   private boolean mySkipChangeRequests;
-  private boolean myHasMultiCarets;
 
   /**
    * We check that caret is located at the target offset at the end of {@link #moveToOffset(int, boolean)} method. However,
@@ -109,8 +97,9 @@ public class CaretModelImpl implements CaretModel, PrioritizedDocumentListener, 
    */
   private int myDesiredX = -1;
 
-  public CaretModelImpl(EditorImpl editor) {
+  public CaretModelImpl(EditorImpl editor , MultiCaretModelImpl multiCaretModel) {
     myEditor = editor;
+    myMultiCaretModel = multiCaretModel;
     myLogicalCaret = new LogicalPosition(0, 0);
     myVisibleCaret = new VisualPosition(0, 0);
     myCaretInfo = new VerticalInfo(0, 0);
@@ -127,7 +116,7 @@ public class CaretModelImpl implements CaretModel, PrioritizedDocumentListener, 
 
       @Override
       public void updateFinished(@NotNull Document doc) {
-        if (doc != myEditor.getDocument() || myIsInUpdate) return;
+        if (doc != myEditor.getDocument() || myMultiCaretModel.isInUpdate()) return;
         LOG.assertTrue(!myReportCaretMoves);
 
         if (savedBeforeBulkCaretMarker != null) {
@@ -155,14 +144,14 @@ public class CaretModelImpl implements CaretModel, PrioritizedDocumentListener, 
   @Override
   public void moveToVisualPosition(@NotNull VisualPosition pos) {
     assertIsDispatchThread();
-    validateCallContext();
+    myMultiCaretModel.validateCallContext();
     if (mySkipChangeRequests) {
       return;
     }
     if (myReportCaretMoves) {
       LogMessageEx.error(LOG, "Unexpected caret move request");
     }
-    if (!myEditor.isStickySelection() && !isDocumentChanged && !pos.equals(myVisibleCaret)) {
+    if (!myEditor.isStickySelection() && !myMultiCaretModel.isDocumentChanged() && !pos.equals(myVisibleCaret)) {
       CopyPasteManager.getInstance().stopKillRings();
     }
 
@@ -216,7 +205,7 @@ public class CaretModelImpl implements CaretModel, PrioritizedDocumentListener, 
 
     if (!oldPosition.equals(myLogicalCaret)) {
       CaretEvent event = new CaretEvent(myEditor, oldPosition, myLogicalCaret);
-      myCaretListeners.getMulticaster().caretPositionChanged(event);
+      myMultiCaretModel.caretPositionChanged(event);
     }
   }
 
@@ -232,7 +221,7 @@ public class CaretModelImpl implements CaretModel, PrioritizedDocumentListener, 
   @Override
   public void moveToOffset(int offset, boolean locateBeforeSoftWrap) {
     assertIsDispatchThread();
-    validateCallContext();
+    myMultiCaretModel.validateCallContext();
     if (mySkipChangeRequests) {
       return;
     }
@@ -258,7 +247,7 @@ public class CaretModelImpl implements CaretModel, PrioritizedDocumentListener, 
         ));
     }
     if (event != null) {
-      myCaretListeners.getMulticaster().caretPositionChanged(event);
+      myMultiCaretModel.caretPositionChanged(event);
       EditorActionUtil.selectNonexpandableFold(myEditor);
     }
   }
@@ -280,7 +269,7 @@ public class CaretModelImpl implements CaretModel, PrioritizedDocumentListener, 
     if (myReportCaretMoves) {
       LogMessageEx.error(LOG, "Unexpected caret move request");
     }
-    if (!myEditor.isStickySelection() && !isDocumentChanged) {
+    if (!myEditor.isStickySelection() && !myMultiCaretModel.isDocumentChanged()) {
       CopyPasteManager.getInstance().stopKillRings();
     }
     SelectionModelImpl selectionModel = myEditor.getSelectionModel();
@@ -450,7 +439,7 @@ public class CaretModelImpl implements CaretModel, PrioritizedDocumentListener, 
     if (myReportCaretMoves) {
       LogMessageEx.error(LOG, "Unexpected caret move request");
     }
-    if (!myEditor.isStickySelection() && !isDocumentChanged && !pos.equals(myLogicalCaret)) {
+    if (!myEditor.isStickySelection() && !myMultiCaretModel.isDocumentChanged() && !pos.equals(myLogicalCaret)) {
       CopyPasteManager.getInstance().stopKillRings();
     }
 
@@ -472,7 +461,7 @@ public class CaretModelImpl implements CaretModel, PrioritizedDocumentListener, 
       debugBuffer.append("Start moveToLogicalPosition(). Locate before soft wrap: " + locateBeforeSoftWrap + ", position: " + pos + "\n");
     }
     myDesiredX = -1;
-    validateCallContext();
+   myMultiCaretModel.validateCallContext();
     int column = pos.column;
     int line = pos.line;
     int softWrapLinesBefore = pos.softWrapLinesBeforeCurrentLogicalLine;
@@ -626,7 +615,7 @@ public class CaretModelImpl implements CaretModel, PrioritizedDocumentListener, 
     if (!oldCaretPosition.toVisualPosition().equals(myLogicalCaret.toVisualPosition())) {
       CaretEvent event = new CaretEvent(myEditor, oldCaretPosition, myLogicalCaret);
       if (fireListeners) {
-        myCaretListeners.getMulticaster().caretPositionChanged(event);
+        myMultiCaretModel.caretPositionChanged(event);
       }
       else {
         return event;
@@ -658,30 +647,26 @@ public class CaretModelImpl implements CaretModel, PrioritizedDocumentListener, 
 
   @Override
   public boolean isUpToDate() {
-    return !myIsInUpdate && !myReportCaretMoves;
+    return !myMultiCaretModel.isInUpdate() && !myReportCaretMoves;
   }
 
   @Override
   @NotNull
   public LogicalPosition getLogicalPosition() {
-    validateCallContext();
+    myMultiCaretModel.validateCallContext();
     return myLogicalCaret;
-  }
-
-  private void validateCallContext() {
-    LOG.assertTrue(!myIsInUpdate, "Caret model is in its update process. All requests are illegal at this point.");
   }
 
   @Override
   @NotNull
   public VisualPosition getVisualPosition() {
-    validateCallContext();
+    myMultiCaretModel.validateCallContext();
     return myVisibleCaret;
   }
 
   @Override
   public int getOffset() {
-    validateCallContext();
+    myMultiCaretModel.validateCallContext();
     return myOffset;
   }
 
@@ -697,12 +682,12 @@ public class CaretModelImpl implements CaretModel, PrioritizedDocumentListener, 
 
   @Override
   public void addCaretListener(@NotNull CaretListener listener) {
-    myCaretListeners.addListener(listener);
+    myMultiCaretModel.getCaretListeners().addListener(listener);
   }
 
   @Override
   public void removeCaretListener(@NotNull CaretListener listener) {
-    myCaretListeners.removeListener(listener);
+    myMultiCaretModel.getCaretListeners().removeListener(listener);
   }
 
   @Override
@@ -719,19 +704,8 @@ public class CaretModelImpl implements CaretModel, PrioritizedDocumentListener, 
     myTextAttributes = null;
   }
 
-  @Override
-  public void documentChanged(DocumentEvent e) {
-    isDocumentChanged = true;
-    try {
-      updateCaretPosition((DocumentEventImpl)e);
-    }
-    finally {
-      isDocumentChanged = false;
-    }
-  }
-
-  private void updateCaretPosition(@NotNull final DocumentEventImpl event) {
-    finishUpdate();
+  public void updateCaretPosition(@NotNull final DocumentEventImpl event) {
+    myMultiCaretModel.finishUpdate();
     final DocumentEx document = myEditor.getDocument();
     boolean performSoftWrapAdjustment = event.getNewLength() > 0 // We want to put caret just after the last added symbol
                                         // There is a possible case that the user removes text just before the soft wrap. We want to keep caret
@@ -781,10 +755,6 @@ public class CaretModelImpl implements CaretModel, PrioritizedDocumentListener, 
     updateVisualLineInfo();
   }
 
-  private void finishUpdate() {
-    myIsInUpdate = false;
-  }
-
   private boolean needToShiftWhiteSpaces(final DocumentEvent e) {
     if (!CharArrayUtil.containsOnlyWhiteSpaces(e.getNewFragment()) || CharArrayUtil.containLineBreaks(e.getNewFragment()))
       return e.getOldLength() > 0;
@@ -794,15 +764,6 @@ public class CaretModelImpl implements CaretModel, PrioritizedDocumentListener, 
     return Character.isWhitespace(charBefore)/* || !Character.isWhitespace(charAfter)*/;
   }
 
-  @Override
-  public void beforeDocumentChange(DocumentEvent e) {
-    myIsInUpdate = true;
-  }
-
-  @Override
-  public int getPriority() {
-    return EditorDocumentPriorities.CARET_MODEL;
-  }
 
   private void setCurrentLogicalCaret(@NotNull LogicalPosition position) {
     myLogicalCaret = position;
@@ -873,121 +834,39 @@ public class CaretModelImpl implements CaretModel, PrioritizedDocumentListener, 
 
   @Override
   public void removeMultiCarets() {
-    if (!myHasMultiCarets) {
-      return;
-    }
-
-    for (RangeHighlighter rangeHighlighter : myEditor.getMarkupModel().getAllHighlighters()) {
-      if (rangeHighlighter.getLayer() == HighlighterLayer.MULTI_EDIT_CARET) {
-        myEditor.getMarkupModel().removeHighlighter(rangeHighlighter);
-      }
-    }
-    myHasMultiCarets = false;
+    throw new IllegalStateException();
   }
 
   @Override
   public boolean hasMultiCarets() {
-    return myHasMultiCarets;
+    throw new IllegalStateException();
   }
 
-  @Override
-  public boolean addOrRemoveMultiCaret(int offset) {
-    final RangeHighlighter[] allHighlighters = myEditor.getMarkupModel().getAllHighlighters();
-    boolean existed = false;
-    for (RangeHighlighter highlighter : allHighlighters) {
-      if (highlighter.getLayer() == HighlighterLayer.MULTI_EDIT_CARET && offset == highlighter.getStartOffset()) {
-        existed = true;
-        myEditor.getMarkupModel().removeHighlighter(highlighter);
-      }
-    }
-    if (!existed) {
-      addMultiCaret(offset);
-    }
-    return !existed;
-  }
 
   @Override
   public void addMultiCaret(int offset) {
-    if (myEditor.getDocument().getTextLength() < offset) {
-      return;
-    }
-    final RangeHighlighterEx selection = getOverlappingHighlighter(offset, offset, HighlighterLayer.MULTI_EDIT_SELECTION);
-    if (selection == null) {
-      myEditor.getMarkupModel()
-        .addRangeHighlighter(offset, offset, HighlighterLayer.MULTI_EDIT_CARET, TEXT_ATTRIBUTES, HighlighterTargetArea.EXACT_RANGE);
-      myHasMultiCarets = true;
-    }
-    else {
-      final RangeHighlighterEx selectionCaret =
-        getOverlappingHighlighter(selection.getStartOffset(), selection.getEndOffset(), HighlighterLayer.MULTI_EDIT_CARET);
-
-      if (selection.getStartOffset() == offset || selection.getEndOffset() == offset) {
-        if (selectionCaret != null && selectionCaret.getStartOffset() != offset) {
-          myEditor.getMarkupModel().removeHighlighter(selectionCaret);
-          myEditor.getMarkupModel()
-            .addRangeHighlighter(offset, offset, HighlighterLayer.MULTI_EDIT_CARET, TEXT_ATTRIBUTES, HighlighterTargetArea.EXACT_RANGE);
-        }
-        else if (selectionCaret == null) {
-          myEditor.getMarkupModel()
-            .addRangeHighlighter(offset, offset, HighlighterLayer.MULTI_EDIT_CARET, TEXT_ATTRIBUTES, HighlighterTargetArea.EXACT_RANGE);
-          myHasMultiCarets = true;
-        }
-      }
-      else if (selectionCaret != null) {
-        moveToOffset(selectionCaret.getStartOffset());
-      }
-    }
-  }
-
-  private RangeHighlighterEx getOverlappingHighlighter(final int start, final int end, final int highlighterLayer) {
-    final Condition<RangeHighlighterEx> condition = new Condition<RangeHighlighterEx>() {
-      @Override
-      public boolean value(RangeHighlighterEx rangeHighlighterEx) {
-        return rangeHighlighterEx.getLayer() == highlighterLayer;
-      }
-    };
-    final CommonProcessors.FindFirstProcessor<RangeHighlighterEx> findFirstProcessor =
-      new CommonProcessors.FindFirstProcessor<RangeHighlighterEx>();
-    final FilteringProcessor<RangeHighlighterEx> filteringProcessor =
-      new FilteringProcessor<RangeHighlighterEx>(condition, findFirstProcessor);
-    final EditorMarkupModelImpl markupModel = (EditorMarkupModelImpl)myEditor.getMarkupModel();
-    markupModel.processRangeHighlightersOverlappingWith(start, end, filteringProcessor);
-    return findFirstProcessor.getFoundValue();
+    throw new IllegalStateException();
   }
 
 
   @Override
   public Collection<Integer> getMultiCaretOffsets() {
-    if (!myHasMultiCarets) {
-      return Collections.emptyList();
-    }
-
-    final RangeHighlighter[] allHighlighters = myEditor.getMarkupModel().getAllHighlighters();
-    Set<Integer> offsets = new HashSet<Integer>();
-    for (RangeHighlighter highlighter : allHighlighters) {
-      if (highlighter.getLayer() == HighlighterLayer.MULTI_EDIT_CARET) {
-        offsets.add(highlighter.getStartOffset());
-      }
-    }
-
-    return offsets;
+    throw new IllegalStateException();
   }
 
   @Override
   public Collection<Integer> getAndRemoveMultiCaretOffsets() {
-    if (!myHasMultiCarets) {
-      return Collections.emptyList();
-    }
-    final RangeHighlighter[] allHighlighters = myEditor.getMarkupModel().getAllHighlighters();
-    Set<Integer> offsets = new HashSet<Integer>();
-    for (RangeHighlighter highlighter : allHighlighters) {
-      if (highlighter.getLayer() == HighlighterLayer.MULTI_EDIT_CARET) {
-        offsets.add(highlighter.getStartOffset());
-        myEditor.getMarkupModel().removeHighlighter(highlighter);
-      }
-    }
-    myHasMultiCarets = false;
-    return offsets;
+    throw new IllegalStateException();
   }
-  
+
+  @Override
+  public List<CaretModel> getMultiCarets() {
+    throw new IllegalStateException();
+  }
+
+  @Override
+  public void setActiveCaret(CaretModel caretModel) {
+    throw new IllegalStateException();
+  }
+
 }

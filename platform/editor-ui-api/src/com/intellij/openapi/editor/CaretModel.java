@@ -141,15 +141,21 @@ public interface CaretModel {
    */
   TextAttributes getTextAttributes();
 
+  
+  //todo krasa move those to another interface?
   void removeMultiCarets();
 
   boolean hasMultiCarets();
-
-  boolean addOrRemoveMultiCaret(int offset);
 
   void addMultiCaret(int offset);
 
   Collection<Integer> getMultiCaretOffsets();
 
   Collection<Integer> getAndRemoveMultiCaretOffsets();
+
+  List<CaretModel> getMultiCarets();
+
+
+  void setActiveCaret(CaretModel caretModel);
+  
 }

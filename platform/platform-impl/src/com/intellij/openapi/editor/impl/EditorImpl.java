@@ -171,9 +171,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
 
   private boolean myIsInsertMode = true;
 
-  private final TIntObjectHashMap<CaretCursor> myMultiCarets = new TIntObjectHashMap<CaretCursor>();
-
-  @NotNull private final CaretCursor myCaretCursor;
+  @NotNull private final MultiCaretCursorWrapper myCaretCursor;
   private final ScrollingTimer myScrollingTimer = new ScrollingTimer();
 
   private final Object MOUSE_DRAGGED_GROUP = new String("MouseDraggedGroup");
@@ -203,7 +201,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
   @NotNull private final EditorMarkupModelImpl myMarkupModel;
   @NotNull private final FoldingModelImpl      myFoldingModel;
   @NotNull private final ScrollingModelImpl    myScrollingModel;
-  @NotNull private final CaretModelImpl        myCaretModel;
+  @NotNull private final MultiCaretModelImpl   myCaretModel;
   @NotNull private final SoftWrapModelImpl     mySoftWrapModel;
 
   @NotNull private static final RepaintCursorCommand ourCaretBlinkingCommand;
@@ -323,7 +321,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     mySelectionModel = new SelectionModelImpl(this);
     myMarkupModel = new EditorMarkupModelImpl(this);
     myFoldingModel = new FoldingModelImpl(this);
-    myCaretModel = new CaretModelImpl(this);
+    myCaretModel = new MultiCaretModelImpl(this);
     mySoftWrapModel = new SoftWrapModelImpl(this);
     mySizeContainer.reset();
 
@@ -423,7 +421,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
       }
     });
 
-    myCaretCursor = new CaretCursor();
+    myCaretCursor = new MultiCaretCursorWrapper();
 
     myFoldingModel.flushCaretShift();
     myScrollBarOrientation = VERTICAL_SCROLLBAR_RIGHT;
@@ -623,7 +621,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
 
   @Override
   @NotNull
-  public CaretModelImpl getCaretModel() {
+  public MultiCaretModelImpl getCaretModel() {
     return myCaretModel;
   }
 
@@ -841,17 +839,6 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     MyMouseMotionListener mouseMotionListener = new MyMouseMotionListener();
     myEditorComponent.addMouseMotionListener(mouseMotionListener);
     myGutterComponent.addMouseMotionListener(mouseMotionListener);
-    myEditorComponent.addFocusListener(new FocusAdapter() {
-      @Override
-      public void focusGained(FocusEvent e) {
-        repaintMultiCarets();
-      }
-
-      @Override
-      public void focusLost(FocusEvent e) {
-        repaintMultiCarets();
-      }
-    });
     myEditorComponent.addFocusListener(new FocusAdapter() {
       @Override
       public void focusGained(FocusEvent e) {
@@ -1734,8 +1721,6 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     int scrollOffset = caretLocation.y - myCaretUpdateVShift;
     getScrollingModel().scrollVertically(scrollOffset);
     updateHasTabsFlag(e.getNewFragment());
-  
-    myMultiCarets.clear();
   }
 
   private void updateHasTabsFlag(CharSequence newChars) {
@@ -2851,7 +2836,6 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
            + "\n\nfolding data: " + getFoldingModel().dumpState()
            + (myDocument instanceof DocumentImpl ? "\n\ndocument info: " + ((DocumentImpl)myDocument).dumpState() : "");
   }
-
   private class CachedFontContent {
     final CharSequence[] data = new CharSequence[CACHED_CHARS_BUFFER_SIZE];
     final int[] starts = new int[CACHED_CHARS_BUFFER_SIZE];
@@ -2935,56 +2919,9 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
   private void paintCaretCursor(@NotNull Graphics g) {
     // There is a possible case that visual caret position is changed because of newly added or removed soft wraps.
     // We check if that's the case and ask caret model to recalculate visual position if necessary.
-
-    myCaretCursor.paint(g);
-    paintMultiCarets(g);
-  }
-
-  private void repaintMultiCarets() {
-    paintMultiCarets(null);
-  }
-
-  private void paintMultiCarets(final Graphics g) {
-    if (!getCaretModel().hasMultiCarets()) {
-      return;
-    }
-    final Collection<Integer> offsets = myCaretModel.getMultiCaretOffsets();
-    if (offsets.isEmpty()) {
-      myMultiCarets.clear();
-      //just to set that flag to false
-      getCaretModel().removeMultiCarets();
-    }
-    for (Integer offset : offsets) {
-      if (myMultiCarets.get(offset) == null) {
-        myMultiCarets.put(offset, createCaretCursor(offset));
+      for (CaretCursorImpl cursor : myCaretCursor.myCaretCursors) {
+        cursor.paint(g);
       }
-    }
-    myMultiCarets.forEachEntry(new TIntObjectProcedure<CaretCursor>() {
-      @Override
-      public boolean execute(int key, CaretCursor cursor) {
-        if (offsets.contains(key)) {
-          if (g == null) {
-            cursor.repaint();
-          }
-          else {
-            cursor.paint(g);
-          } 
-        }
-        else {
-          myMultiCarets.remove(key);
-        }
-        return true;
-      }
-    });
-  }
-
-  private CaretCursor createCaretCursor(Integer offset) {
-    final CaretCursor caretCursor = new CaretCursor();
-    final VisualPosition visualPosition = offsetToVisualPosition(offset);
-    Point pos1 = visualPositionToXY(visualPosition);
-    Point pos2 = visualPositionToXY(new VisualPosition(visualPosition.line, visualPosition.column + 1));
-    caretCursor.setPosition(pos1, pos2.x - pos1.x);
-    return caretCursor;
   }
 
   private void paintLineMarkersSeparators(@NotNull final Graphics g,
@@ -4348,7 +4285,10 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
       @Override
       public void run() {
         if (myEditor != null) {
-          myEditor.myCaretCursor.repaint();
+          final List<CaretCursorImpl> caretCursors = myEditor.myCaretCursor.myCaretCursors;
+          for (CaretCursorImpl caretCursor : caretCursors) {
+            caretCursor.repaint();
+          }         
         }
       }
     }
@@ -4372,24 +4312,27 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     @Override
     public void run() {
       if (myEditor != null) {
-        CaretCursor activeCursor = myEditor.myCaretCursor;
-
-        long time = System.currentTimeMillis();
-        time -= activeCursor.myStartTime;
-
-        if (time > mySleepTime) {
-          boolean toRepaint = true;
-          if (myIsBlinkCaret) {
-            activeCursor.myIsShown = !activeCursor.myIsShown;
-          }
-          else {
-            toRepaint = !activeCursor.myIsShown;
-            activeCursor.myIsShown = true;
-          }
-
-          if (toRepaint) {
-            SwingUtilities.invokeLater(myRepaintRunnable);
-          }
+        final List<CaretCursorImpl> caretCursors = myEditor.myCaretCursor.myCaretCursors;
+        for (CaretCursorImpl activeCursor : caretCursors) {
+          if (activeCursor != null) {
+             long time = System.currentTimeMillis();
+             time -= activeCursor.myStartTime;
+   
+             if (time > mySleepTime) {
+               boolean toRepaint = true;
+               if (myIsBlinkCaret) {
+                 activeCursor.myIsShown = !activeCursor.myIsShown;
+               }
+               else {
+                 toRepaint = !activeCursor.myIsShown;
+                 activeCursor.myIsShown = true;
+               }
+   
+               if (toRepaint) {
+                 SwingUtilities.invokeLater(myRepaintRunnable);
+               }
+             }
+           }
         }
       }
     }
@@ -4404,10 +4347,36 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
   }
 
   private void setCursorPosition() {
-    VisualPosition caretPosition = getCaretModel().getVisualPosition();
-    Point pos1 = visualPositionToXY(caretPosition);
-    Point pos2 = visualPositionToXY(new VisualPosition(caretPosition.line, caretPosition.column + 1));
-    myCaretCursor.setPosition(pos1, pos2.x - pos1.x);
+    List<CaretModel> multiCarets = myCaretModel.getMultiCarets();
+    List<CaretCursorImpl> caretCursors = myCaretCursor.myCaretCursors;
+    while (multiCarets.size() > caretCursors.size()) {
+      myCaretCursor.myCaretCursors.add(new CaretCursorImpl());
+    }
+    while (multiCarets.size() < caretCursors.size()) {
+      int index = myCaretCursor.myCaretCursors.size() - 1;
+      CaretCursorImpl remove = myCaretCursor.myCaretCursors.remove(index);
+      remove.repaint();
+    }
+
+    //TODO recalculate only when needed? maybe add #positionChanged to caret 
+    for (int i = 0; i < multiCarets.size(); i++) {
+      CaretModel caretModel = multiCarets.get(i);
+      CaretCursorImpl caretCursor = caretCursors.get(i);
+      VisualPosition caretPosition = caretModel.getVisualPosition();
+      Point pos1 = visualPositionToXY(caretPosition);
+      Point pos2 = visualPositionToXY(new VisualPosition(caretPosition.line, caretPosition.column + 1));
+      caretCursor.setPosition(pos1, pos2.x - pos1.x);
+    }
+  }
+
+  public void caretRemoved(CaretModel multiCaret) {
+    //todo removing the right caret
+    CaretCursorImpl remove = myCaretCursor.myCaretCursors.remove(myCaretCursor.myCaretCursors.size() - 1);
+    setCursorPosition();
+  }
+
+  public void repaintCursors() {
+    setCursorPosition();
   }
 
   @Override
@@ -4481,7 +4450,53 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     //myEditorComponent.setOpaque(true);
   }
 
-  private class CaretCursor {
+  private class MultiCaretCursorWrapper implements CaretCursor {
+    List<CaretCursorImpl> myCaretCursors = new ArrayList<CaretCursorImpl>();
+
+    @Override
+    public boolean isEnabled() {
+      for (CaretCursor caretCursor : myCaretCursors) {
+        if (caretCursor.isEnabled()) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    @Override
+    public void setEnabled(boolean enabled) {
+      for (CaretCursor caretCursor : myCaretCursors) {
+        caretCursor.setEnabled(enabled);
+      }
+    }
+
+    @Override
+    public void activate() {
+      for (CaretCursor caretCursor : myCaretCursors) {
+        caretCursor.activate();
+      }
+    }
+
+    @Override
+    public boolean isActive() {
+      for (CaretCursor caretCursor : myCaretCursors) {
+        if (caretCursor.isActive()) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    @Override
+    public void passivate() {
+      for (CaretCursor caretCursor : myCaretCursors) {
+        caretCursor.passivate();
+      }
+    }
+
+  }
+
+  private class CaretCursorImpl implements CaretCursor {
     private Point myLocation;
     private int myWidth;
     private boolean myEnabled;
@@ -4490,20 +4505,23 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     private boolean myIsShown = false;
     private long myStartTime = 0;
 
-    private CaretCursor() {
+    private CaretCursorImpl() {
       myLocation = new Point(0, 0);
       setEnabled(true);
     }
 
+    @Override
     public boolean isEnabled() {
       return myEnabled;
     }
 
+    @Override
     public void setEnabled(boolean enabled) {
       myEnabled = enabled;
     }
 
-    private void activate() {
+    @Override
+    public void activate() {
       final boolean blink = mySettings.isBlinkCaret();
       final int blinkPeriod = mySettings.getCaretBlinkPeriod();
       synchronized (ourCaretBlinkingCommand) {
@@ -4514,13 +4532,15 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
       }
     }
 
+    @Override
     public boolean isActive() {
       synchronized (ourCaretBlinkingCommand) {
         return myIsShown;
       }
     }
 
-    private void passivate() {
+    @Override
+    public void passivate() {
       synchronized (ourCaretBlinkingCommand) {
         myIsShown = false;
       }
@@ -5635,18 +5655,24 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
       // at 'line markers' area).
       if (e.getSource() != myGutterComponent ||
           (eventArea != EditorMouseEventArea.LINE_MARKERS_AREA && eventArea != EditorMouseEventArea.ANNOTATIONS_AREA)) {
-        
-        if (isMultiEditMode(e) && !getSelectionModel().hasMultiSelections()  && !getCaretModel().hasMultiCarets() ) {
-          if (oldStart != oldEnd ) {
-            getSelectionModel().addMultiSelection(oldStart, oldEnd, null, false);
+        final int oldOffset = getCaretModel().getOffset();
+
+        if (isMultiEditMode(e)) {
+          if (!getSelectionModel().hasMultiSelections() && !getCaretModel().hasMultiCarets()) {
+            if (oldStart != oldEnd) {
+              getSelectionModel().addMultiSelection(oldStart, oldEnd, null, false);
+            }
+            if (getSelectionModel().hasBlockSelection()) {
+              addBlockMultiSelection();
+            }
           }
-          if (getSelectionModel().hasBlockSelection()) {
-            addBlockMultiSelection();
-          }
-          getCaretModel().addMultiCaret(getCaretModel().getOffset());
         }
 
         moveCaretToScreenPos(x, y);
+
+        if (isMultiEditMode(e)) {
+          getCaretModel().addMultiCaret(oldOffset);
+        }
       }
 
       if (e.isPopupTrigger()) return isNavigation;
@@ -6780,4 +6806,15 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     }
   }
 
+  public static interface CaretCursor {
+    boolean isEnabled();
+  
+    void setEnabled(boolean enabled);
+  
+    void activate();
+  
+    boolean isActive();
+  
+    void passivate();
+  }
 }

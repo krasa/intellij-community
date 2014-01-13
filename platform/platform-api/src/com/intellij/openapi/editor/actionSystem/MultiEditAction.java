@@ -15,13 +15,16 @@
  */
 package com.intellij.openapi.editor.actionSystem;
 
+import com.google.common.base.Objects;
 import com.intellij.openapi.actionSystem.DataContext;
+import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.CaretModel;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.SelectionModel;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.UserDataHolder;
 import com.intellij.util.Range;
+import gnu.trove.TIntObjectHashMap;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -36,22 +39,12 @@ import static java.lang.Math.min;
  * @author Vojtech Krasa
  */
 public abstract class MultiEditAction  {
+  private static final Logger LOG = Logger.getInstance("#com.intellij.openapi.editor.actionSystem.MultiEditAction");
 
   public static final Key<Object> ALREADY_PROCESSING = Key.create("MultiEditAction.alreadyProcessing");
 
   private MultiEditAction() {
   }
-
-//public void actionPerformed(AnActionEvent e) {
-    //final DataContext dataContext = e.getDataContext();
-    //final Editor editor = CommonDataKeys.EDITOR.getData(dataContext);
-    //if (editor == null) {
-    //  return;
-    //}
-    //final CaretModel caretModel = editor.getCaretModel();
-    //caretModel.addOrRemoveMultiCaret(caretModel.getOffset());
-  //}
-
 
   public static Runnable wrapRunnable(final Runnable executeHandler, final Editor editor, final DataContext dataContext) {
     return new Runnable() {
@@ -85,48 +78,38 @@ public abstract class MultiEditAction  {
     try {
       SelectionModel selectionModel = editor.getSelectionModel();
       CaretModel caretModel = editor.getCaretModel();
-      final List<Range<Integer>> caretsAndSelections = getAndRemoveMultiEditRanges(editor);
-
-      if (caretsAndSelections.isEmpty()) {
+      final List<CaretModelWithSelection> caretsAndSelections = getAndRemoveMultiEditRanges(editor);
+      LOG.debug("executing with "+caretsAndSelections.size() + " carets");
+      if (caretsAndSelections.size()<=1) {
         executeHandler.run();
       }
       else {
-        for (int i = 0; i < caretsAndSelections.size(); i++) {
-          Range<Integer> range = caretsAndSelections.get(i);
-          SelectionModel.Direction direction = null;
-          if (isCaret(range)) {
-            direction = SelectionModel.Direction.RIGHT;
-          }
-          //merge overlapping selections and carets
-          Range<Integer> nextRange = getNextRange(caretsAndSelections, i);
-          while (nextRange != null && nextRange.getTo() >= range.getFrom()) {
-            i++;
-            range = new Range<Integer>(min(nextRange.getFrom(), range.getFrom()), range.getTo());
-            if (direction == null && isCaret(nextRange)) {
-              direction = determineDirection(range, nextRange);
+        MultiEditListener multiEditListener = (MultiEditListener)caretModel;
+        multiEditListener.beforeMultiCaretsExecution();
+        try {
+          for (int i = 0; i < caretsAndSelections.size(); i++) {
+            CaretModelWithSelection caretModelWithSelection = caretsAndSelections.get(i);
+            Range<Integer> range = caretModelWithSelection.selection;
+  
+            caretModel.setActiveCaret(caretModelWithSelection.myCaretModel);
+            if (isCaretOnly(caretModelWithSelection)) {
+              selectionModel.removeSelection();
             }
-            nextRange = getNextRange(caretsAndSelections, i);
+            else {
+              selectionModel.setSelection(range.getFrom(), range.getTo());
+            }
+  
+            executeHandler.run();
+  
+            if (selectionModel.hasSelection()) {
+              boolean putCursorOnStart = selectionModel.getSelectionStart() == caretModel.getOffset();
+              selectionModel.addMultiSelection(selectionModel.getSelectionStart(), selectionModel.getSelectionEnd(),
+                                               SelectionModel.Direction.getDirection(putCursorOnStart), true);
+            }
           }
-
-          if (isCaret(range)) {
-            selectionModel.removeSelection();
-            caretModel.moveToOffset(range.getFrom());
-          }
-          else {
-            selectionModel.setSelection(range.getFrom(), range.getTo());
-            moveCaretToOffset(caretModel, range, direction);
-          }
-
-          executeHandler.run();
-
-          if (selectionModel.hasSelection()) {
-            boolean putCursorOnStart = selectionModel.getSelectionStart() == caretModel.getOffset();
-            selectionModel.addMultiSelection(selectionModel.getSelectionStart(), selectionModel.getSelectionEnd(),
-                                             SelectionModel.Direction.getDirection(putCursorOnStart), true);
-          }
-          else {
-            caretModel.addMultiCaret(caretModel.getOffset());
-          }
+        }
+        finally {
+          multiEditListener.afterMultiCaretsExecution();
         }
       }
     }
@@ -137,60 +120,57 @@ public abstract class MultiEditAction  {
     }
   }
 
-  public static List<Range<Integer>> getAndRemoveMultiEditRanges(Editor editor) {
+  private static boolean isCaretOnly(CaretModelWithSelection caretModelWithSelection) {
+    return caretModelWithSelection.selection==null;
+  }
+
+  public static List<CaretModelWithSelection> getAndRemoveMultiEditRanges(Editor editor) {
     SelectionModel selectionModel = editor.getSelectionModel();
     CaretModel caretModel = editor.getCaretModel();
 
 
     final List<Range<Integer>> multiSelects = selectionModel.getAndRemoveMultiSelections();
-    List<Integer> carets = new ArrayList<Integer>(caretModel.getAndRemoveMultiCaretOffsets());
-    return merge(carets, multiSelects);
+    return merge(caretModel.getMultiCarets(), multiSelects);
   }
 
-  private static SelectionModel.Direction determineDirection(Range<Integer> range, Range<Integer> nextRange) {
-    SelectionModel.Direction direction = null;
-    final Integer caretOffset = nextRange.getFrom();
-    if (caretOffset.equals(range.getFrom())) {
-      direction = SelectionModel.Direction.LEFT;
+
+  public static List<CaretModelWithSelection> merge(List<CaretModel> carets, List<Range<Integer>> selections) {
+    TIntObjectHashMap<Range<Integer>> selectionsMap = new TIntObjectHashMap<Range<Integer>>();
+    for (Range<Integer> integerRange : selections) {
+      selectionsMap.put(integerRange.getFrom(), integerRange);
+      selectionsMap.put(integerRange.getTo(), integerRange);
     }
-    else if (caretOffset.equals(range.getTo())) {
-      direction = SelectionModel.Direction.RIGHT;
+
+    List<CaretModelWithSelection> caretModelWithSelections = new ArrayList<CaretModelWithSelection>(carets.size());
+    for (CaretModel caret : carets) {
+      Range<Integer> selection = selectionsMap.get(caret.getOffset());
+      caretModelWithSelections.add(new CaretModelWithSelection(caret, selection));
     }
-    return direction;
+    Collections.sort(caretModelWithSelections);
+
+    return caretModelWithSelections;
   }
 
-  /* move caret on the right place so that shift+arrow work properly */
-  private static void moveCaretToOffset(CaretModel caretModel, Range<Integer> range, SelectionModel.Direction direction) {
-    if (direction == SelectionModel.Direction.LEFT) {
-      caretModel.moveToOffset(range.getFrom());
+  public static class CaretModelWithSelection implements Comparable<CaretModelWithSelection>{
+   public CaretModel myCaretModel;
+   public Range<Integer> selection;
+
+    CaretModelWithSelection(CaretModel caretModel, Range<Integer> selection) {
+      myCaretModel = caretModel;
+      this.selection = selection;
     }
-    else {//default right
-      caretModel.moveToOffset(range.getTo());
+
+    @Override
+    public int compareTo(CaretModelWithSelection o) {
+      Integer offset = o.myCaretModel.getOffset();
+      return offset.compareTo(this.myCaretModel.getOffset());
+    }
+
+    @Override
+    public String toString() {
+      return Objects.toStringHelper(this).add("caretOffset", myCaretModel.getOffset()).add("selection", selection).toString();
     }
   }
-
-  private static Range<Integer> getNextRange(List<Range<Integer>> caretsAndSelections, int current) {
-    final int next = current + 1;
-    if (next == caretsAndSelections.size()) {
-      return null;
-    }
-    return caretsAndSelections.get(next);
-  }
-
-  private static boolean isCaret(Range<Integer> caretsOrSelection) {
-    return caretsOrSelection.getFrom().equals(caretsOrSelection.getTo());
-  }
-
-  public static List<Range<Integer>> merge(List<Integer> carets, List<Range<Integer>> caretModel) {
-    final ArrayList<Range<Integer>> merge = new ArrayList<Range<Integer>>(carets.size() + caretModel.size());
-    merge.addAll(caretModel);
-    for (Integer caretOffset : carets) {
-      merge.add(new Range<Integer>(caretOffset, caretOffset));
-    }
-    Collections.sort(merge, RANGE_COMPARATOR);
-    return merge;
-  }
-
   public static final Comparator<Range<Integer>> RANGE_COMPARATOR = new Comparator<Range<Integer>>() {
     @Override
     public int compare(Range<Integer> o1, Range<Integer> o2) {

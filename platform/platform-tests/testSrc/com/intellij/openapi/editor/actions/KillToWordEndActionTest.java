@@ -18,8 +18,8 @@ package com.intellij.openapi.editor.actions;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.FoldRegion;
 import com.intellij.openapi.editor.FoldingModel;
-import com.intellij.openapi.editor.impl.CaretModelImpl;
 import com.intellij.openapi.editor.impl.EditorImpl;
+import com.intellij.openapi.editor.impl.MultiCaretModelImpl;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.ide.CopyPasteManager;
 import com.intellij.openapi.ide.KillRingTransferable;
@@ -195,7 +195,7 @@ public class KillToWordEndActionTest extends LightPlatformCodeInsightTestCase {
     String text = "<caret>first second third";
     configureFromFileText(getTestName(false) + ".txt", text);
     final Document document = myEditor.getDocument();
-    final CaretModelImpl caretModel = new CaretModelImpl((EditorImpl)myEditor);
+    final MultiCaretModelImpl caretModel = new MultiCaretModelImpl((EditorImpl)myEditor);
     try {
       document.addDocumentListener(caretModel);
       caretModel.moveToOffset(document.getTextLength()-1);

@@ -35,15 +35,23 @@ import com.intellij.util.Range;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
-
-import static com.intellij.openapi.editor.SelectionModel.Direction.getDirection;
 
 /**
  * @author Vojtech Krasa
  */
 public class SelectNextOccurrenceAction extends EditorAction {
   protected static class Handler extends EditorActionHandler {
+
+    public static final Comparator<CaretModel> OFFSET_COMPARATOR = new Comparator<CaretModel>() {
+      @Override
+      public int compare(CaretModel o1, CaretModel o2) {
+        final Integer offset = o1.getOffset();
+        return offset.compareTo(o2.getOffset());
+      }
+    };
+
     @Override
     public void execute(Editor editor, DataContext dataContext) {
       Project project = CommonDataKeys.PROJECT.getData(DataManager.getInstance().getDataContext(editor.getComponent()));
@@ -51,71 +59,40 @@ public class SelectNextOccurrenceAction extends EditorAction {
       final CaretModel caretModel = editor.getCaretModel();
 
       List<Range<Integer>> multiSelections = new ArrayList<Range<Integer>>(selectionModel.getMultiSelections());
-      List<Integer> carets = new ArrayList<Integer>(caretModel.getMultiCaretOffsets());
+      List<CaretModel> carets = new ArrayList<CaretModel>(caretModel.getMultiCarets());
 
-      addNormalCaretAndSelectionWhenNotUsingMultiEdit(selectionModel, caretModel, multiSelections, carets);
 
-      final List<Range<Integer>> caretsAndSelections = MultiEditAction.merge(carets, multiSelections);
+      final List<MultiEditAction.CaretModelWithSelection> caretsAndSelections = MultiEditAction.merge(carets, multiSelections);
       boolean hadSingleCarets = selectWordAtAllCarets(editor, multiSelections, caretsAndSelections, dataContext);
 
       if (!hadSingleCarets) {
-        selectNextOccurrence(editor, project, dataContext, multiSelections,carets);
+        selectNextOccurrence(editor, project, dataContext, multiSelections, carets);
       }
     }
 
-    protected void addNormalCaretAndSelectionWhenNotUsingMultiEdit(SelectionModel selectionModel,
-                                                                   CaretModel caretModel,
-                                                                   List<Range<Integer>> multiSelections,
-                                                                   List<Integer> carets) {
-      //add normal selections/carets when multi edit is not used
-      if (selectionModel.hasSelection() && multiSelections.isEmpty()) {
-        final int selectionStart = selectionModel.getSelectionStart();
-        final SelectionModel.Direction direction = getDirection(selectionStart == caretModel.getOffset());
-        final int selectionEnd = selectionModel.getSelectionEnd();
-        selectionModel.addMultiSelection(selectionStart, selectionEnd, direction, false);
-        multiSelections.add(new Range<Integer>(selectionStart, selectionEnd));
-        carets.add(direction == SelectionModel.Direction.LEFT ? selectionStart : selectionEnd);
-      }
-      else if (carets.isEmpty()) {
-        caretModel.addMultiCaret(caretModel.getOffset());
-        carets.add(caretModel.getOffset());
-      }
-    }
 
     protected boolean selectWordAtAllCarets(Editor editor,
                                             List<Range<Integer>> multiSelections,
-                                            List<Range<Integer>> caretsAndSelections,
+                                            List<MultiEditAction.CaretModelWithSelection> caretsAndSelections,
                                             DataContext dataContext) {
       final SelectionModel selectionModel = editor.getSelectionModel();
       final CaretModel caretModel = editor.getCaretModel();
 
       boolean hadSingleCarets = false;
-      Integer bottomCaretOffset = null;
       for (int i = 0; i < caretsAndSelections.size(); i++) {
-        Range<Integer> integerRange = caretsAndSelections.get(i);
-        if (isCaret(integerRange)) {
-          //continue if is part of selection
-          if (isSelectionCaret(caretsAndSelections, i, integerRange)) {
-            if (bottomCaretOffset == null) {
-              bottomCaretOffset = integerRange.getTo();
-            }
-            continue;
-          }
-        }
-        else {
+        MultiEditAction.CaretModelWithSelection caretModelWithSelection = caretsAndSelections.get(i);
+        //continue if is part of selection
+        if (caretModelWithSelection.selection != null) {
           continue;
         }
-        final Integer caretOffset = integerRange.getFrom();
-        caretModel.moveToOffset(caretOffset);
+
+        caretModel.setActiveCaret(caretModelWithSelection.myCaretModel);
         hadSingleCarets = true;
 
         if (selectionModel.hasSelection()) {
           selectionModel.removeSelection();
         }
         selectWordAtCaret(editor, multiSelections, dataContext);
-        if (bottomCaretOffset == null) {
-          bottomCaretOffset = caretModel.getOffset();
-        }
       }
 
       //bottom selection should be the main one
@@ -123,7 +100,6 @@ public class SelectNextOccurrenceAction extends EditorAction {
         Collections.sort(multiSelections, MultiEditAction.RANGE_COMPARATOR);
         final Range<Integer> integerRange = multiSelections.get(0);
         selectionModel.setSelection(integerRange.getFrom(), integerRange.getTo());
-        caretModel.moveToOffset(bottomCaretOffset);
       }
       return hadSingleCarets;
     }
@@ -149,8 +125,10 @@ public class SelectNextOccurrenceAction extends EditorAction {
                                         Project project,
                                         DataContext dataContext,
                                         List<Range<Integer>> multiSelections,
-                                        List<Integer> carets) {
+                                        List<CaretModel> carets) {
       final SelectionModel selectionModel = editor.getSelectionModel();
+      Collections.sort(carets, OFFSET_COMPARATOR);
+      editor.getCaretModel().setActiveCaret(carets.get(carets.size() - 1));
 
       FindResult wordAtCaret = FindUtil.findWordAtCaret(project, editor, wholeWordsOnly(editor));
       //find next if found one is already selected
@@ -169,8 +147,8 @@ public class SelectNextOccurrenceAction extends EditorAction {
         if (selectionModel.hasSelection()) {
           if (multiSelections.contains(new Range<Integer>(selectionModel.getSelectionStart(), selectionModel.getSelectionEnd()))) {
             // side effect workaround , #searchAgain scrolls to caret, so when everything is selected it is not so nice as it scrolls like crazy
-            Collections.sort(carets);
-            editor.getCaretModel().moveToOffset(carets.get(0));
+            Collections.sort(carets, OFFSET_COMPARATOR);
+            editor.getCaretModel().setActiveCaret(carets.get(0));
             editor.getScrollingModel().scrollToCaret(ScrollType.CENTER);
           }
           else {
@@ -186,16 +164,6 @@ public class SelectNextOccurrenceAction extends EditorAction {
       return !editor.getSelectionModel().hasSelection();
     }
 
-    protected boolean isSelectionCaret(List<Range<Integer>> caretsAndSelections, int i, Range<Integer> caret) {
-      final boolean caretOnStartOfSelection = i > 0 && caretsAndSelections.get(i - 1).getFrom().equals(caret.getTo());
-      final boolean caretOnEndOfSelection =
-        caretsAndSelections.size() > i + 1 && caretsAndSelections.get(i + 1).getTo().equals(caret.getTo());
-      return caretOnStartOfSelection || caretOnEndOfSelection;
-    }
-
-    protected boolean isCaret(Range<Integer> integerRange) {
-      return integerRange.getFrom().equals(integerRange.getTo());
-    }
 
     @Override
     public boolean isEnabled(Editor editor, DataContext dataContext) {
