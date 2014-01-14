@@ -27,7 +27,6 @@ import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.openapi.util.text.StringUtil;
-import com.intellij.util.ArrayUtil;
 import com.intellij.xml.XmlBundle;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -40,7 +39,7 @@ public class DefaultUrlOpener extends UrlOpener {
   private static final Logger LOG = Logger.getInstance(DefaultUrlOpener.class);
 
   @Override
-  public boolean openUrl(final @NotNull WebBrowser browser, final @NotNull String url) {
+  public boolean openUrl(@NotNull WebBrowser browser, @NotNull String url) {
     return launchBrowser(browser, url, false);
   }
 
@@ -49,7 +48,7 @@ public class DefaultUrlOpener extends UrlOpener {
                                       boolean newWindowIfPossible,
                                       @NotNull String... additionalParameters) {
     final String browserPath = browser.getPath();
-    if (StringUtil.isEmptyOrSpaces(browserPath)) {
+    if (StringUtil.isEmpty(browserPath)) {
       Messages.showErrorDialog(browser.getBrowserNotFoundMessage(), IdeBundle.message("title.browser.not.found"));
       return false;
     }
@@ -58,7 +57,7 @@ public class DefaultUrlOpener extends UrlOpener {
   }
 
   private static boolean doLaunchBrowser(final String browserPath,
-                                         final BrowserSpecificSettings browserSpecificSettings,
+                                         @Nullable BrowserSpecificSettings browserSpecificSettings,
                                          final String url,
                                          final boolean newWindowIfPossible,
                                          final String[] additionalParameters) {
@@ -79,20 +78,19 @@ public class DefaultUrlOpener extends UrlOpener {
   }
 
   private static void addArgs(List<String> command, @Nullable BrowserSpecificSettings settings, String[] additional) {
-    String[] specific = settings != null ? settings.getAdditionalParameters() : ArrayUtil.EMPTY_STRING_ARRAY;
-
-    if (specific.length + additional.length > 0) {
+    List<String> specific = settings == null ? Collections.<String>emptyList() : settings.getAdditionalParameters();
+    if (specific.size() + additional.length > 0) {
       if (SystemInfo.isMac && ExecUtil.getOpenCommandPath().equals(command.get(0))) {
-        if (!BrowserUtil.isOpenCommandSupportArgs()) {
-          LOG.warn("'open' command doesn't allow to pass command line arguments so they will be ignored: " +
-                   Arrays.toString(specific) + " " + Arrays.toString(additional));
+        if (BrowserUtil.isOpenCommandSupportArgs()) {
+          command.add("--args");
         }
         else {
-          command.add("--args");
+          LOG.warn("'open' command doesn't allow to pass command line arguments so they will be ignored: " +
+                   StringUtil.join(specific, ", ") + " " + Arrays.toString(additional));
         }
       }
 
-      Collections.addAll(command, specific);
+      command.addAll(specific);
       Collections.addAll(command, additional);
     }
   }
