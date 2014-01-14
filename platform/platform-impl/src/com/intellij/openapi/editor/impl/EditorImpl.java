@@ -4011,7 +4011,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
       mySelectionModel.addMultiSelection(getSelectionModel().getSelectionStart(), getSelectionModel().getSelectionEnd(), direction, true);
     }
     else if (isMultiEditMode(e) ) {
-      myCaretModel.addMultiCaret(myCaretModel.getOffset());
+      //myCaretModel.addMultiCaret(myCaretModel.getOffset());
     }
     else {
       getSelectionModel().removeMultiSelections();
@@ -5687,7 +5687,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
 
         moveCaretToScreenPos(x, y);
 
-        if (isMultiEditMode(e)) {
+        if (isMultiEditMode(e) || getCaretModel().hasMultiCarets()) {
           getCaretModel().addMultiCaret(oldOffset);
         }
       }

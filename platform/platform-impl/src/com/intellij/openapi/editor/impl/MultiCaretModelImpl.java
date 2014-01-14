@@ -219,7 +219,7 @@ public class MultiCaretModelImpl implements CaretModel, PrioritizedDocumentListe
   private CaretModelImpl getOverlappingCaret(int startOffset, int endOffset) {
     for (CaretModelImpl caret : carets) {
       int offset = caret.getOffset();
-      if (caret != activeCaret && offset >= startOffset && offset <= endOffset) {
+      if (offset >= startOffset && offset <= endOffset) {
         return caret;
       }
     }
@@ -296,9 +296,16 @@ public class MultiCaretModelImpl implements CaretModel, PrioritizedDocumentListe
         }
       }
       if (!delete.isEmpty()) {
+        LOG.debug("sweep - removing "+delete.size());
         for (CaretModel caretModel : delete) {
-          removeCaret(caretModel);
+          final CaretModelImpl caretImpl = (CaretModelImpl)caretModel;
+          carets.remove(caretImpl);
+          caretImpl.dispose();
+          if (activeCaret == caretModel) {
+            activeCaret = carets.get(0);
+          }
         }
+        myEditor.caretRemoved(null);
       }
     }
   }
@@ -313,6 +320,7 @@ public class MultiCaretModelImpl implements CaretModel, PrioritizedDocumentListe
     }
 
     activeCaret = (CaretModelImpl)caretModel;
+    myEditor.setLastColumnNumber(activeCaret.getLogicalPosition().column);
   }
 
   void validateCallContext() {
