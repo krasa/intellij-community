@@ -196,6 +196,46 @@ public class FindUtil {
     }
   }
 
+  @Nullable
+  public static FindResult findFirstInRange(TextRange r, Editor editor, final FindManager findManager, FindModel findModel) {
+    VirtualFile virtualFile = FileDocumentManager.getInstance().getFile(editor.getDocument());
+
+    CharSequence charSequence = editor.getDocument().getCharsSequence();
+
+    int offset = r.getStartOffset();
+    int maxOffset = Math.min(r.getEndOffset(), charSequence.length());
+
+    while (true) {
+      FindResult result;
+      try {
+        CharSequence bombedCharSequence = StringUtil.newBombedCharSequence(charSequence, 3000);
+        result = findManager.findString(bombedCharSequence, offset, findModel, virtualFile);
+      }
+      catch (PatternSyntaxException e) {
+        result = null;
+      }
+      catch (ProcessCanceledException e) {
+        result = null;
+      }
+      if (result == null || !result.isStringFound()) break;
+      int newOffset = result.getEndOffset();
+      if (result.getEndOffset() > maxOffset) break;
+      if (offset == newOffset) {
+        if (offset < maxOffset - 1) {
+          offset++;
+        }
+        else {
+          return result;
+        }
+      }
+      else {
+        offset = newOffset;
+      }
+      return result;
+    }
+    return null;
+  }
+
   private enum Direction {
     UP, DOWN
   }

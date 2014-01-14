@@ -16,6 +16,8 @@
 
 package com.intellij.openapi.editor.actions;
 
+import com.intellij.find.FindManager;
+import com.intellij.find.FindModel;
 import com.intellij.find.FindResult;
 import com.intellij.find.FindUtil;
 import com.intellij.ide.DataManager;
@@ -23,14 +25,12 @@ import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.actionSystem.IdeActions;
-import com.intellij.openapi.editor.CaretModel;
-import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.editor.ScrollType;
-import com.intellij.openapi.editor.SelectionModel;
+import com.intellij.openapi.editor.*;
 import com.intellij.openapi.editor.actionSystem.EditorAction;
 import com.intellij.openapi.editor.actionSystem.EditorActionHandler;
 import com.intellij.openapi.editor.actionSystem.MultiEditAction;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.TextRange;
 import com.intellij.util.Range;
 
 import java.util.ArrayList;
@@ -49,14 +49,24 @@ public class SelectNextOccurrenceAction extends EditorAction {
       final SelectionModel selectionModel = editor.getSelectionModel();
       final CaretModel caretModel = editor.getCaretModel();
 
-      List<Range<Integer>> multiSelections = new ArrayList<Range<Integer>>(selectionModel.getMultiSelections());
       List<CaretModel> carets = new ArrayList<CaretModel>(caretModel.getMultiCarets());
+      List<Range<Integer>> multiSelections = new ArrayList<Range<Integer>>(selectionModel.getMultiSelections());
+      
+      setNormalSelectionAsMulti(selectionModel, multiSelections);
 
       final List<MultiEditAction.CaretModelWithSelection> caretsAndSelections = MultiEditAction.merge(carets, multiSelections);
+
       boolean hadSingleCarets = selectWordAtAllCarets(editor, caretsAndSelections, dataContext);
 
       if (!hadSingleCarets) {
-        selectNextOccurrence(editor, project, dataContext, caretsAndSelections, multiSelections);
+        selectNextOccurrence(editor, project, caretsAndSelections, multiSelections);
+      }
+    }
+
+    protected void setNormalSelectionAsMulti(SelectionModel selectionModel, List<Range<Integer>> multiSelections) {
+      if (multiSelections.isEmpty() && selectionModel.hasSelection()) {
+        multiSelections.add(new Range<Integer>(selectionModel.getSelectionStart(), selectionModel.getSelectionEnd()));
+        selectionModel.addMultiSelection(selectionModel.getSelectionStart(), selectionModel.getSelectionEnd(), null, false);
       }
     }
 
@@ -71,7 +81,7 @@ public class SelectNextOccurrenceAction extends EditorAction {
       for (int i = 0; i < caretsAndSelections.size(); i++) {
         MultiEditAction.CaretModelWithSelection caretModelWithSelection = caretsAndSelections.get(i);
         //continue if is part of selection
-        if (caretModelWithSelection.getSelection() != null) {
+        if (caretModelWithSelection.hasSelection()) {
           continue;
         }
         if (!isValidCaret(caretModel, caretModelWithSelection)) {
@@ -102,57 +112,90 @@ public class SelectNextOccurrenceAction extends EditorAction {
       }
     }
 
-    /**
-     * it searches for a word from last selection, which is either last added selection, or first selection after some editor action was executed(MultiEdit works from bottom up)
-     */
     protected void selectNextOccurrence(Editor editor,
                                         Project project,
-                                        DataContext dataContext,
                                         List<MultiEditAction.CaretModelWithSelection> caretModelWithSelections,
                                         List<Range<Integer>> multiSelections) {
-      final SelectionModel selectionModel = editor.getSelectionModel();
-      final CaretModel caretModel = editor.getCaretModel();
 
-      activateLastCaret(editor, caretModelWithSelections);
-      caretModel.addMultiCaret(caretModel.getOffset());
+      Collections.sort(caretModelWithSelections);
+      final MultiEditAction.CaretModelWithSelection caretModelWithSelection = caretModelWithSelections.get(0);
 
-      FindResult wordAtCaret = FindUtil.findWordAtCaret(project, editor, wholeWordsOnly(editor));
-      //find next if found one is already selected
-      while (wordAtCaret != null &&
-             wordAtCaret.isStringFound() &&
-             multiSelections.contains(new Range<Integer>(wordAtCaret.getStartOffset(), wordAtCaret.getEndOffset()))) {
-        wordAtCaret = FindUtil.findWordAtCaret(project, editor, wholeWordsOnly(editor));
+      int searchFrom = Math.max(caretModelWithSelection.getCaretModel().getOffset(), caretModelWithSelection.getSelection().getTo());
+
+      final FindModel findModel = getFindModel(editor, caretModelWithSelection);
+
+      final FindManager findManager = FindManager.getInstance(project);
+
+      FindResult findResult =
+        FindUtil.findFirstInRange(TextRange.create(searchFrom, editor.getDocument().getTextLength()), editor, findManager, findModel);
+
+      if (findResult != null) {
+        editor.getSelectionModel()
+          .addMultiSelection(findResult.getStartOffset(), findResult.getEndOffset(), SelectionModel.Direction.RIGHT, false);
+        scrollToResult(editor, findResult);
       }
-
-      if (wordAtCaret != null && wordAtCaret.isStringFound()) {
-        selectionModel.addMultiSelection(wordAtCaret.getStartOffset(), wordAtCaret.getEndOffset(), SelectionModel.Direction.RIGHT, false);
+      else {
+        searchFromTop(editor, multiSelections, findModel, findManager, caretModelWithSelections);
       }
-      else {//search from start of the document
-        FindUtil.searchAgain(project, editor, dataContext);
+    }
 
-        if (selectionModel.hasSelection()) {
-          if (multiSelections.contains(new Range<Integer>(selectionModel.getSelectionStart(), selectionModel.getSelectionEnd()))) {
-            // side effect workaround , #searchAgain scrolls to caret, so when everything is selected it is not so nice as it scrolls like crazy
-            caretModel.setActiveCaret(caretModelWithSelections.get(caretModelWithSelections.size() - 1).getCaretModel());
-            editor.getScrollingModel().scrollToCaret(ScrollType.CENTER);
-          }
-          else {
-            int startOffset = selectionModel.getSelectionStart();
-            int endOffset = selectionModel.getSelectionEnd();
-            selectionModel.addMultiSelection(startOffset, endOffset, SelectionModel.Direction.RIGHT, false);
-          }
+    private FindModel getFindModel(Editor editor, MultiEditAction.CaretModelWithSelection caretModelWithSelection) {
+      Document document = editor.getDocument();
+      CharSequence text = document.getCharsSequence();
+
+      final FindModel findModel = new FindModel();
+      findModel.setWholeWordsOnly(wholeWordsOnly(editor));
+      findModel.setCaseSensitive(true);
+      findModel.setStringToFind(
+        text.subSequence(caretModelWithSelection.getSelection().getFrom(), caretModelWithSelection.getSelection().getTo()).toString());
+      return findModel;
+    }
+
+    private void searchFromTop(Editor editor,
+                               List<Range<Integer>> multiSelections, FindModel findModel,
+                               FindManager instance,
+                               List<MultiEditAction.CaretModelWithSelection> caretModelWithSelections) {
+      int searchFrom = 0;
+      final MultiEditAction.CaretModelWithSelection caretModelWithSelection =
+        caretModelWithSelections.get(0);
+      final int searchTo = Math.min(caretModelWithSelection.getCaretModel().getOffset(), caretModelWithSelection.getSelection().getFrom());
+
+      FindResult findResult;
+      do {
+        findResult = FindUtil.findFirstInRange(TextRange.create(searchFrom, searchTo), editor, instance, findModel);
+        if (findResult != null) {
+          searchFrom = findResult.getEndOffset();
+        }
+      }
+      while (findResult != null && searchFrom <= searchTo && isAlreadySelected(findResult, multiSelections));
+
+      if (findResult != null) {
+        editor.getSelectionModel()
+          .addMultiSelection(findResult.getStartOffset(), findResult.getEndOffset(), SelectionModel.Direction.RIGHT, false);
+        scrollToResult(editor, findResult);
+      }
+    }
+
+    private boolean isAlreadySelected(FindResult findResult, List<Range<Integer>> multiSelections) {
+      return multiSelections.contains(new Range<Integer>(findResult.getStartOffset(), findResult.getEndOffset()));
+    }
+
+    private void scrollToResult(Editor editor, FindResult findResult) {
+      setActiveCaret(editor, findResult);
+      editor.getScrollingModel().scrollToCaret(ScrollType.CENTER);
+    }
+
+    private void setActiveCaret(Editor editor, FindResult findResult) {
+      CaretModel caretModel = editor.getCaretModel();
+      final List<CaretModel> multiCarets = caretModel.getMultiCarets();
+      for (CaretModel multiCaret : multiCarets) {
+        if (multiCaret.getOffset() == findResult.getEndOffset()) {
+          caretModel.setActiveCaret(multiCaret);
+          return;
         }
       }
     }
 
-    private void activateLastCaret(Editor editor, List<MultiEditAction.CaretModelWithSelection> caretModelWithSelections) {
-      Collections.sort(caretModelWithSelections);
-      final MultiEditAction.CaretModelWithSelection caretModelWithSelection = caretModelWithSelections.get(0);
-      editor.getCaretModel().setActiveCaret(caretModelWithSelection.getCaretModel());
-      if (caretModelWithSelection.getSelection() != null) {
-        editor.getSelectionModel().setSelection(caretModelWithSelection.getSelection().getFrom(), caretModelWithSelection.getSelection().getTo());
-      }
-    }
 
     protected boolean wholeWordsOnly(Editor editor) {
       return !editor.getSelectionModel().hasSelection();

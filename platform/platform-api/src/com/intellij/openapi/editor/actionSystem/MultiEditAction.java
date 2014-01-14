@@ -168,6 +168,10 @@ public abstract class MultiEditAction {
       return mySelection == null;
     }
 
+    public boolean hasSelection() {
+      return mySelection != null;
+    }
+
     @Override
     public int compareTo(CaretModelWithSelection o) {
       Integer offset = o.myCaretModel.getOffset();
