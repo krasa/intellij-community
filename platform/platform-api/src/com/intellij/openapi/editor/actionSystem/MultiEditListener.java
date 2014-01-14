@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,18 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.intellij.openapi.editor.markup;
+package com.intellij.openapi.editor.actionSystem;
 
-public interface HighlighterLayer {
-  int CARET_ROW = 1000;
-  int SYNTAX = 2000;
-  int ADDITIONAL_SYNTAX = 3000;
-  int GUARDED_BLOCKS = 3500;
-  int WARNING = 4000;
-  int ERROR = 5000;
-  int SELECTION = 6000;
-  int MULTI_EDIT_SELECTION = 6666;
+/**
+ * @author Vojtech Krasa
+ */
+public interface MultiEditListener {
 
-  int FIRST = CARET_ROW;
-  int LAST = SELECTION;
+  void beforeMultiCaretsExecution();
+
+  void afterMultiCaretsExecution();
 }

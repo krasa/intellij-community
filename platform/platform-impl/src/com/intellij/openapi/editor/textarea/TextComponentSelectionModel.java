@@ -216,11 +216,6 @@ public class TextComponentSelectionModel implements SelectionModel {
   }
 
   @Override
-  public List<Range<Integer>> getAndRemoveMultiSelections() {
-    return Collections.emptyList();
-  }
-
-  @Override
   public List<Range<Integer>> getMultiSelections() {
     return Collections.emptyList();
   }

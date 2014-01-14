@@ -118,6 +118,12 @@
   <action id="SelectAllOccurrences">
     <keyboard-shortcut first-keystroke="alt G"/>
   </action>
+  <action id="SelectNextWholeWordOccurrence">
+    <keyboard-shortcut first-keystroke="control alt D"/>
+  </action>
+  <action id="SelectAllWholeWordOccurrences">
+    <keyboard-shortcut first-keystroke="control alt G"/>
+  </action>
   <action id="GotoDeclaration">
     <keyboard-shortcut first-keystroke="control B"/>
     <mouse-shortcut keystroke="ctrl button1"/>

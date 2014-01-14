@@ -19,7 +19,6 @@ import com.intellij.openapi.editor.event.CaretListener;
 import com.intellij.openapi.editor.markup.TextAttributes;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.Collection;
 import java.util.List;
 
 /**
@@ -141,15 +140,16 @@ public interface CaretModel {
    */
   TextAttributes getTextAttributes();
 
+  
+  //todo krasa move those to another interface?
   void removeMultiCarets();
 
   boolean hasMultiCarets();
 
-  boolean addOrRemoveMultiCaret(int offset);
+  CaretModel addMultiCaret(int offset);
 
-  void addMultiCaret(int offset);
+  List<CaretModel> getMultiCarets();
 
-  Collection<Integer> getMultiCaretOffsets();
-
-  Collection<Integer> getAndRemoveMultiCaretOffsets();
+  void setActiveCaret(CaretModel caretModel);
+  
 }

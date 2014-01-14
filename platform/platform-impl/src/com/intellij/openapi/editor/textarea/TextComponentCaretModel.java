@@ -25,8 +25,7 @@ import org.jetbrains.annotations.NotNull;
 import javax.swing.*;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.JTextComponent;
-import java.util.Collection;
-import java.util.Collections;
+import java.util.List;
 
 /**
  * @author yole
@@ -142,23 +141,19 @@ public class TextComponentCaretModel implements CaretModel {
     return false;
   }
 
+
   @Override
-  public boolean addOrRemoveMultiCaret(int offset) {
+  public CaretModel addMultiCaret(int offset) {
     throw new UnsupportedOperationException("Not implemented");
   }
 
   @Override
-  public void addMultiCaret(int offset) {
-    throw new UnsupportedOperationException("Not implemented");
+  public List<CaretModel> getMultiCarets() {
+    return null;
   }
 
   @Override
-  public Collection<Integer> getMultiCaretOffsets() {
-    return Collections.emptyList();
-  }
+  public void setActiveCaret(CaretModel caretModel) {
 
-  @Override
-  public Collection<Integer> getAndRemoveMultiCaretOffsets() {
-    return Collections.emptyList();
   }
 }

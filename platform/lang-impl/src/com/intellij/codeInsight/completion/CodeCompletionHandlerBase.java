@@ -37,6 +37,7 @@ import com.intellij.openapi.command.CommandProcessor;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.*;
 import com.intellij.openapi.editor.actionSystem.EditorActionManager;
+import com.intellij.openapi.editor.actionSystem.MultiEditAction;
 import com.intellij.openapi.editor.ex.DocumentEx;
 import com.intellij.openapi.editor.ex.util.EditorUtil;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
@@ -597,8 +598,9 @@ public class CodeCompletionHandlerBase {
     if (idEndOffset < 0) {
       idEndOffset = CompletionInitializationContext.calcDefaultIdentifierEnd(editor, caretOffset);
     }
-
-    final Collection<Integer> multiCaretOffsets1 = editor.getCaretModel().getAndRemoveMultiCaretOffsets();
+    //todo krasa imho carets do not need that markers logic
+    final Collection<Integer> multiCaretOffsets1 = MultiEditAction.getMultiCaretOffsets(editor);
+    editor.getCaretModel().removeMultiCarets();
     final Integer[] multiCaretOffsets = multiCaretOffsets1.toArray(new Integer[multiCaretOffsets1.size()]);
     final boolean isMultiEdit = multiCaretOffsets.length > 0;
 

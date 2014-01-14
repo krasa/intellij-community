@@ -23,6 +23,7 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.LogicalPosition;
 import com.intellij.openapi.editor.ScrollType;
+import com.intellij.openapi.editor.actionSystem.MultiEditAction;
 import com.intellij.openapi.editor.ex.EditorEx;
 import com.intellij.openapi.editor.ex.util.EditorUtil;
 import com.intellij.openapi.fileEditor.*;
@@ -201,7 +202,7 @@ public class TextEditorProvider implements FileEditorProvider, DumbAware {
     state.SELECTION_END = editor.getSelectionModel().getSelectionEnd();
 
     final List<Range<Integer>> multiSelections = editor.getSelectionModel().getMultiSelections();
-    final Collection<Integer> multiCaretOffsets = editor.getCaretModel().getMultiCaretOffsets();
+    final Collection<Integer> multiCaretOffsets = MultiEditAction.getMultiCaretOffsets(editor);
     state.setMultiEditState(new MultiEditState(multiSelections, multiCaretOffsets));
     
     // Saving scrolling proportion on UNDO may cause undesirable results of undo action fails to perform since

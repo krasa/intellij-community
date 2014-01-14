@@ -377,7 +377,6 @@ public class EditorSearchComponent extends EditorHeaderComponent implements Data
             getEditor().getSelectionModel()
               .addMultiSelection(occurrence.getStartOffset(), occurrence.getEndOffset(), SelectionModel.Direction.LEFT, false);
           }
-          //todo krasa sometimes carets are not painted
           close();
         }
       }

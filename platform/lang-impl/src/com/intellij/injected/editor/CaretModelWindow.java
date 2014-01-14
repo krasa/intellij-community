@@ -26,6 +26,7 @@ import com.intellij.openapi.editor.markup.TextAttributes;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collection;
+import java.util.List;
 
 /**
  * @author Alexey
@@ -154,22 +155,17 @@ public class CaretModelWindow implements CaretModel {
   }
 
   @Override
-  public boolean addOrRemoveMultiCaret(int offset) {
-    return myDelegate.addOrRemoveMultiCaret(offset);
+  public CaretModel addMultiCaret(int offset) {
+    return myDelegate.addMultiCaret(offset);
   }
 
   @Override
-  public void addMultiCaret(int offset) {
-    myDelegate.addMultiCaret(offset);
+  public List<CaretModel> getMultiCarets() {
+    return myDelegate.getMultiCarets();
   }
 
   @Override
-  public Collection<Integer> getMultiCaretOffsets() {
-    return myDelegate.getMultiCaretOffsets();
-  }
-
-  @Override
-  public Collection<Integer> getAndRemoveMultiCaretOffsets() {
-    return myDelegate.getAndRemoveMultiCaretOffsets();
+  public void setActiveCaret(CaretModel caretModel) {
+    myDelegate.setActiveCaret(caretModel);
   }
 }

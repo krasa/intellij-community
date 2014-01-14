@@ -21,8 +21,10 @@ import com.intellij.find.FindModel;
 import com.intellij.find.FindResult;
 import com.intellij.find.FindUtil;
 import com.intellij.ide.DataManager;
+import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.actionSystem.DataContext;
+import com.intellij.openapi.actionSystem.IdeActions;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.SelectionModel;
@@ -37,17 +39,19 @@ import java.util.ArrayList;
  * @author Vojtech Krasa
  */
 public class SelectAllOccurrencesAction extends EditorAction {
-  private static class Handler extends EditorActionHandler {
+  protected static class Handler extends EditorActionHandler {
     @Override
     public void execute(Editor editor, DataContext dataContext) {
       Project project = CommonDataKeys.PROJECT.getData(DataManager.getInstance().getDataContext(editor.getComponent()));
       selectAllOccurrences(editor, dataContext, project);
     }
 
-    private void selectAllOccurrences(Editor editor, DataContext dataContext, Project project) {
+    protected void selectAllOccurrences(Editor editor, DataContext dataContext, Project project) {
       final SelectionModel selectionModel = editor.getSelectionModel();
       if (!selectionModel.hasSelection()) {
-        new SelectWordAtCaretAction().getHandler().execute(editor, dataContext);
+        final EditorAction editorSelectWord =
+          (EditorAction)ActionManager.getInstance().getAction(IdeActions.ACTION_EDITOR_SELECT_WORD_AT_CARET);
+        editorSelectWord.getHandler().execute(editor, dataContext);
       }
       Document document = editor.getDocument();
       CharSequence text = document.getCharsSequence();
@@ -55,6 +59,7 @@ public class SelectAllOccurrencesAction extends EditorAction {
 
 
       final FindModel findModel = new FindModel();
+      findModel.setWholeWordsOnly(wholeWordsOnly());
       findModel.setCaseSensitive(true);
       findModel.setStringToFind(textToFind);
 
@@ -68,6 +73,10 @@ public class SelectAllOccurrencesAction extends EditorAction {
         int endOffset = result.getEndOffset();
         selectionModel.addMultiSelection(startOffset, endOffset, SelectionModel.Direction.RIGHT, false);
       }
+    }
+
+    protected boolean wholeWordsOnly() {
+      return false;
     }
 
     @Override

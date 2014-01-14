@@ -56,7 +56,6 @@ import org.jetbrains.annotations.Nullable;
 import java.awt.*;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
-import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -910,12 +909,51 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
                                 int selectionEnd,
                                 final Direction direction,
                                 final boolean addCaretForZeroWidthSelection) {
-    final EditorMarkupModelImpl markupModel = (EditorMarkupModelImpl)myEditor.getMarkupModel();
 
     RangeHighlighterExProcessor processor = processOverlappingHighlighters(selectionStart, selectionEnd);
     final int mergedStartOffset = processor.startOffset;
     final int mergedEndOffset = processor.endOffset;
 
+    addMergedSelection(processor, mergedStartOffset, mergedEndOffset);
+    removeExcessCarets(mergedStartOffset, mergedEndOffset);
+
+    if (direction != null) {
+      if ((addCaretForZeroWidthSelection && mergedStartOffset == mergedEndOffset) || mergedStartOffset != mergedEndOffset) {
+         //we need to add caret on the end or start of selection, so that shift+arrow works
+        myEditor.getCaretModel().addMultiCaret(direction == Direction.LEFT ? mergedStartOffset : mergedEndOffset);
+      }
+    }
+    myHasMultiSelection = true;
+  }
+
+  private void removeExcessCarets(int mergedStartOffset, int mergedEndOffset) {
+    final List<CaretModel> multiCarets = myEditor.getCaretModel().getMultiCarets();
+    final MultiCaretModelImpl caretModel = myEditor.getCaretModel();
+    boolean hasCaretOnEnd = false;
+    for (CaretModel multiCaret : multiCarets) {
+      final int offset = multiCaret.getOffset();
+      if ( offset == mergedEndOffset) {
+        hasCaretOnEnd = true;
+      }
+    }
+    
+    for (CaretModel multiCaret : multiCarets) {
+      final int offset = multiCaret.getOffset();
+      if (offset >= mergedStartOffset && offset < mergedEndOffset) {
+        //delete carets in the middle or on start
+        if (hasCaretOnEnd) {
+          caretModel.removeCaret(multiCaret);
+        }//or move one on the end
+        else {
+          multiCaret.moveToOffset(mergedEndOffset);
+          hasCaretOnEnd = true;
+        }
+      }
+    }
+  }
+
+  protected void addMergedSelection(RangeHighlighterExProcessor processor, int mergedStartOffset, int mergedEndOffset) {
+    final EditorMarkupModelImpl markupModel = (EditorMarkupModelImpl)myEditor.getMarkupModel();
     //remove overlapping selections and carets
     for (RangeHighlighterEx rangeHighlighterEx : processor.myList) {
       markupModel.removeHighlighter(rangeHighlighterEx);
@@ -931,15 +969,6 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
         .addRangeHighlighter(mergedStartOffset, mergedEndOffset, HighlighterLayer.MULTI_EDIT_SELECTION, getTextAttributes(),
                              HighlighterTargetArea.EXACT_RANGE);
     }
-
-    if (direction != null) {
-      if ((addCaretForZeroWidthSelection && mergedStartOffset == mergedEndOffset) || mergedStartOffset != mergedEndOffset) {
-         //we need to add caret on the end or start of selection, so that shift+arrow works
-        myEditor.getCaretModel().addMultiCaret(direction == Direction.LEFT ? mergedStartOffset : mergedEndOffset);
-        myEditor.getCaretModel().moveToOffset(direction == Direction.LEFT ? mergedStartOffset : mergedEndOffset);
-      }
-    }
-    myHasMultiSelection = true;
   }
 
   private RangeHighlighterExProcessor processOverlappingHighlighters(int selectionStart, int selectionEnd) {
@@ -947,8 +976,7 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
     final Condition<RangeHighlighterEx> condition = new Condition<RangeHighlighterEx>() {
       @Override
       public boolean value(RangeHighlighterEx rangeHighlighterEx) {
-        return rangeHighlighterEx.getLayer() == HighlighterLayer.MULTI_EDIT_SELECTION ||
-               rangeHighlighterEx.getLayer() == HighlighterLayer.MULTI_EDIT_CARET;
+        return rangeHighlighterEx.getLayer() == HighlighterLayer.MULTI_EDIT_SELECTION ;
       }
     };
     final FilteringProcessor<RangeHighlighterEx> filteringProcessor = new FilteringProcessor<RangeHighlighterEx>(condition, processor);
@@ -988,23 +1016,7 @@ public class SelectionModelImpl implements SelectionModel, PrioritizedDocumentLi
     }
   }
 
-  @Override
-  public List<Range<Integer>> getAndRemoveMultiSelections() {
-    if (!myHasMultiSelection) {
-      return Collections.emptyList();
-    }
-    List<Range<Integer>> selections = new ArrayList<Range<Integer>>();
-    final MarkupModel markupModel = myEditor.getMarkupModel();
-    for (RangeHighlighter rangeHighlighter : markupModel.getAllHighlighters()) {
-      if (rangeHighlighter.getLayer() == HighlighterLayer.MULTI_EDIT_SELECTION) {
-        selections.add(new Range<Integer>(rangeHighlighter.getStartOffset(), rangeHighlighter.getEndOffset()));
-        markupModel.removeHighlighter(rangeHighlighter);
-      }
-    }
-    return selections;
-  }
-
-  public boolean hasMultiSelections(MouseEvent e) {
+  public boolean hasMultiSelections() {
      return myHasMultiSelection;
   }
   

@@ -15,14 +15,12 @@
  */
 package com.intellij.codeInsight.template.impl.editorActions;
 
-import com.intellij.codeInsight.lookup.LookupManager;
 import com.intellij.codeInsight.template.TemplateManager;
 import com.intellij.codeInsight.template.impl.TemplateManagerImpl;
 import com.intellij.codeInsight.template.impl.TemplateSettings;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.editor.Editor;
-import com.intellij.openapi.editor.actionSystem.MultiEditAction;
 import com.intellij.openapi.editor.actionSystem.TypedActionHandler;
 import com.intellij.openapi.project.Project;
 import org.jetbrains.annotations.NotNull;
@@ -45,17 +43,7 @@ public class SpaceHandler extends TypedActionHandlerBase {
     }
 
     if (myOriginalHandler != null) {
-      if (LookupManager.getActiveLookup(editor) != null) {
-        MultiEditAction.executeWithMultiEdit(new Runnable() {
-          @Override
-          public void run() {
-            myOriginalHandler.execute(editor, charTyped, dataContext);
-          }
-        }, editor, null);
-      }
-      else {
-        myOriginalHandler.execute(editor, charTyped, dataContext);
-      }
+      myOriginalHandler.execute(editor, charTyped, dataContext);
     }
   }
 }
