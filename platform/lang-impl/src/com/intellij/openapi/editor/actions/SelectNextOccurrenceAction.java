@@ -132,7 +132,7 @@ public class SelectNextOccurrenceAction extends EditorAction {
       if (findResult != null) {
         editor.getSelectionModel()
           .addMultiSelection(findResult.getStartOffset(), findResult.getEndOffset(), SelectionModel.Direction.RIGHT, false);
-        scrollToResult(editor, findResult);
+        scrollToResult(findResult, editor);
       }
       else {
         searchFromTop(editor, multiSelections, findModel, findManager, caretModelWithSelections);
@@ -153,7 +153,7 @@ public class SelectNextOccurrenceAction extends EditorAction {
 
     private void searchFromTop(Editor editor,
                                List<Range<Integer>> multiSelections, FindModel findModel,
-                               FindManager instance,
+                               FindManager findManager,
                                List<MultiEditAction.CaretModelWithSelection> caretModelWithSelections) {
       int searchFrom = 0;
       final MultiEditAction.CaretModelWithSelection caretModelWithSelection =
@@ -162,7 +162,7 @@ public class SelectNextOccurrenceAction extends EditorAction {
 
       FindResult findResult;
       do {
-        findResult = FindUtil.findFirstInRange(TextRange.create(searchFrom, searchTo), editor, instance, findModel);
+        findResult = FindUtil.findFirstInRange(TextRange.create(searchFrom, searchTo), editor, findManager, findModel);
         if (findResult != null) {
           searchFrom = findResult.getEndOffset();
         }
@@ -172,7 +172,7 @@ public class SelectNextOccurrenceAction extends EditorAction {
       if (findResult != null) {
         editor.getSelectionModel()
           .addMultiSelection(findResult.getStartOffset(), findResult.getEndOffset(), SelectionModel.Direction.RIGHT, false);
-        scrollToResult(editor, findResult);
+        scrollToResult(findResult, editor);
       }
     }
 
@@ -180,16 +180,16 @@ public class SelectNextOccurrenceAction extends EditorAction {
       return multiSelections.contains(new Range<Integer>(findResult.getStartOffset(), findResult.getEndOffset()));
     }
 
-    private void scrollToResult(Editor editor, FindResult findResult) {
-      setActiveCaret(editor, findResult);
+    private void scrollToResult(FindResult findResult, Editor editor) {
+      setActiveCaret(findResult.getEndOffset(), editor);
       editor.getScrollingModel().scrollToCaret(ScrollType.CENTER);
     }
 
-    private void setActiveCaret(Editor editor, FindResult findResult) {
+    private void setActiveCaret(final int offset, Editor editor) {
       CaretModel caretModel = editor.getCaretModel();
       final List<CaretModel> multiCarets = caretModel.getMultiCarets();
       for (CaretModel multiCaret : multiCarets) {
-        if (multiCaret.getOffset() == findResult.getEndOffset()) {
+        if (multiCaret.getOffset() == offset) {
           caretModel.setActiveCaret(multiCaret);
           return;
         }
