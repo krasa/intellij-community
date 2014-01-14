@@ -138,7 +138,7 @@ public class ScrollingModelImpl implements ScrollingModelEx {
 
   @Override
   public void scrollToCaret(@NotNull ScrollType scrollType) {
-    if (myEditor.getUserData(MultiEditAction.ALREADY_PROCESSING) != null) {
+    if (myEditor.getUserData(MultiEditAction.PROCESSING) != null) {
       //just small optimisation
       return;
     }

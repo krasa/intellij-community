@@ -48,7 +48,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.awt.*;
-import java.util.Collection;
 import java.util.List;
 
 public class CaretModelImpl implements CaretModel,  Disposable {
@@ -834,39 +833,29 @@ public class CaretModelImpl implements CaretModel,  Disposable {
 
   @Override
   public void removeMultiCarets() {
-    throw new IllegalStateException();
+    throw new UnsupportedOperationException("Do not call this");
   }
 
   @Override
   public boolean hasMultiCarets() {
-    throw new IllegalStateException();
+    throw new UnsupportedOperationException("Do not call this");
   }
 
 
   @Override
   public CaretModel addMultiCaret(int offset) {
-    throw new IllegalStateException();
+    throw new UnsupportedOperationException("Do not call this");
   }
 
-
-  @Override
-  public Collection<Integer> getMultiCaretOffsets() {
-    throw new IllegalStateException();
-  }
-
-  @Override
-  public Collection<Integer> getAndRemoveMultiCaretOffsets() {
-    throw new IllegalStateException();
-  }
 
   @Override
   public List<CaretModel> getMultiCarets() {
-    throw new IllegalStateException();
+    throw new UnsupportedOperationException("Do not call this");
   }
 
   @Override
   public void setActiveCaret(CaretModel caretModel) {
-    throw new IllegalStateException();
+    throw new UnsupportedOperationException("Do not call this");
   }
 
 }

@@ -5683,11 +5683,14 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
               addBlockMultiSelection();
             }
           }
+        } else if (getCaretModel().hasMultiCarets()) {
+          getCaretModel().removeMultiCarets();
+          getSelectionModel().removeMultiSelections();
         }
 
         moveCaretToScreenPos(x, y);
 
-        if (isMultiEditMode(e) || getCaretModel().hasMultiCarets()) {
+        if (isMultiEditMode(e)) {
           getCaretModel().addMultiCaret(oldOffset);
         }
       }

@@ -18,11 +18,11 @@ import com.intellij.openapi.util.Condition;
 import com.intellij.util.CommonProcessors;
 import com.intellij.util.EventDispatcher;
 import com.intellij.util.FilteringProcessor;
-import com.intellij.util.containers.HashSet;
 import gnu.trove.TIntHashSet;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.locks.ReentrantLock;
 
 public class MultiCaretModelImpl implements CaretModel, PrioritizedDocumentListener, Disposable, MultiEditListener {
@@ -251,27 +251,6 @@ public class MultiCaretModelImpl implements CaretModel, PrioritizedDocumentListe
     return findFirstProcessor.getFoundValue();
   }
 
-  @Override
-  public Collection<Integer> getMultiCaretOffsets() {
-    if (!hasMultiCarets()) {
-      return Collections.emptyList();
-    }
-    sweep();
-    Set<Integer> offsets = new HashSet<Integer>();
-    for (CaretModelImpl caret : carets) {
-      offsets.add(caret.getOffset());
-    }
-
-    return offsets;
-  }
-
-  @Override
-  public Collection<Integer> getAndRemoveMultiCaretOffsets() {
-    Collection<Integer> multiCaretOffsets = getMultiCaretOffsets();
-    removeMultiCarets();
-    return multiCaretOffsets;
-  }
-
   EventDispatcher<CaretListener> getCaretListeners() {
     return myCaretListeners;
   }
@@ -283,7 +262,6 @@ public class MultiCaretModelImpl implements CaretModel, PrioritizedDocumentListe
   }
 
   private void sweep() {
-    //TODO krasa optimize this shit
     if (carets.size() > 1) {
       TIntHashSet tIntHashSet = new TIntHashSet();
       List<CaretModel> delete = new ArrayList<CaretModel>();

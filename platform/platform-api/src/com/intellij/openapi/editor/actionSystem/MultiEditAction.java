@@ -24,24 +24,18 @@ import com.intellij.openapi.editor.SelectionModel;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.UserDataHolder;
 import com.intellij.util.Range;
+import com.intellij.util.containers.HashSet;
 import gnu.trove.TIntObjectHashMap;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
-
-import static java.lang.Math.min;
+import java.util.*;
 
 /**
- * Highlighters are used only because they can keep offsets up to date.
- *
  * @author Vojtech Krasa
  */
-public abstract class MultiEditAction  {
+public abstract class MultiEditAction {
   private static final Logger LOG = Logger.getInstance("#com.intellij.openapi.editor.actionSystem.MultiEditAction");
 
-  public static final Key<Object> ALREADY_PROCESSING = Key.create("MultiEditAction.alreadyProcessing");
+  public static final Key<Object> PROCESSING = Key.create("MultiEditAction.Processing");
 
   private MultiEditAction() {
   }
@@ -61,17 +55,18 @@ public abstract class MultiEditAction  {
     if (dataContext instanceof UserDataHolder) {
       final UserDataHolder userDataHolder = (UserDataHolder)dataContext;
       //TODO maybe there is a better way how to find out if there is lookup, I just do not see com.intellij.codeInsight.lookup.LookupManager#getActiveLookup
-      if (userDataHolder.getUserData(ALREADY_PROCESSING) != null ||
+      if (userDataHolder.getUserData(PROCESSING) != null ||
           Editor.SHOWING_LOOKUP.get(editor) != null ||
-          editor.getUserData(ALREADY_PROCESSING) != null) {
+          editor.getUserData(PROCESSING) != null) {
         executeHandler.run();
         return;
       }
       else {
         //todo SmartEnter dirty fix, those processors do not use action's DataContext. see com.intellij.codeInsight.editorActions.smartEnter.JavaSmartEnterProcessor.plainEnter()
-        editor.putUserData(ALREADY_PROCESSING, "1");
+        editor.putUserData(PROCESSING, "1");
+        
         clearEditorContext = true;
-        userDataHolder.putUserData(ALREADY_PROCESSING, "1");
+        userDataHolder.putUserData(PROCESSING, "1");
       }
     }
 
@@ -79,32 +74,27 @@ public abstract class MultiEditAction  {
       SelectionModel selectionModel = editor.getSelectionModel();
       CaretModel caretModel = editor.getCaretModel();
       final List<CaretModelWithSelection> caretsAndSelections = getAndRemoveMultiEditRanges(editor);
-      LOG.debug("executing with "+caretsAndSelections.size() + " carets");
-      if (caretsAndSelections.size()<=1) {
+      LOG.debug("executing with " + caretsAndSelections.size() + " carets");
+      if (caretsAndSelections.size() <= 1) {
         executeHandler.run();
       }
       else {
         MultiEditListener multiEditListener = (MultiEditListener)caretModel;
         multiEditListener.beforeMultiCaretsExecution();
         try {
-          for (int i = 0; i < caretsAndSelections.size(); i++) {
-            CaretModelWithSelection caretModelWithSelection = caretsAndSelections.get(i);
-            Range<Integer> range = caretModelWithSelection.selection;
-  
+          for (CaretModelWithSelection caretModelWithSelection : caretsAndSelections) {
             caretModel.setActiveCaret(caretModelWithSelection.myCaretModel);
-            if (isCaretOnly(caretModelWithSelection)) {
+            if (caretModelWithSelection.isCaretOnly()) {
               selectionModel.removeSelection();
             }
             else {
-              selectionModel.setSelection(range.getFrom(), range.getTo());
+              selectionModel.setSelection(caretModelWithSelection.mySelection.getFrom(), caretModelWithSelection.mySelection.getTo());
             }
-  
+
             executeHandler.run();
-  
+
             if (selectionModel.hasSelection()) {
-              boolean putCursorOnStart = selectionModel.getSelectionStart() == caretModel.getOffset();
-              selectionModel.addMultiSelection(selectionModel.getSelectionStart(), selectionModel.getSelectionEnd(),
-                                               SelectionModel.Direction.getDirection(putCursorOnStart), true);
+              selectionModel.addMultiSelection(selectionModel.getSelectionStart(), selectionModel.getSelectionEnd(), null, false);
             }
           }
         }
@@ -115,13 +105,9 @@ public abstract class MultiEditAction  {
     }
     finally {
       if (clearEditorContext) {
-        editor.putUserData(ALREADY_PROCESSING, null);
+        editor.putUserData(PROCESSING, null);
       }
     }
-  }
-
-  private static boolean isCaretOnly(CaretModelWithSelection caretModelWithSelection) {
-    return caretModelWithSelection.selection==null;
   }
 
   public static List<CaretModelWithSelection> getAndRemoveMultiEditRanges(Editor editor) {
@@ -129,7 +115,8 @@ public abstract class MultiEditAction  {
     CaretModel caretModel = editor.getCaretModel();
 
 
-    final List<Range<Integer>> multiSelects = selectionModel.getAndRemoveMultiSelections();
+    final List<Range<Integer>> multiSelects = selectionModel.getMultiSelections();
+    selectionModel.removeMultiSelections();
     return merge(caretModel.getMultiCarets(), multiSelects);
   }
 
@@ -151,13 +138,34 @@ public abstract class MultiEditAction  {
     return caretModelWithSelections;
   }
 
-  public static class CaretModelWithSelection implements Comparable<CaretModelWithSelection>{
-   public CaretModel myCaretModel;
-   public Range<Integer> selection;
+  public static Collection<Integer> getMultiCaretOffsets(final Editor editor) {
+    Set<Integer> offsets = new HashSet<Integer>();
+    for (CaretModel caret : editor.getCaretModel().getMultiCarets()) {
+      offsets.add(caret.getOffset());
+    }
+
+    return offsets;
+  }
+
+  public static class CaretModelWithSelection implements Comparable<CaretModelWithSelection> {
+   private  CaretModel myCaretModel;
+   private  Range<Integer> mySelection;
 
     public CaretModelWithSelection(CaretModel caretModel, Range<Integer> selection) {
       myCaretModel = caretModel;
-      this.selection = selection;
+      mySelection = selection;
+    }
+
+    public CaretModel getCaretModel() {
+      return myCaretModel;
+    }
+
+    public Range<Integer> getSelection() {
+      return mySelection;
+    }
+
+    private boolean isCaretOnly() {
+      return mySelection == null;
     }
 
     @Override
@@ -168,24 +176,9 @@ public abstract class MultiEditAction  {
 
     @Override
     public String toString() {
-      return Objects.toStringHelper(this).add("caretOffset", myCaretModel.getOffset()).add("selection", selection).toString();
+      return Objects.toStringHelper(this).add("caretOffset", myCaretModel.getOffset()).add("selection", mySelection).toString();
     }
   }
-  public static final Comparator<Range<Integer>> RANGE_COMPARATOR = new Comparator<Range<Integer>>() {
-    @Override
-    public int compare(Range<Integer> o1, Range<Integer> o2) {
-      final Integer to = o1.getTo();
-      final Integer to2 = o2.getTo();
-      final int i = to2.compareTo(to);
-      if (i == 0) {
-        final Integer from = o1.getFrom();
-        final Integer from2 = o2.getFrom();
-        //caret before selection
-        return from2.compareTo(from);
-      }
-      return i;
-    }
-  };
 
 
 }

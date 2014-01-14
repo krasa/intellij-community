@@ -71,13 +71,13 @@ public class SelectNextOccurrenceAction extends EditorAction {
       for (int i = 0; i < caretsAndSelections.size(); i++) {
         MultiEditAction.CaretModelWithSelection caretModelWithSelection = caretsAndSelections.get(i);
         //continue if is part of selection
-        if (caretModelWithSelection.selection != null) {
+        if (caretModelWithSelection.getSelection() != null) {
           continue;
         }
         if (!isValidCaret(caretModel, caretModelWithSelection)) {
           continue;
         }
-        caretModel.setActiveCaret(caretModelWithSelection.myCaretModel);
+        caretModel.setActiveCaret(caretModelWithSelection.getCaretModel());
         hadSingleCarets = true;
 
         if (selectionModel.hasSelection()) {
@@ -133,7 +133,7 @@ public class SelectNextOccurrenceAction extends EditorAction {
         if (selectionModel.hasSelection()) {
           if (multiSelections.contains(new Range<Integer>(selectionModel.getSelectionStart(), selectionModel.getSelectionEnd()))) {
             // side effect workaround , #searchAgain scrolls to caret, so when everything is selected it is not so nice as it scrolls like crazy
-            caretModel.setActiveCaret(caretModelWithSelections.get(caretModelWithSelections.size() - 1).myCaretModel);
+            caretModel.setActiveCaret(caretModelWithSelections.get(caretModelWithSelections.size() - 1).getCaretModel());
             editor.getScrollingModel().scrollToCaret(ScrollType.CENTER);
           }
           else {
@@ -148,9 +148,9 @@ public class SelectNextOccurrenceAction extends EditorAction {
     private void activateLastCaret(Editor editor, List<MultiEditAction.CaretModelWithSelection> caretModelWithSelections) {
       Collections.sort(caretModelWithSelections);
       final MultiEditAction.CaretModelWithSelection caretModelWithSelection = caretModelWithSelections.get(0);
-      editor.getCaretModel().setActiveCaret(caretModelWithSelection.myCaretModel);
-      if (caretModelWithSelection.selection != null) {
-        editor.getSelectionModel().setSelection(caretModelWithSelection.selection.getFrom(), caretModelWithSelection.selection.getTo());
+      editor.getCaretModel().setActiveCaret(caretModelWithSelection.getCaretModel());
+      if (caretModelWithSelection.getSelection() != null) {
+        editor.getSelectionModel().setSelection(caretModelWithSelection.getSelection().getFrom(), caretModelWithSelection.getSelection().getTo());
       }
     }
 
@@ -167,7 +167,7 @@ public class SelectNextOccurrenceAction extends EditorAction {
 
   //todo maybe move into CaretModel?
   private static boolean isValidCaret(CaretModel caretModel, MultiEditAction.CaretModelWithSelection caretModelWithSelection) {
-    return caretModel.getMultiCarets().contains(caretModelWithSelection.myCaretModel);
+    return caretModel.getMultiCarets().contains(caretModelWithSelection.getCaretModel());
   }
 
   public SelectNextOccurrenceAction() {

@@ -19,7 +19,6 @@ import com.intellij.openapi.editor.event.CaretListener;
 import com.intellij.openapi.editor.markup.TextAttributes;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.Collection;
 import java.util.List;
 
 /**
@@ -149,12 +148,7 @@ public interface CaretModel {
 
   CaretModel addMultiCaret(int offset);
 
-  Collection<Integer> getMultiCaretOffsets();
-
-  Collection<Integer> getAndRemoveMultiCaretOffsets();
-
   List<CaretModel> getMultiCarets();
-
 
   void setActiveCaret(CaretModel caretModel);
   

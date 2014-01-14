@@ -263,8 +263,6 @@ public interface SelectionModel {
 
   void removeMultiSelections();
 
-  List<Range<Integer>> getAndRemoveMultiSelections();
-
   List<Range<Integer>> getMultiSelections();
 
   enum Direction {
