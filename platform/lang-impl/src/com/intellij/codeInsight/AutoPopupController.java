@@ -33,6 +33,7 @@ import com.intellij.openapi.actionSystem.ex.AnActionListener;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.components.ServiceManager;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.editor.impl.MultiCaretModelImpl;
 import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.IndexNotReadyException;
 import com.intellij.openapi.project.Project;
@@ -97,6 +98,13 @@ public class AutoPopupController implements Disposable {
     }
     if (PowerSaveMode.isEnabled()) {
       return;
+    }
+
+    if (editor.getCaretModel() instanceof MultiCaretModelImpl) {
+      final MultiCaretModelImpl caretModel = (MultiCaretModelImpl)editor.getCaretModel();
+      if (caretModel.isMultiEditLocked()) {
+        return;
+      }
     }
 
     if (!CompletionServiceImpl.isPhase(CompletionPhase.CommittingDocuments.class, CompletionPhase.NoCompletion.getClass())) {

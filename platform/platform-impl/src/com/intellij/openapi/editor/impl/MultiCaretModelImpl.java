@@ -35,8 +35,8 @@ public class MultiCaretModelImpl implements CaretModel, PrioritizedDocumentListe
   private final EventDispatcher<CaretListener> myCaretListeners = EventDispatcher.create(CaretListener.class);
   private boolean myIsInUpdate;
 
-  ReentrantLock myMultiEditLock = new ReentrantLock();
-  CaretEvent myBlockedCaretEvent;
+  private ReentrantLock myMultiEditLock = new ReentrantLock();
+  private CaretEvent myBlockedCaretEvent;
   private boolean isDocumentChanged;
 
 
@@ -296,7 +296,7 @@ public class MultiCaretModelImpl implements CaretModel, PrioritizedDocumentListe
         }
       }
       if (!delete.isEmpty()) {
-        LOG.debug("sweep - removing "+delete.size());
+        LOG.debug("sweep - removing " + delete.size());
         for (CaretModel caretModel : delete) {
           final CaretModelImpl caretImpl = (CaretModelImpl)caretModel;
           carets.remove(caretImpl);
@@ -336,7 +336,7 @@ public class MultiCaretModelImpl implements CaretModel, PrioritizedDocumentListe
   }
 
   void caretPositionChanged(CaretEvent event) {
-    if (myMultiEditLock.isLocked()) {
+    if (isMultiEditLocked()) {
       myBlockedCaretEvent = event;
     }
     else {
@@ -352,10 +352,14 @@ public class MultiCaretModelImpl implements CaretModel, PrioritizedDocumentListe
   @Override
   public void afterMultiCaretsExecution() {
     myMultiEditLock.unlock();
-    if (!myMultiEditLock.isLocked() && myBlockedCaretEvent != null) {
+    if (!isMultiEditLocked() && myBlockedCaretEvent != null) {
       getCaretListeners().getMulticaster().caretPositionChanged(myBlockedCaretEvent);
       myBlockedCaretEvent = null;
     }
+  }
+
+  public boolean isMultiEditLocked() {
+    return myMultiEditLock.isLocked();
   }
 
   public void removeCaret(CaretModel multiCaret) {
@@ -366,7 +370,7 @@ public class MultiCaretModelImpl implements CaretModel, PrioritizedDocumentListe
     final CaretModelImpl caretImpl = (CaretModelImpl)multiCaret;
     carets.remove(caretImpl);
     caretImpl.dispose();
-    
+
     myEditor.caretRemoved(multiCaret);
     if (activeCaret == multiCaret) {
       activeCaret = carets.get(0);
