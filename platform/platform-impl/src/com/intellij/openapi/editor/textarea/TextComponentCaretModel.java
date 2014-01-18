@@ -25,6 +25,7 @@ import org.jetbrains.annotations.NotNull;
 import javax.swing.*;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.JTextComponent;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -149,7 +150,7 @@ public class TextComponentCaretModel implements CaretModel {
 
   @Override
   public List<CaretModel> getMultiCarets() {
-    return null;
+    return Collections.emptyList();
   }
 
   @Override
