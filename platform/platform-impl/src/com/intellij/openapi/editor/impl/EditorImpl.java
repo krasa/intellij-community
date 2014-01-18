@@ -4387,8 +4387,10 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
 
   public void caretRemoved(CaretModel multiCaret) {
     //todo removing the right caret
-    CaretCursorImpl remove = myCaretCursor.myCaretCursors.remove(myCaretCursor.myCaretCursors.size() - 1);
-    setCursorPosition();
+    if (myCaretCursor.myCaretCursors.size() > 1) {
+      CaretCursorImpl remove = myCaretCursor.myCaretCursors.remove(myCaretCursor.myCaretCursors.size() - 1);
+      setCursorPosition();
+    }
   }
 
   public void caretsChanged() {
