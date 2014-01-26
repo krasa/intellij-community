@@ -15,16 +15,19 @@
  */
 package com.intellij.codeInsight.template.impl;
 
+import com.intellij.codeInsight.CodeInsightBundle;
 import com.intellij.codeInsight.template.TemplateManager;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
-import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.command.CommandProcessor;
 import com.intellij.openapi.editor.Document;
+import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.editor.actionSystem.MultiEditAction;
+import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.text.StringUtil;
-import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.ReadonlyStatusHandler;
-import com.intellij.openapi.fileEditor.FileDocumentManager;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.ui.UIUtil;
 
 import java.util.Set;
@@ -73,6 +76,16 @@ public class InvokeTemplateAction extends AnAction {
       ReadonlyStatusHandler.getInstance(myProject).ensureFilesWritable(file);
     }
 
+    Runnable runnable = MultiEditAction.wrapRunnable(new Runnable() {
+      @Override
+      public void run() {
+        performInternal(document);
+      }
+    }, myEditor, null);
+    CommandProcessor.getInstance().executeCommand(myProject, runnable, CodeInsightBundle.message("insert.code.template.command"), null);
+  }
+
+  private void performInternal(Document document) {
     // adjust the selection so that it starts with a non-whitespace character (to make sure that the template is inserted
     // at a meaningful position rather than at indent 0)
     if (myEditor.getSelectionModel().hasSelection() && myTemplate.isToReformat()) {

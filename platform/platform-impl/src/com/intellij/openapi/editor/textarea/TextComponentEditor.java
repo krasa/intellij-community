@@ -291,4 +291,5 @@ public class TextComponentEditor extends UserDataHolderBase implements Editor {
   public IndentsModel getIndentsModel() {
     return new EmptyIndentsModel();
   }
+
 }

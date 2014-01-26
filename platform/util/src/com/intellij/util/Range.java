@@ -41,4 +41,32 @@ public class Range<T extends Comparable<T>> {
   public T getTo() {
     return myTo;
   }
+
+  @Override
+  public String toString() {
+    return "Range{" +
+           "myFrom=" + myFrom +
+           ", myTo=" + myTo +
+           '}';
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) return true;
+    if (o == null || getClass() != o.getClass()) return false;
+
+    Range range = (Range)o;
+
+    if (myFrom != null ? !myFrom.equals(range.myFrom) : range.myFrom != null) return false;
+    if (myTo != null ? !myTo.equals(range.myTo) : range.myTo != null) return false;
+
+    return true;
+  }
+
+  @Override
+  public int hashCode() {
+    int result = myFrom != null ? myFrom.hashCode() : 0;
+    result = 31 * result + (myTo != null ? myTo.hashCode() : 0);
+    return result;
+  }
 }

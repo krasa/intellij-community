@@ -27,6 +27,7 @@ import com.intellij.openapi.editor.event.DocumentAdapter;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.editor.impl.CaretModelImpl;
 import com.intellij.openapi.editor.impl.EditorImpl;
+import com.intellij.openapi.editor.impl.MultiCaretModelImpl;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.TextRange;
@@ -155,7 +156,7 @@ public abstract class MethodSignatureEditor<M extends PsiElement> extends Editor
       indexParameters(createFromString(), INDEXER);
 
       ((EditorImpl)editor).setScrollToCaret(false);
-      ((CaretModelImpl)editor.getCaretModel()).setIgnoreWrongMoves(true);
+      ((MultiCaretModelImpl)editor.getCaretModel()).setIgnoreWrongMoves(true);
       final TextRange range = getCurrentSignatureTextRange();
       ApplicationManager.getApplication().runWriteAction(new Runnable() {
         @Override

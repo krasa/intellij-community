@@ -20,7 +20,6 @@ import com.intellij.codeInsight.template.impl.TemplateManagerImpl;
 import com.intellij.codeInsight.template.impl.TemplateSettings;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.actionSystem.DataContext;
-import com.intellij.openapi.actionSystem.PlatformDataKeys;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.actionSystem.TypedActionHandler;
 import com.intellij.openapi.project.Project;
@@ -32,7 +31,7 @@ public class SpaceHandler extends TypedActionHandlerBase {
   }
 
   @Override
-  public void execute(@NotNull Editor editor, char charTyped, @NotNull DataContext dataContext) {
+  public void execute(@NotNull final Editor editor, final char charTyped, @NotNull final DataContext dataContext) {
     if (charTyped == ' ') {
       Project project = CommonDataKeys.PROJECT.getData(dataContext);
       if (project != null) {

@@ -23,6 +23,7 @@ import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.LogicalPosition;
 import com.intellij.openapi.editor.ScrollType;
+import com.intellij.openapi.editor.actionSystem.MultiEditAction;
 import com.intellij.openapi.editor.ex.EditorEx;
 import com.intellij.openapi.editor.ex.util.EditorUtil;
 import com.intellij.openapi.fileEditor.*;
@@ -39,6 +40,7 @@ import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.pom.Navigatable;
 import com.intellij.psi.SingleRootFileViewProvider;
+import com.intellij.util.Range;
 import org.jdom.Element;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
@@ -46,6 +48,8 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.beans.PropertyChangeListener;
+import java.util.Collection;
+import java.util.List;
 
 /**
  * @author Anton Katilin
@@ -197,6 +201,10 @@ public class TextEditorProvider implements FileEditorProvider, DumbAware {
     state.SELECTION_START = editor.getSelectionModel().getSelectionStart();
     state.SELECTION_END = editor.getSelectionModel().getSelectionEnd();
 
+    final List<Range<Integer>> multiSelections = editor.getSelectionModel().getMultiSelections();
+    final Collection<Integer> multiCaretOffsets = MultiEditAction.getMultiCaretOffsets(editor);
+    state.setMultiEditState(new MultiEditState(multiSelections, multiCaretOffsets));
+    
     // Saving scrolling proportion on UNDO may cause undesirable results of undo action fails to perform since
     // scrolling proportion restored slightly differs from what have been saved.
     state.VERTICAL_SCROLL_PROPORTION = level == FileEditorStateLevel.UNDO ? -1 : EditorUtil.calcVerticalScrollProportion(editor);
@@ -245,6 +253,19 @@ public class TextEditorProvider implements FileEditorProvider, DumbAware {
     }
     if (!preciselyScrollVertically) {
       editor.getScrollingModel().scrollToCaret(ScrollType.RELATIVE);
+    }
+    
+    final MultiEditState multiEditState = state.getMultiEditState();
+    if (multiEditState != null) {
+      editor.getCaretModel().removeMultiCarets();
+      editor.getSelectionModel().removeMultiSelections();
+
+      for (Range<Integer> multiEditRange : multiEditState.getMultiEditSelections()) {
+        editor.getSelectionModel().addMultiSelection(multiEditRange.getFrom(), multiEditRange.getTo(), null, false);
+      }
+      for (Integer offset : multiEditState.getMultiCaretOffsets()) {
+        editor.getCaretModel().addMultiCaret(offset);
+      }
     }
   }
 

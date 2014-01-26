@@ -22,6 +22,7 @@ import com.intellij.codeInsight.lookup.LookupManager;
 import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.actionSystem.EditorActionHandler;
+import com.intellij.openapi.editor.actionSystem.MultiEditAction;
 
 public class BackspaceHandler extends EditorActionHandler {
   private final EditorActionHandler myOriginalHandler;
@@ -49,12 +50,12 @@ public class BackspaceHandler extends EditorActionHandler {
 
   static void truncatePrefix(final DataContext dataContext, LookupImpl lookup, final EditorActionHandler handler, final int hideOffset) {
     final Editor editor = lookup.getEditor();
-    if (!lookup.performGuardedChange(new Runnable() {
+    if (!lookup.performGuardedChange(MultiEditAction.wrapRunnable(new Runnable() {
       @Override
       public void run() {
         handler.execute(editor, dataContext);
       }
-    })) {
+    }, editor, null))) {
       return;
     }
 

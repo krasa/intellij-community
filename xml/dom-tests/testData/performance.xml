@@ -285,6 +285,10 @@
         <action id="FindNext" class="xcom.intellij.ide.actions.SearchAgainAction" text="Find _Next" description="Repeat the last Find/Replace operation"/>
         <action id="FindPrevious" class="xcom.intellij.ide.actions.SearchBackAction" text="Find Pre_vious" description="Repeat the last Find/Replace operation in reverse direction"/>
         <action id="FindWordAtCaret" class="xcom.intellij.openapi.editor.actions.FindWordAtCaretAction" text="Find _Word at Caret" description="Find next occurrence of the word at caret"/>
+        <action id="SelectNextOccurrence" class="xcom.intellij.openapi.editor.actions.SelectNextOccurrenceAction" text="Select Next Occurrence" description="Select next occurrence of the selected text, or the word at caret"/>
+        <action id="SelectAllOccurrences" class="xcom.intellij.openapi.editor.actions.SelectAllOccurrencesAction" text="Select All Occurrences" description="Select all occurrences of the selected text, or the word at caret"/>
+        <action id="SelectNextWholeWordOccurrence" class="xcom.intellij.openapi.editor.actions.SelectNextWholeWordOccurrenceAction" text="Select Next Whole Word Occurrence" description="Select next whole word occurrence of the selected text, or the word at caret"/>
+        <action id="SelectAllWholeWordOccurrences" class="xcom.intellij.openapi.editor.actions.SelectAllWholeWordOccurrencesAction" text="Select All Whole Word Occurrences" description="Select all whole word occurrences of the selected text, or the word at caret"/>
         <action id="IncrementalSearch" class="xcom.intellij.codeInsight.navigation.actions.IncrementalSearchAction" text="Incrementa_l Search" description="Start incremental search (searches string as you type)"/>
         <separator/>
         <action id="FindUsages" class="xcom.intellij.find.actions.FindUsagesAction" text="Find _Usages..." description="Find usages of the symbol at caret"/>

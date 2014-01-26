@@ -106,6 +106,7 @@ public interface IdeActions {
   @NonNls String ACTION_PIN_ACTIVE_TAB = "PinActiveTab";
   @NonNls String ACTION_SYNCHRONIZE = "Synchronize";
   @NonNls String ACTION_NEXT_OCCURENCE = "NextOccurence";
+  @NonNls String ACTION_SELECT_NEXT_OCCURRENCE = "SelectNextOccurrence";
   @NonNls String ACTION_PREVIOUS_OCCURENCE = "PreviousOccurence";
   @NonNls String ACTION_NEXT_TAB = "NextTab";
   @NonNls String ACTION_PREVIOUS_TAB = "PreviousTab";

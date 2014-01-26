@@ -17,6 +17,8 @@ package com.intellij.openapi.actionSystem;
 
 import com.intellij.ide.DataManager;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Key;
+import com.intellij.openapi.util.UserDataHolder;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.ui.PlaceProvider;
 import org.intellij.lang.annotations.JdkConstants;
@@ -124,17 +126,45 @@ public class AnActionEvent implements PlaceProvider<String> {
     if (!myWorksInInjected) {
       return myDataContext;
     }
-    return new DataContext() {
-      @Override
-      @Nullable
-      public Object getData(@NonNls String dataId) {
-        Object injected = myDataContext.getData(injectedId(dataId));
-        if (injected != null) return injected;
-        return myDataContext.getData(dataId);
-      }
-    };
+
+    if (myDataContext instanceof UserDataHolder) {
+      return new MyDataContext() {
+        @Override
+        @Nullable
+        public Object getData(@NonNls String dataId) {
+          Object injected = myDataContext.getData(injectedId(dataId));
+          if (injected != null) return injected;
+          return myDataContext.getData(dataId);
+        }
+
+        @Nullable
+        @Override
+        public <T> T getUserData(@NotNull Key<T> key) {
+          return ((UserDataHolder)myDataContext).getUserData(key);
+        }
+
+        @Override
+        public <T> void putUserData(@NotNull Key<T> key, @Nullable T value) {
+          ((UserDataHolder)myDataContext).putUserData(key, value);
+        }
+      };
+    }
+    else {
+      return new DataContext() {
+        @Override
+        @Nullable
+        public Object getData(@NonNls String dataId) {
+          Object injected = myDataContext.getData(injectedId(dataId));
+          if (injected != null) return injected;
+          return myDataContext.getData(dataId);
+        }
+      };
+    }
   }
 
+  public static abstract class MyDataContext implements DataContext, UserDataHolder {
+  }
+  
   @Nullable
   public <T> T getData(@NotNull DataKey<T> key) {
     return key.getData(getDataContext());

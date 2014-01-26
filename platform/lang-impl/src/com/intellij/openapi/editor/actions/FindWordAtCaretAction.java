@@ -28,7 +28,6 @@ import com.intellij.find.FindUtil;
 import com.intellij.ide.DataManager;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.actionSystem.DataContext;
-import com.intellij.openapi.actionSystem.PlatformDataKeys;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.actionSystem.EditorAction;
 import com.intellij.openapi.editor.actionSystem.EditorActionHandler;
@@ -39,7 +38,7 @@ public class FindWordAtCaretAction extends EditorAction {
     @Override
     public void execute(Editor editor, DataContext dataContext) {
       Project project = CommonDataKeys.PROJECT.getData(DataManager.getInstance().getDataContext(editor.getComponent()));
-      FindUtil.findWordAtCaret(project, editor);
+      FindUtil.findWordAtCaret(project, editor, !editor.getSelectionModel().hasSelection());
     }
 
     @Override

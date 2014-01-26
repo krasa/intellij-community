@@ -21,6 +21,7 @@ import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.editor.actionSystem.MultiEditAction;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.vfs.ReadonlyStatusHandler;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -59,13 +60,18 @@ public class WrapWithCustomTemplateAction extends AnAction {
     if (file != null) {
       ReadonlyStatusHandler.getInstance(myFile.getProject()).ensureFilesWritable(file);
     }
+    MultiEditAction.executeWithMultiEdit(new Runnable() {
+      @Override
+      public void run() {
+        String selection = myEditor.getSelectionModel().getSelectedText();
 
-    String selection = myEditor.getSelectionModel().getSelectedText();
+        if (selection != null) {
+          selection = selection.trim();
+          PsiDocumentManager.getInstance(myFile.getProject()).commitAllDocuments();
+          myTemplate.wrap(selection, new CustomTemplateCallback(myEditor, myFile, true));
+        }
+      }
+    }, myEditor, null);
 
-    if (selection != null) {
-      selection = selection.trim();
-      PsiDocumentManager.getInstance(myFile.getProject()).commitAllDocuments();
-      myTemplate.wrap(selection, new CustomTemplateCallback(myEditor, myFile, true));
-    }
   }
 }

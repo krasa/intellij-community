@@ -25,8 +25,11 @@ import com.intellij.openapi.editor.ex.EditorEx;
 import com.intellij.openapi.editor.markup.TextAttributes;
 import com.intellij.openapi.util.ProperTextRange;
 import com.intellij.openapi.util.TextRange;
+import com.intellij.util.Range;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
 
 /**
  * @author cdr
@@ -193,5 +196,23 @@ public class SelectionModelWindow implements SelectionModel {
   @Override
   public TextAttributes getTextAttributes() {
     return myHostModel.getTextAttributes();
+  }
+
+  @Override
+  public void addMultiSelection(int selectionStart,
+                                int selectionEnd,
+                                final Direction direction,
+                                final boolean putCaretOnAllLinesWithZeroWidthSelection) {
+    myHostModel.addMultiSelection(selectionStart, selectionEnd, direction, putCaretOnAllLinesWithZeroWidthSelection);
+  }
+
+  @Override
+  public void removeMultiSelections() {
+    myHostModel.removeMultiSelections();
+  }
+
+  @Override
+  public List<Range<Integer>> getMultiSelections() {
+    return myHostModel.getMultiSelections();
   }
 }

@@ -15,9 +15,12 @@
  */
 package com.intellij.codeInsight.editorActions;
 
+import com.intellij.codeInsight.lookup.LookupManager;
+import com.intellij.codeInsight.lookup.impl.LookupImpl;
 import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.actionSystem.EditorActionHandler;
+import com.intellij.openapi.editor.actionSystem.MultiEditAction;
 
 /**
  * @author yole
@@ -28,7 +31,22 @@ public class BackspaceToWordStartHandler extends BackspaceHandler {
   }
 
   @Override
-  public void executeWriteAction(Editor editor, DataContext dataContext) {
+  public void executeWriteAction(final Editor editor, final DataContext dataContext) {
+    LookupImpl lookup = (LookupImpl)LookupManager.getActiveLookup(editor);
+    if (lookup != null) {
+      MultiEditAction.executeWithMultiEdit(new Runnable() {
+        @Override
+        public void run() {
+          executeWriteActionInternal(editor, dataContext);
+        }
+      }, editor, null);
+    }
+    else {
+      executeWriteActionInternal(editor, dataContext);
+    }
+  }
+
+  private void executeWriteActionInternal(Editor editor, DataContext dataContext) {
     if (!handleBackspace(editor, dataContext, true)) {
       myOriginalHandler.execute(editor, dataContext);
     }

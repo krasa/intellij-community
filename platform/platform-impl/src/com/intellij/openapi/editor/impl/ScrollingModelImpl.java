@@ -30,6 +30,7 @@ import com.intellij.openapi.command.CommandProcessor;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.LogicalPosition;
 import com.intellij.openapi.editor.ScrollType;
+import com.intellij.openapi.editor.actionSystem.MultiEditAction;
 import com.intellij.openapi.editor.event.DocumentAdapter;
 import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.editor.event.VisibleAreaEvent;
@@ -136,7 +137,11 @@ public class ScrollingModelImpl implements ScrollingModelEx {
   }
 
   @Override
-  public void scrollToCaret(ScrollType scrollType) {
+  public void scrollToCaret(@NotNull ScrollType scrollType) {
+    if (myEditor.getUserData(MultiEditAction.PROCESSING) != null) {
+      //just small optimisation
+      return;
+    }
     assertIsDispatchThread();
     LogicalPosition caretPosition = myEditor.getCaretModel().getLogicalPosition();
     myEditor.validateSize();

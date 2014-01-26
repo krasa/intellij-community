@@ -26,10 +26,13 @@ import com.intellij.openapi.editor.actionSystem.EditorActionManager;
 import com.intellij.openapi.editor.event.SelectionListener;
 import com.intellij.openapi.editor.impl.SelectionModelImpl;
 import com.intellij.openapi.editor.markup.TextAttributes;
+import com.intellij.util.Range;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.text.JTextComponent;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * @author yole
@@ -199,5 +202,21 @@ public class TextComponentSelectionModel implements SelectionModel {
   @Override
   public TextAttributes getTextAttributes() {
     return null;
+  }
+
+  @Override
+  public void addMultiSelection(int selectionStart,
+                                int selectionEnd,
+                                final Direction direction,
+                                final boolean putCaretOnAllLinesWithZeroWidthSelection) {
+  }
+
+  @Override
+  public void removeMultiSelections() {
+  }
+
+  @Override
+  public List<Range<Integer>> getMultiSelections() {
+    return Collections.emptyList();
   }
 }

@@ -40,11 +40,22 @@ public final class TextEditorState implements FileEditorState {
    * This field can be <code>null</code>.
    */
   private           CodeFoldingState           myFoldingState;
+  //TODO serialization
+  private           MultiEditState             myMultiEditState;
   @Nullable private Producer<CodeFoldingState> myDelayedFoldInfoProducer;
 
   private static final int MIN_CHANGE_DISTANCE = 4;
 
   public TextEditorState() {
+  }
+
+  @Nullable
+  public MultiEditState getMultiEditState() {
+    return myMultiEditState;
+  }
+
+  public void setMultiEditState(MultiEditState multiEditState) {
+    myMultiEditState = multiEditState;
   }
 
   /**
@@ -76,7 +87,6 @@ public final class TextEditorState implements FileEditorState {
     myFoldingState = foldingState;
     myDelayedFoldInfoProducer = null;
   }
-
   public boolean equals(Object o) {
     if (!(o instanceof TextEditorState)) {
       return false;
@@ -92,6 +102,7 @@ public final class TextEditorState implements FileEditorState {
     CodeFoldingState localFoldingState = getFoldingState();
     CodeFoldingState theirFoldingState = textEditorState.getFoldingState();
     if (localFoldingState == null ? theirFoldingState != null : !localFoldingState.equals(theirFoldingState)) return false;
+    if (myMultiEditState == null ? textEditorState.getMultiEditState() != null : !myMultiEditState.equals(textEditorState.getMultiEditState())) return false;
 
     return true;
   }
