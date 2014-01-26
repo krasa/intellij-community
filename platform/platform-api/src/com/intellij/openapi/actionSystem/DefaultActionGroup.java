@@ -35,7 +35,13 @@ import java.util.List;
  * to implement your own <code>ActionGroup</code>.
  *
  * @see Constraints
- * @see ComputableActionGroup
+ *
+ * @see com.intellij.openapi.actionSystem.ComputableActionGroup
+ *
+ * @see com.intellij.ide.actions.NonEmptyActionGroup
+ * @see com.intellij.ide.actions.NonTrivialActionGroup
+ * @see com.intellij.ide.actions.SmartPopupActionGroup
+ *
  */
 public class DefaultActionGroup extends ActionGroup {
   private static final Logger LOG = Logger.getInstance("#com.intellij.openapi.actionSystem.DefaultActionGroup");
@@ -239,9 +245,9 @@ public class DefaultActionGroup extends ActionGroup {
 
 
   /**
-   * Replaces specified action with the new one.
+   * Replaces specified action with the a one.
    */
-  public boolean replaceAction(AnAction oldAction, AnAction newAction) {
+  public boolean replaceAction(@NotNull AnAction oldAction, @NotNull AnAction newAction) {
     int index = mySortedChildren.indexOf(oldAction);
     if (index >= 0) {
       mySortedChildren.set(index, newAction);
@@ -259,6 +265,20 @@ public class DefaultActionGroup extends ActionGroup {
     return false;
   }
 
+  /**
+   * Copies content from <code>group</code>.
+   * @param other group to copy from
+   */
+  public void copyFromGroup(@NotNull DefaultActionGroup other) {
+    copyFrom(other);
+    setPopup(other.isPopup());
+
+    mySortedChildren.clear();
+    mySortedChildren.addAll(other.mySortedChildren);
+
+    myPairs.clear();
+    myPairs.addAll(other.myPairs);
+  }
 
   /**
    * Returns group's children in the order determined by constraints.

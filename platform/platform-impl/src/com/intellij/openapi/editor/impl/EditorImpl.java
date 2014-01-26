@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -95,7 +95,6 @@ import com.intellij.util.ui.update.UiNotifyConnector;
 import gnu.trove.*;
 import org.intellij.lang.annotations.JdkConstants;
 import org.intellij.lang.annotations.MagicConstant;
-import org.jdom.Element;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -159,10 +158,10 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     ComplementaryFontsRegistry.getFontAbleToDisplay(' ', 0, 0, UIManager.getFont("Label.font").getFamily()); // load costly font info
   }
 
-  private final          CommandProcessor myCommandProcessor;
-  @NotNull private final MyScrollBar      myVerticalScrollBar;
+  private final CommandProcessor myCommandProcessor;
+  @NotNull private final MyScrollBar myVerticalScrollBar;
 
-  private final          List<EditorMouseListener>       myMouseListeners       = ContainerUtil.createLockFreeCopyOnWriteList();
+  private final List<EditorMouseListener> myMouseListeners = ContainerUtil.createLockFreeCopyOnWriteList();
   @NotNull private final List<EditorMouseMotionListener> myMouseMotionListeners = ContainerUtil.createLockFreeCopyOnWriteList();
 
   private int myCharHeight = -1;
@@ -194,10 +193,11 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
   private final PropertyChangeSupport myPropertyChangeSupport = new PropertyChangeSupport(this);
   private MyEditable myEditable;
 
-  private                EditorColorsScheme    myScheme;
-  private                ArrowPainter          myTabPainter;
-  private final          boolean               myIsViewer;
-  @NotNull private final SelectionModelImpl    mySelectionModel;
+  @NotNull
+  private EditorColorsScheme myScheme;
+  private ArrowPainter myTabPainter;
+  private final boolean myIsViewer;
+  @NotNull private final SelectionModelImpl mySelectionModel;
   @NotNull private final EditorMarkupModelImpl myMarkupModel;
   @NotNull private final FoldingModelImpl      myFoldingModel;
   @NotNull private final ScrollingModelImpl    myScrollingModel;
@@ -215,6 +215,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
   private static final int MOUSE_SELECTION_STATE_LINE_SELECTED = 2;
 
   private EditorHighlighter myHighlighter;
+  private Disposable myHighlighterDisposable = Disposer.newDisposable();
   private final TextDrawingCallback myTextDrawingCallback = new MyTextDrawingCallback();
 
   @MagicConstant(intValues = {VERTICAL_SCROLLBAR_LEFT, VERTICAL_SCROLLBAR_RIGHT})
@@ -233,31 +234,31 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
   private final EditorSizeContainer mySizeContainer = new EditorSizeContainer();
 
   private boolean myUpdateCursor;
-  private int     myCaretUpdateVShift;
+  private int myCaretUpdateVShift;
 
   @Nullable
   private final Project myProject;
-  private       long    myMouseSelectionChangeTimestamp;
-  private       int     mySavedCaretOffsetForDNDUndoHack;
+  private long myMouseSelectionChangeTimestamp;
+  private int mySavedCaretOffsetForDNDUndoHack;
   private final List<FocusChangeListener> myFocusListeners = ContainerUtil.createLockFreeCopyOnWriteList();
 
   private MyInputMethodHandler myInputMethodRequestsHandler;
-  private InputMethodRequests  myInputMethodRequestsSwingWrapper;
-  private boolean              myIsOneLineMode;
-  private boolean              myIsRendererMode;
-  private VirtualFile          myVirtualFile;
-  private           boolean myIsColumnMode     = false;
-  @Nullable private Color   myForcedBackground = null;
+  private InputMethodRequests myInputMethodRequestsSwingWrapper;
+  private boolean myIsOneLineMode;
+  private boolean myIsRendererMode;
+  private VirtualFile myVirtualFile;
+  private boolean myIsColumnMode = false;
+  @Nullable private Color myForcedBackground = null;
   @Nullable private Dimension myPreferredSize;
-  private           int       myVirtualPageHeight;
+  private int myVirtualPageHeight;
   @Nullable private Runnable myGutterSizeUpdater = null;
-  private           boolean  myGutterNeedsUpdate = false;
+  private boolean myGutterNeedsUpdate = false;
   private Alarm myAppleRepaintAlarm;
 
   private final Alarm myMouseSelectionStateAlarm = new Alarm(Alarm.ThreadToUse.SWING_THREAD);
   private Runnable myMouseSelectionStateResetRunnable;
 
-  private           boolean           myEmbeddedIntoDialogWrapper;
+  private boolean myEmbeddedIntoDialogWrapper;
   @Nullable private CachedFontContent myLastCache;
   private int myDragOnGutterSelectionStartLine = -1;
 
@@ -282,28 +283,28 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
   @NotNull private final JPanel myHeaderPanel;
 
   @Nullable private MouseEvent myInitialMouseEvent;
-  private           boolean    myIgnoreMouseEventsConsecutiveToInitial;
+  private boolean myIgnoreMouseEventsConsecutiveToInitial;
 
   private EditorDropHandler myDropHandler;
 
-  private                char[]         myPrefixText;
-  private                TextAttributes myPrefixAttributes;
-  private                int            myPrefixWidthInPixels;
-  @NotNull private final IndentsModel   myIndentsModel;
+  private char[] myPrefixText;
+  private TextAttributes myPrefixAttributes;
+  private int myPrefixWidthInPixels;
+  @NotNull private final IndentsModel myIndentsModel;
 
   @Nullable
   private CharSequence myPlaceholderText;
-  private int          myLastPaintedPlaceholderWidth;
+  private int myLastPaintedPlaceholderWidth;
 
   private boolean myStickySelection;
-  private int     myStickySelectionStart;
+  private int myStickySelectionStart;
   private boolean myScrollToCaret = true;
 
   private boolean myPurePaintingMode;
   private boolean myPaintSelection;
 
   private final EditorSizeAdjustmentStrategy mySizeAdjustmentStrategy = new EditorSizeAdjustmentStrategy();
-  private final Disposable                   myDisposable             = Disposer.newDisposable();
+  private final Disposable myDisposable = Disposer.newDisposable();
 
   static {
     ourCaretBlinkingCommand = new RepaintCursorCommand();
@@ -383,7 +384,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     myDocument.addDocumentListener(new EditorDocumentAdapter(), myCaretModel);
     myDocument.addDocumentListener(mySoftWrapModel, myCaretModel);
 
-    myFoldingModel.addListener(mySoftWrapModel);
+    myFoldingModel.addListener(mySoftWrapModel, myCaretModel);
 
     myIndentsModel = new IndentsModelImpl(this);
     myCaretModel.addCaretListener(new CaretListener() {
@@ -427,7 +428,6 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     myScrollBarOrientation = VERTICAL_SCROLLBAR_RIGHT;
 
     mySoftWrapModel.addSoftWrapChangeListener(new SoftWrapChangeListenerAdapter() {
-
       @Override
       public void recalculationEnds() {
         if (myCaretModel.isUpToDate()) {
@@ -518,10 +518,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
   }
 
   public static boolean isPresentationMode(Project project) {
-    if (project != null && !project.isDefault()) {
-      return PropertiesComponent.getInstance(project).isTrueValue("editor.presentation.mode");
-    }
-    return false;
+    return project != null && !project.isDefault() && PropertiesComponent.getInstance(project).isTrueValue("editor.presentation.mode");
   }
 
   @NotNull
@@ -726,9 +723,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     myTraceableDisposable.kill(null);
 
     isReleased = true;
-    myDocument.removeDocumentListener(myHighlighter);
 
-    myFoldingModel.removeListener(mySoftWrapModel);
     myFoldingModel.dispose();
 
     mySoftWrapModel.release();
@@ -748,6 +743,8 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     clearCaretThread();
 
     myFocusListeners.clear();
+    myMouseListeners.clear();
+    myMouseMotionListeners.clear();
 
     if (myConnection != null) {
       myConnection.disconnect();
@@ -764,9 +761,6 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
   }
 
   private void initComponent() {
-//    myStatusBar = new EditorStatusBarImpl();
-
-    //myPanel.setLayout(new BoxLayout(myPanel, BoxLayout.Y_AXIS));
     myPanel.setLayout(new BorderLayout());
 
     myPanel.add(myHeaderPanel, BorderLayout.NORTH);
@@ -1005,17 +999,22 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
   }
 
   @Override
-  public void setHighlighter(@NotNull EditorHighlighter highlighter) {
+  public void setHighlighter(@NotNull final EditorHighlighter highlighter) {
     assertIsDispatchThread();
     final Document document = getDocument();
-    if (myHighlighter != null && !isDisposed()) {
-      document.removeDocumentListener(myHighlighter);
-    }
+    Disposer.dispose(myHighlighterDisposable);
 
     document.addDocumentListener(highlighter);
+    myHighlighter = highlighter;
+    myHighlighterDisposable = new Disposable() {
+      @Override
+      public void dispose() {
+        document.removeDocumentListener(highlighter);
+      }
+    };
+    Disposer.register(myDisposable, myHighlighterDisposable);
     highlighter.setEditor(this);
     highlighter.setText(document.getCharsSequence());
-    myHighlighter = highlighter;
     EditorHighlighterCache.rememberEditorHighlighterForCachesOptimization(document, highlighter);
 
     if (myPanel != null) {
@@ -1734,7 +1733,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     updateHasTabsFlag(e.getNewFragment());
   }
 
-  private void updateHasTabsFlag(CharSequence newChars) {
+  private void updateHasTabsFlag(@NotNull CharSequence newChars) {
     if (!hasTabs) {
       hasTabs = StringUtil.contains(newChars, 0, newChars.length(), '\t');
     }
@@ -1834,7 +1833,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
   @Override
   public void removeEditorMouseListener(@NotNull EditorMouseListener listener) {
     boolean success = myMouseListeners.remove(listener);
-    LOG.assertTrue(success);
+    LOG.assertTrue(success || isReleased);
   }
 
   @Override
@@ -1845,7 +1844,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
   @Override
   public void removeEditorMouseMotionListener(@NotNull EditorMouseMotionListener listener) {
     boolean success = myMouseMotionListeners.remove(listener);
-    LOG.assertTrue(success);
+    LOG.assertTrue(success || isReleased);
   }
 
   @Override
@@ -1993,11 +1992,13 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     return header != null && header != getPermanentHeaderComponent();
   }
 
+  @Override
   @Nullable
   public JComponent getPermanentHeaderComponent() {
     return getUserData(PERMANENT_HEADER);
   }
 
+  @Override
   public void setPermanentHeaderComponent(@Nullable JComponent component) {
     putUserData(PERMANENT_HEADER, component);
   }
@@ -4631,11 +4632,9 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
             //don't worry it's cheap. Cache is not required
             state = new IterationState(EditorImpl.this, offset, offset + 1, true);
             TextAttributes attributes = state.getMergedAttributes();
-            if (attributes != null) {
-              FontInfo info = EditorUtil.fontForChar(ch, attributes.getFontType(), EditorImpl.this);
-              if (info != null) {
-                g.setFont(info.getFont());
-              }
+            FontInfo info = EditorUtil.fontForChar(ch, attributes.getFontType(), EditorImpl.this);
+            if (info != null) {
+              g.setFont(info.getFont());
             }
             //todo[kb]
             //in case of italic style we paint out of the cursor block. Painting the symbol to a dedicated buffered image
@@ -5964,7 +5963,6 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
   }
 
   private class MyColorSchemeDelegate extends DelegateColorScheme {
-
     private final FontPreferences                        myFontPreferences = new FontPreferences();
     private final Map<TextAttributesKey, TextAttributes> myOwnAttributes   = ContainerUtilRt.newHashMap();
     private final Map<ColorKey, Color>                   myOwnColors       = ContainerUtilRt.newHashMap();
@@ -6099,14 +6097,6 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
       return null;
     }
 
-    @Override
-    public void readExternal(Element element) throws InvalidDataException {
-    }
-
-    @Override
-    public void writeExternal(Element element) throws WriteExternalException {
-    }
-
     public void updateGlobalScheme() {
       setDelegate(myCustomGlobalScheme == null ? EditorColorsManager.getInstance().getGlobalScheme() : myCustomGlobalScheme);
     }
@@ -6160,6 +6150,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
             public void run() {
               try {
                 editor.getSelectionModel().removeSelection();
+
                 final int offset;
                 if (myDraggedRange != null) {
                   editor.getCaretModel().moveToOffset(caretOffset);
@@ -6168,16 +6159,15 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
                 else {
                   offset = editor.getCaretModel().getOffset();
                 }
-                if (editor.getDocument().getRangeGuard(offset, offset) != null) return;
-
-                EditorActionHandler pasteHandler = EditorActionManager.getInstance().getActionHandler(IdeActions.ACTION_EDITOR_PASTE);
+                if (editor.getDocument().getRangeGuard(offset, offset) != null) {
+                  return;
+                }
 
                 editor.putUserData(LAST_PASTED_REGION, null);
 
+                EditorActionHandler pasteHandler = EditorActionManager.getInstance().getActionHandler(IdeActions.ACTION_EDITOR_PASTE);
                 LOG.assertTrue(pasteHandler instanceof EditorTextInsertHandler);
-
-                EditorTextInsertHandler handler = (EditorTextInsertHandler)pasteHandler;
-                handler.execute(editor, editor.getDataContext(), new Producer<Transferable>() {
+                ((EditorTextInsertHandler)pasteHandler).execute(editor, editor.getDataContext(), new Producer<Transferable>() {
                   @Override
                   public Transferable produce() {
                     return t;
@@ -6295,7 +6285,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     }
   }
 
-  class EditorDocumentBulkUpdateAdapter implements DocumentBulkUpdateListener {
+  private class EditorDocumentBulkUpdateAdapter implements DocumentBulkUpdateListener {
     @Override
     public void updateStarted(@NotNull Document doc) {
       if (doc != getDocument()) return;

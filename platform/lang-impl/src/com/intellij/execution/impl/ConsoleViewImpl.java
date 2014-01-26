@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2012 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -79,7 +79,6 @@ import org.jetbrains.annotations.Nullable;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.datatransfer.DataFlavor;
-import java.awt.datatransfer.Transferable;
 import java.awt.event.MouseEvent;
 import java.io.IOException;
 import java.util.*;
@@ -661,7 +660,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     if (cycleUsed) {
       clearHyperlinkAndFoldings();
     }
-    
+
     CommandProcessor.getInstance().executeCommand(myProject, new Runnable() {
       @Override
       public void run() {
@@ -1065,9 +1064,6 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
       final int lEnd = line - 1;
       int lStart = lEnd;
       while (prevFolding.equals(myFolding.get(lStart - 1))) lStart--;
-      if (lStart == lEnd) {
-        return;
-      }
 
       for (int i = lStart; i <= lEnd; i++) {
         myFolding.remove(i);
@@ -1128,6 +1124,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
   private class MyHighlighter extends DocumentAdapter implements EditorHighlighter {
     private HighlighterClient myEditor;
 
+    @NotNull
     @Override
     public HighlighterIterator createIterator(final int startOffset) {
       final int startIndex = ConsoleUtil.findTokenInfoIndexByOffset(myTokens, startOffset);
@@ -1182,17 +1179,17 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     }
 
     @Override
-    public void setText(final CharSequence text) {
+    public void setText(@NotNull final CharSequence text) {
     }
 
     @Override
-    public void setEditor(final HighlighterClient editor) {
+    public void setEditor(@NotNull final HighlighterClient editor) {
       LOG.assertTrue(myEditor == null, "Highlighters cannot be reused with different editors");
       myEditor = editor;
     }
 
     @Override
-    public void setColorScheme(EditorColorsScheme scheme) {
+    public void setColorScheme(@NotNull EditorColorsScheme scheme) {
     }
   }
 
@@ -1264,15 +1261,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
   private static class PasteHandler extends ConsoleAction {
     @Override
     public void execute(final ConsoleViewImpl consoleView, final DataContext context) {
-      final Transferable content = CopyPasteManager.getInstance().getContents();
-      if (content == null) return;
-      String s = null;
-      try {
-        s = (String)content.getTransferData(DataFlavor.stringFlavor);
-      }
-      catch (Exception e) {
-        consoleView.getToolkit().beep();
-      }
+      String s = CopyPasteManager.getInstance().getContents(DataFlavor.stringFlavor);
       if (s == null) return;
       ApplicationManager.getApplication().assertIsDispatchThread();
       Editor editor = consoleView.myEditor;

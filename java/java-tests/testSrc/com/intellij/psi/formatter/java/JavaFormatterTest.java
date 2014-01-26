@@ -25,10 +25,7 @@ import com.intellij.psi.JavaCodeFragmentFactory;
 import com.intellij.psi.JavaPsiFacade;
 import com.intellij.psi.PsiCodeFragment;
 import com.intellij.psi.PsiElement;
-import com.intellij.psi.codeStyle.CodeStyleManager;
-import com.intellij.psi.codeStyle.CodeStyleSettings;
-import com.intellij.psi.codeStyle.CodeStyleSettingsManager;
-import com.intellij.psi.codeStyle.CommonCodeStyleSettings;
+import com.intellij.psi.codeStyle.*;
 import com.intellij.util.IncorrectOperationException;
 import org.jetbrains.annotations.NonNls;
 
@@ -2198,12 +2195,8 @@ public void testSCR260() throws Exception {
     getSettings().KEEP_SIMPLE_METHODS_IN_ONE_LINE = true;
     getSettings().ALIGN_MULTILINE_PARAMETERS = true;
     getSettings().METHOD_PARAMETERS_WRAP = CommonCodeStyleSettings.WRAP_AS_NEEDED;
-    doTextTest("class TEst {\n" +
-               "    void foo(A a,B b){ /* compiled code */ }\n" +
-               "}",
-               "class TEst {\n" +
-               "    void foo(A a,\n" +
-               "             B b) { /* compiled code */ }\n" + "}");
+    doTextTest("class TEst {\n" + "void foo(A a,B b){ /* compiled code */ }\n" + "}",
+               "class TEst {\n" + "    void foo(A a, B b)\n" + "    { /* compiled code */ }\n" + "}");
   }
 
   public void testSCR1615() throws Exception {

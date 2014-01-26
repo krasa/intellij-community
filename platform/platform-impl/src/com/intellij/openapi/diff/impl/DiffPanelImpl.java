@@ -15,6 +15,7 @@
  */
 package com.intellij.openapi.diff.impl;
 
+import com.intellij.icons.AllIcons;
 import com.intellij.ide.actions.EditSourceAction;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.actionSystem.*;
@@ -110,9 +111,17 @@ public class DiffPanelImpl implements DiffPanelEx, ContentChangeListener, TwoSid
         ActionManager actionManager = ActionManager.getInstance();
         toolbar.addAction(actionManager.getAction("DiffPanel.Toolbar"));
         toolbar.addAction(actionManager.getAction("ContextHelp"));
+        toolbar.addAction(getEditSourceAction());
         toolbar.addSeparator();
         toolbar.addAction(new DiffMergeSettingsAction(Arrays.asList(getEditor1(), getEditor2()),
                                                       ServiceManager.getService(myProject, DiffToolSettings.class)));
+      }
+
+      @NotNull
+      private AnAction getEditSourceAction() {
+        AnAction editSourceAction = new EditSourceAction();
+        editSourceAction.getTemplatePresentation().setIcon(AllIcons.Actions.EditSource);
+        return editSourceAction;
       }
     };
   }

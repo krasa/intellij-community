@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -69,6 +69,8 @@ import java.util.regex.Pattern;
  */
 @SuppressWarnings("StaticMethodOnlyUsedInOneClass")
 public class UIUtil {
+
+  @NonNls public static final String BORDER_LINE = "<hr size=1 noshade>";
 
   private static final AtomicNotNullLazyValue<Boolean> X_RENDER_ACTIVE = new AtomicNotNullLazyValue<Boolean>() {
     @NotNull
@@ -222,6 +224,11 @@ public class UIUtil {
   }
 
   public static boolean isRetina() {
+    //Temporary workaround for HiDPI on Windows/Linux
+    if ("true".equalsIgnoreCase(System.getProperty("is.hidpi"))) {
+      return true;
+    }
+
     synchronized (ourRetina) {
       if (ourRetina.isNull()) {
         ourRetina.set(false); // in case HiDPIScaledImage.drawIntoImage is not called for some reason
@@ -349,6 +356,11 @@ public class UIUtil {
 
   public static void setEnabled(Component component, boolean enabled, boolean recursively) {
     component.setEnabled(enabled);
+    if (component instanceof JComboBox) {
+      // On Mac JComboBox instances have children: com.apple.laf.AquaComboBoxButton and javax.swing.CellRendererPane.
+      // Disabling these children results in ugly UI. See WEB-10733
+      return;
+    }
     if (component instanceof JLabel) {
       Color color = enabled ? getLabelForeground() : getLabelDisabledForeground();
       if (color != null) {
@@ -426,18 +438,22 @@ public class UIUtil {
     return ArrayUtil.toStringArray(lines);
   }
 
-  public static void setActionNameAndMnemonic(String text, Action action) {
-    int mnemoPos = text.indexOf('&');
-    if (mnemoPos >= 0 && mnemoPos < text.length() - 2) {
-      String mnemoChar = text.substring(mnemoPos + 1, mnemoPos + 2).trim();
-      if (mnemoChar.length() == 1) {
-        action.putValue(Action.MNEMONIC_KEY, Integer.valueOf((int)mnemoChar.charAt(0)));
-      }
-    }
+  public static void setActionNameAndMnemonic(@NotNull String text, @NotNull Action action) {
+    assignMnemonic(text, action);
 
     text = text.replaceAll("&", "");
     action.putValue(Action.NAME, text);
   }
+  public static void assignMnemonic(@NotNull String text, @NotNull Action action) {
+    int mnemoPos = text.indexOf('&');
+    if (mnemoPos >= 0 && mnemoPos < text.length() - 2) {
+      String mnemoChar = text.substring(mnemoPos + 1, mnemoPos + 2).trim();
+      if (mnemoChar.length() == 1) {
+        action.putValue(Action.MNEMONIC_KEY, Integer.valueOf(mnemoChar.charAt(0)));
+      }
+    }
+  }
+
 
   public static Font getLabelFont(@NotNull FontSize size) {
     return getFont(size, null);
@@ -2657,7 +2673,7 @@ public class UIUtil {
     }
   }
 
-  private static final Color DECORATED_ROW_BG_COLOR = new JBColor(new Color(242, 245, 249), new Color(79, 83, 84));
+  private static final Color DECORATED_ROW_BG_COLOR = new JBColor(new Color(242, 245, 249), new Color(65, 69, 71));
 
   public static Color getDecoratedRowColor() {
     return DECORATED_ROW_BG_COLOR;

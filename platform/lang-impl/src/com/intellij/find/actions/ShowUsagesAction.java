@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import com.intellij.codeInsight.hint.HintManager;
 import com.intellij.codeInsight.hint.HintUtil;
 import com.intellij.featureStatistics.FeatureUsageTracker;
 import com.intellij.find.FindManager;
+import com.intellij.find.FindSettings;
 import com.intellij.find.findUsages.*;
 import com.intellij.find.impl.FindManagerImpl;
 import com.intellij.icons.AllIcons;
@@ -47,7 +48,6 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.wm.IdeFocusManager;
 import com.intellij.psi.PsiDocumentManager;
 import com.intellij.psi.PsiElement;
-import com.intellij.psi.SmartPsiElementPointer;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.search.ProjectScope;
 import com.intellij.psi.search.PsiElementProcessor;
@@ -66,6 +66,7 @@ import com.intellij.util.messages.MessageBusConnection;
 import com.intellij.util.ui.AsyncProcessIcon;
 import com.intellij.util.ui.ColumnInfo;
 import com.intellij.util.ui.ListTableModel;
+import com.intellij.xml.util.XmlStringUtil;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -231,8 +232,6 @@ public class ShowUsagesAction extends AnAction implements PopupAction {
 
     final List<Usage> usages = new ArrayList<Usage>();
     final Set<UsageNode> visibleNodes = new LinkedHashSet<UsageNode>();
-    UsageInfoToUsageConverter.TargetElementsDescriptor descriptor =
-      new UsageInfoToUsageConverter.TargetElementsDescriptor(handler.getPrimaryElements(), handler.getSecondaryElements());
 
     final MyTable table = new MyTable();
     final AsyncProcessIcon processIcon = new AsyncProcessIcon("xxx");
@@ -252,7 +251,7 @@ public class ShowUsagesAction extends AnAction implements PopupAction {
     SpeedSearchBase<JTable> speedSearch = new MySpeedSearch(table);
     speedSearch.setComparator(new SpeedSearchComparator(false));
 
-    final JBPopup popup = createUsagePopup(usages, descriptor, visibleNodes, handler, editor, popupPosition,
+    final JBPopup popup = createUsagePopup(usages, visibleNodes, handler, editor, popupPosition,
                                            maxUsages, usageView, options, table, presentation, processIcon, hadMoreSeparator);
 
     Disposer.register(popup, usageView);
@@ -332,7 +331,7 @@ public class ShowUsagesAction extends AnAction implements PopupAction {
       }
     };
 
-    final ProgressIndicator indicator = FindUsagesManager.startProcessUsages(handler, descriptor, collect, options, new Runnable() {
+    final ProgressIndicator indicator = FindUsagesManager.startProcessUsages(handler, handler.getPrimaryElements(), handler.getSecondaryElements(), collect, options, new Runnable() {
       @Override
       public void run() {
         ApplicationManager.getApplication().invokeLater(new Runnable() {
@@ -551,7 +550,6 @@ public class ShowUsagesAction extends AnAction implements PopupAction {
 
   @NotNull
   private JBPopup createUsagePopup(@NotNull final List<Usage> usages,
-                                   @NotNull final UsageInfoToUsageConverter.TargetElementsDescriptor descriptor,
                                    @NotNull Set<UsageNode> visibleNodes,
                                    @NotNull final FindUsagesHandler handler,
                                    final Editor editor,
@@ -638,7 +636,7 @@ public class ShowUsagesAction extends AnAction implements PopupAction {
       }
     };
     final DefaultActionGroup pinGroup = new DefaultActionGroup();
-    final ActiveComponent pin = createPinButton(descriptor, usageView, options, popup, pinGroup);
+    final ActiveComponent pin = createPinButton(handler, usageView, options, popup, pinGroup);
     builder.setCommandButton(new CompositeActiveComponent(spinningProgress, settingsButton, pin));
 
     DefaultActionGroup toolbar = new DefaultActionGroup();
@@ -671,9 +669,11 @@ public class ShowUsagesAction extends AnAction implements PopupAction {
     return popup[0];
   }
 
-  private ActiveComponent createPinButton(final UsageInfoToUsageConverter.TargetElementsDescriptor descriptor,
-                                          final UsageViewImpl usageView,
-                                          final FindUsagesOptions options, final JBPopup[] popup, DefaultActionGroup pinGroup) {
+  private ActiveComponent createPinButton(@NotNull final FindUsagesHandler handler,
+                                          @NotNull final UsageViewImpl usageView,
+                                          @NotNull final FindUsagesOptions options,
+                                          @NotNull final JBPopup[] popup,
+                                          @NotNull DefaultActionGroup pinGroup) {
     final AnAction pinAction =
       new AnAction("Open Find Usages Toolwindow", "Show all usages in a separate toolwindow", AllIcons.General.AutohideOff) {
         {
@@ -686,12 +686,8 @@ public class ShowUsagesAction extends AnAction implements PopupAction {
           hideHints();
           popup[0].cancel();
           FindUsagesManager findUsagesManager = ((FindManagerImpl)FindManager.getInstance(usageView.getProject())).getFindUsagesManager();
-          FindUsagesManager.SearchData data = new FindUsagesManager.SearchData();
-          data.myOptions = options;
-          List<SmartPsiElementPointer<PsiElement>> plist = descriptor.getAllElementPointers();
-
-          data.myElements = plist.toArray(new SmartPsiElementPointer[plist.size()]);
-          findUsagesManager.rerunAndRecallFromHistory(data);
+          findUsagesManager.findUsages(handler.getPrimaryElements(), handler.getSecondaryElements(), handler, options,
+                                       FindSettings.getInstance().isSkipResultsWithOneUsage());
         }
       };
     pinGroup.add(pinAction);
@@ -736,7 +732,7 @@ public class ShowUsagesAction extends AnAction implements PopupAction {
     if (title != null) {
         text += "<br><small>Press " + title + "</small>";
     }
-    return "<html><body>" + text + "</body></html>";
+    return XmlStringUtil.wrapInHtml(text);
   }
 
   @Nullable

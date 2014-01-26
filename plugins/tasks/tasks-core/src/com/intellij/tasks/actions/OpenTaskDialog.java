@@ -107,7 +107,9 @@ public class OpenTaskDialog extends DialogWrapper {
       myCreateChangelist.setSelected(manager.getState().createChangelist);
       myCreateBranch.setSelected(manager.getState().createBranch);
 
-      if (vcs.getType() != VcsType.distributed) {
+      // In git 'master' branch appears (in .git/refs/heads/master) only after at least one commit was made in it.
+      // Before that feature branches can't be created normally.
+      if (vcs.getType() != VcsType.distributed || !branchesExist(project)) {
         myCreateBranch.setSelected(false);
         myCreateBranch.setVisible(false);
         myBranchName.setVisible(false);
@@ -162,6 +164,15 @@ public class OpenTaskDialog extends DialogWrapper {
     init();
   }
 
+  private static boolean branchesExist(Project project) {
+    for (VcsTaskHandler handler : VcsTaskHandler.getAllHandlers(project)) {
+      if (handler.getCurrentTasks().length != 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   private void updateFields() {
     myBranchName.setEnabled(myCreateBranch.isSelected());
     myChangelistName.setEnabled(myCreateChangelist.isSelected());
@@ -187,7 +198,7 @@ public class OpenTaskDialog extends DialogWrapper {
         repository.setTaskState(myTask, TaskState.IN_PROGRESS);
       }
       catch (Exception ex) {
-        Messages.showErrorDialog(myProject, "Could not set state for " + myTask.getId(), "Error");
+        Messages.showErrorDialog(myProject, ex.getMessage(), "Cannot Set State For Issue");
         LOG.warn(ex);
       }
     }

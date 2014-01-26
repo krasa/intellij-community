@@ -34,6 +34,7 @@ import com.intellij.openapi.vfs.newvfs.impl.VirtualFileSystemEntry;
 import com.intellij.util.*;
 import com.intellij.util.containers.ConcurrentIntObjectMap;
 import com.intellij.util.containers.ContainerUtil;
+import com.intellij.util.containers.EmptyIntHashSet;
 import com.intellij.util.containers.StripedLockIntObjectConcurrentHashMap;
 import com.intellij.util.io.ReplicatorInputStream;
 import com.intellij.util.io.URLUtil;
@@ -361,7 +362,10 @@ public class PersistentFSImpl extends PersistentFS implements ApplicationCompone
   @Override
   public void setWritable(@NotNull final VirtualFile file, final boolean writableFlag) throws IOException {
     getDelegate(file).setWritable(file, writableFlag);
-    processEvent(new VFilePropertyChangeEvent(this, file, VirtualFile.PROP_WRITABLE, isWritable(file), writableFlag, false));
+    boolean oldWritable = isWritable(file);
+    if (oldWritable != writableFlag) {
+      processEvent(new VFilePropertyChangeEvent(this, file, VirtualFile.PROP_WRITABLE, oldWritable, writableFlag, false));
+    }
   }
 
   @Override
@@ -456,9 +460,12 @@ public class PersistentFSImpl extends PersistentFS implements ApplicationCompone
   }
 
   @Override
-  public void renameFile(final Object requestor, @NotNull final VirtualFile file, @NotNull final String newName) throws IOException {
+  public void renameFile(final Object requestor, @NotNull VirtualFile file, @NotNull String newName) throws IOException {
     getDelegate(file).renameFile(requestor, file, newName);
-    processEvent(new VFilePropertyChangeEvent(requestor, file, VirtualFile.PROP_NAME, file.getName(), newName, false));
+    String oldName = file.getName();
+    if (!newName.equals(oldName)) {
+      processEvent(new VFilePropertyChangeEvent(requestor, file, VirtualFile.PROP_NAME, oldName, newName, false));
+    }
   }
 
   @Override
@@ -695,28 +702,34 @@ public class PersistentFSImpl extends PersistentFS implements ApplicationCompone
       }
     }
 
-    ContainerUtil.quickSort(deletionEvents, DEPTH_COMPARATOR);
+    final TIntHashSet invalidIDs;
+    if (deletionEvents.isEmpty()) {
+      invalidIDs = EmptyIntHashSet.INSTANCE;
+    }
+    else {
+      ContainerUtil.quickSort(deletionEvents, DEPTH_COMPARATOR);
 
-    final TIntHashSet invalidIDs = new TIntHashSet(deletionEvents.size());
-    final Set<VirtualFile> dirsToBeDeleted = new THashSet<VirtualFile>(deletionEvents.size());
-    nextEvent:
-    for (EventWrapper wrapper : deletionEvents) {
-      final VirtualFile candidate = wrapper.event.getFile();
-      VirtualFile parent = candidate;
-      while (parent != null) {
-        if (dirsToBeDeleted.contains(parent)) {
-          invalidIDs.add(wrapper.id);
-          continue nextEvent;
+      invalidIDs = new TIntHashSet(deletionEvents.size());
+      final Set<VirtualFile> dirsToBeDeleted = new THashSet<VirtualFile>(deletionEvents.size());
+      nextEvent:
+      for (EventWrapper wrapper : deletionEvents) {
+        final VirtualFile candidate = wrapper.event.getFile();
+        VirtualFile parent = candidate;
+        while (parent != null) {
+          if (dirsToBeDeleted.contains(parent)) {
+            invalidIDs.add(wrapper.id);
+            continue nextEvent;
+          }
+          parent = parent.getParent();
         }
-        parent = parent.getParent();
-      }
 
-      if (candidate.isDirectory()) {
-        dirsToBeDeleted.add(candidate);
+        if (candidate.isDirectory()) {
+          dirsToBeDeleted.add(candidate);
+        }
       }
     }
 
-    final List<VFileEvent> filtered = ContainerUtil.newArrayListWithCapacity(events.size() - invalidIDs.size());
+    final List<VFileEvent> filtered = new ArrayList<VFileEvent>(events.size() - invalidIDs.size());
     for (int i = 0, size = events.size(); i < size; i++) {
       final VFileEvent event = events.get(i);
       if (event.isValid() && !(event instanceof VFileDeleteEvent && invalidIDs.contains(i))) {
@@ -845,60 +858,58 @@ public class PersistentFSImpl extends PersistentFS implements ApplicationCompone
     }
 
     String rootUrl = normalizeRootUrl(basePath, fs);
-    VirtualFileSystemEntry root;
 
     myRootsLock.readLock().lock();
     try {
-      root = myRoots.get(rootUrl);
+      VirtualFileSystemEntry root = myRoots.get(rootUrl);
       if (root != null) return root;
     }
     finally {
       myRootsLock.readLock().unlock();
     }
 
+    VirtualFileSystemEntry newRoot;
+    int rootId = FSRecords.findRootRecord(rootUrl);
+
+    if (fs instanceof JarFileSystem) {
+      // optimization: for jar roots do not store base path in the myName field, use local FS file's getPath()
+      String parentPath = basePath.substring(0, basePath.indexOf(JarFileSystem.JAR_SEPARATOR));
+      VirtualFile parentFile = LocalFileSystem.getInstance().findFileByPath(parentPath);
+      if (parentFile == null) return null;
+      newRoot = new JarRoot(fs, rootId, parentFile);
+    }
+    else {
+      newRoot = new FsRoot(fs, rootId, basePath);
+    }
+
+    FileAttributes attributes = fs.getAttributes(newRoot);
+    if (attributes == null || !attributes.isDirectory()) {
+      return null;
+    }
+
+    boolean mark = false;
+
     myRootsLock.writeLock().lock();
     try {
-      root = myRoots.get(rootUrl);
+      VirtualFileSystemEntry root = myRoots.get(rootUrl);
       if (root != null) return root;
 
-      int rootId = FSRecords.findRootRecord(rootUrl);
+      mark = writeAttributesToRecord(rootId, 0, newRoot, fs, attributes);
 
-      if (fs instanceof JarFileSystem) {
-        // optimization: for jar roots do not store base path in the myName field, use local FS file's getPath()
-        String parentPath = basePath.substring(0, basePath.indexOf(JarFileSystem.JAR_SEPARATOR));
-        VirtualFile parentLocalFile = LocalFileSystem.getInstance().findFileByPath(parentPath);
-        if (parentLocalFile == null) return null;
-
-        // check one more time since the findFileByPath could have created the root (by reentering the findRoot)
-        root = myRoots.get(rootUrl);
-        if (root != null) return root;
-
-        root = new JarRoot(fs, rootId, parentLocalFile);
-      }
-      else {
-        root = new FsRoot(fs, rootId, basePath);
-      }
-
-      FileAttributes attributes = fs.getAttributes(root);
-      if (attributes == null || !attributes.isDirectory()) {
-        return null;
-      }
-
-      boolean newRoot = writeAttributesToRecord(rootId, 0, root, fs, attributes);
-      if (!newRoot && attributes.lastModified != FSRecords.getTimestamp(rootId)) {
-        root.markDirtyRecursively();
-      }
-
-      myRoots.put(rootUrl, root);
-      myRootsById.put(rootId, root);
-
-      LOG.assertTrue(rootId == root.getId(), "root=" + root + " expected=" + rootId + " actual=" + root.getId());
-
-      return root;
+      myRoots.put(rootUrl, newRoot);
+      myRootsById.put(rootId, newRoot);
     }
     finally {
       myRootsLock.writeLock().unlock();
     }
+
+    if (!mark && attributes.lastModified != FSRecords.getTimestamp(rootId)) {
+      newRoot.markDirtyRecursively();
+    }
+
+    LOG.assertTrue(rootId == newRoot.getId(), "root=" + newRoot + " expected=" + rootId + " actual=" + newRoot.getId());
+
+    return newRoot;
   }
 
   @NotNull

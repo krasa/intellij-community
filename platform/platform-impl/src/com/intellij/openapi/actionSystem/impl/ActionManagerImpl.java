@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -129,6 +129,7 @@ public final class ActionManagerImpl extends ActionManagerEx implements Applicat
   @NonNls public static final String ACTIONS_BUNDLE = "messages.ActionsBundle";
   @NonNls public static final String USE_SHORTCUT_OF_ATTR_NAME = "use-shortcut-of";
   @NonNls public static final String OVERRIDES_ATTR_NAME = "overrides";
+  @NonNls public static final String KEEP_CONTENT_ATTR_NAME = "keep-content";
 
   private final List<ActionPopupMenuImpl> myPopups = new ArrayList<ActionPopupMenuImpl>();
 
@@ -203,12 +204,12 @@ public final class ActionManagerImpl extends ActionManagerEx implements Applicat
   }
 
   @Override
-  public ActionToolbar createActionToolbar(final String place, final ActionGroup group, final boolean horizontal) {
+  public ActionToolbar createActionToolbar(final String place, @NotNull final ActionGroup group, final boolean horizontal) {
     return createActionToolbar(place, group, horizontal, false);
   }
 
   @Override
-  public ActionToolbar createActionToolbar(final String place, final ActionGroup group, final boolean horizontal, final boolean decorateButtons) {
+  public ActionToolbar createActionToolbar(final String place, @NotNull final ActionGroup group, final boolean horizontal, final boolean decorateButtons) {
     return new ActionToolbarImpl(place, group, horizontal, decorateButtons, myDataManager, this, (KeymapManagerEx)myKeymapManager);
   }
 
@@ -338,7 +339,7 @@ public final class ActionManagerImpl extends ActionManagerEx implements Applicat
   }
 
   @Override
-  public JComponent createButtonToolbar(final String actionPlace, final ActionGroup messageActionGroup) {
+  public JComponent createButtonToolbar(final String actionPlace, @NotNull final ActionGroup messageActionGroup) {
     return new ButtonToolbarImpl(actionPlace, messageActionGroup, myDataManager, this);
   }
 
@@ -424,11 +425,16 @@ public final class ActionManagerImpl extends ActionManagerEx implements Applicat
 
   private void registerOrReplaceActionInner(@NotNull Element element, @NotNull String id, @NotNull AnAction action, @Nullable PluginId pluginId) {
     synchronized (myLock) {
-      if (Boolean.valueOf(element.getAttributeValue(OVERRIDES_ATTR_NAME)).booleanValue()) {
+      if (Boolean.valueOf(element.getAttributeValue(OVERRIDES_ATTR_NAME))) {
         if (getActionOrStub(id) == null) {
           throw new RuntimeException(element.getName() + " '" + id + "' doesn't override anything");
         }
-        replaceAction(id, action, pluginId);
+        AnAction prev = replaceAction(id, action, pluginId);
+        if (action instanceof DefaultActionGroup && prev instanceof DefaultActionGroup) {
+          if (Boolean.valueOf(element.getAttributeValue(KEEP_CONTENT_ATTR_NAME))) {
+            ((DefaultActionGroup)action).copyFromGroup((DefaultActionGroup)prev);
+          }
+        }
       }
       else {
         registerAction(id, action, pluginId);
@@ -1030,6 +1036,7 @@ public final class ActionManagerImpl extends ActionManagerEx implements Applicat
     };
   }
 
+  @NotNull
   @Override
   public String[] getPluginActions(PluginId pluginName) {
     if (myPlugin2Id.containsKey(pluginName)){

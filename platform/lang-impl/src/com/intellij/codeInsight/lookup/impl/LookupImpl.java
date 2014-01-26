@@ -653,7 +653,13 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable 
     ApplicationManager.getApplication().runWriteAction(MultiEditAction.wrapRunnable(new Runnable() {
       @Override
       public void run() {
-        insertLookupString(item, getPrefixLength(item));
+        myEditor.getDocument().startGuardedBlockChecking();
+        try {
+          insertLookupString(item, getPrefixLength(item));
+        }
+        finally {
+          myEditor.getDocument().stopGuardedBlockChecking();
+        }
       }
     }, myEditor, null));
 
@@ -767,12 +773,14 @@ public class LookupImpl extends LightweightHint implements LookupEx, Disposable 
     checkValid();
     assert !myChangeGuard : "already in change";
 
+    myEditor.getDocument().startGuardedBlockChecking();
     myChangeGuard = true;
     boolean result;
     try {
       result = myOffsets.performGuardedChange(change, debug);
     }
     finally {
+      myEditor.getDocument().stopGuardedBlockChecking();
       myChangeGuard = false;
     }
     if (!result || myDisposed) {

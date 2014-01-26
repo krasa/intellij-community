@@ -97,6 +97,11 @@ public class MavenModuleBuilder extends ModuleBuilder implements SourcePathsBuil
   }
 
   @Override
+  public String getParentGroup() {
+    return getModuleTypeName();
+  }
+
+  @Override
   public String getDescription() {
     return "Maven modules are used for developing <b>JVM-based</b> applications with dependencies managed by <b>Maven</b>. " +
            "You can create either a blank Maven module or a module based on a <b>Maven archetype</b>.";
@@ -127,17 +132,6 @@ public class MavenModuleBuilder extends ModuleBuilder implements SourcePathsBuil
       new MavenModuleWizardStep(this, wizardContext, !wizardContext.isNewWizard()),
       new SelectPropertiesStep(wizardContext.getProject(), this)
     };
-  }
-
-  public MavenProject findPotentialParentProject(Project project) {
-    if (!MavenProjectsManager.getInstance(project).isMavenizedProject()) return null;
-
-    File parentDir = new File(getContentEntryPath()).getParentFile();
-    if (parentDir == null) return null;
-    VirtualFile parentPom = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(new File(parentDir, "pom.xml"));
-    if (parentPom == null) return null;
-
-    return MavenProjectsManager.getInstance(project).findProject(parentPom);
   }
 
   private VirtualFile createAndGetContentEntry() {

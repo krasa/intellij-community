@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -122,7 +122,7 @@ public class AppUIUtil {
     if ("true".equals(System.getProperty("idea.debug.mode"))) {
       wmClass += "-debug";
     }
-    return PlatformUtils.isCommunity() ? wmClass + "-ce" : wmClass;
+    return PlatformUtils.isIdeaCommunity() ? wmClass + "-ce" : wmClass;
   }
 
   public static void registerBundledFonts() {
@@ -166,10 +166,12 @@ public class AppUIUtil {
     });
   }
 
+  @Deprecated
+  /**
+   * to remove in IDEA 14
+   */
   public static JTextField createUndoableTextField() {
-    JTextField field = new JTextField();
-    new TextComponentUndoProvider(field);
-    return field;
+    return GuiUtils.createUndoableTextField();
   }
 
   private static final int MIN_ICON_SIZE = 32;

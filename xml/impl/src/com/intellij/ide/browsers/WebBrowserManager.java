@@ -17,6 +17,8 @@ package com.intellij.ide.browsers;
 
 import com.intellij.openapi.components.*;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.util.JDOMUtil;
+import com.intellij.openapi.util.ModificationTracker;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.util.SmartList;
 import com.intellij.util.xmlb.SkipDefaultValuesSerializationFilters;
@@ -32,8 +34,8 @@ import java.util.UUID;
 
 import static com.intellij.ide.browsers.BrowsersConfiguration.BrowserFamily;
 
-@State(name = "WebBrowsersConfiguration", storages = {@Storage(file = StoragePathMacros.APP_CONFIG + "/browsers.xml")})
-public class WebBrowserManager implements PersistentStateComponent<Element> {
+@State(name = "WebBrowsersConfiguration", storages = {@Storage(file = StoragePathMacros.APP_CONFIG + "/web-browsers.xml")})
+public class WebBrowserManager implements PersistentStateComponent<Element>, ModificationTracker {
   private static final Logger LOG = Logger.getInstance(WebBrowserManager.class);
 
   // default standard browser ID must be constant across all IDE versions on all machines for all users
@@ -43,7 +45,11 @@ public class WebBrowserManager implements PersistentStateComponent<Element> {
   private static final UUID DEFAULT_OPERA_ID = UUID.fromString("53E2F627-B1A7-4DFA-BFA7-5B83CC034776");
   private static final UUID DEFAULT_EXPLORER_ID = UUID.fromString("16BF23D4-93E0-4FFC-BFD6-CB13575177B0");
 
-  private final List<ConfigurableWebBrowser> browsers;
+  private List<ConfigurableWebBrowser> browsers;
+
+  private long modificationCount;
+
+  DefaultBrowser defaultBrowser = DefaultBrowser.SYSTEM;
 
   public WebBrowserManager() {
     browsers = new ArrayList<ConfigurableWebBrowser>();
@@ -58,17 +64,41 @@ public class WebBrowserManager implements PersistentStateComponent<Element> {
     return ServiceManager.getService(WebBrowserManager.class);
   }
 
+  boolean isPredefinedBrowser(@NotNull ConfigurableWebBrowser browser) {
+    UUID id = browser.getId();
+    return id.equals(DEFAULT_CHROME_ID) ||
+           id.equals(DEFAULT_FIREFOX_ID) ||
+           id.equals(DEFAULT_SAFARI_ID) ||
+           id.equals(DEFAULT_OPERA_ID) ||
+           id.equals(DEFAULT_EXPLORER_ID);
+  }
+
+  public enum DefaultBrowser {
+    SYSTEM, FIRST, ALTERNATIVE
+  }
+
+  public DefaultBrowser getDefaultBrowser() {
+    return defaultBrowser;
+  }
+
   @Override
   public Element getState() {
     Element state = new Element("state");
+    if (defaultBrowser != DefaultBrowser.SYSTEM) {
+      state.setAttribute("default", defaultBrowser.name().toLowerCase());
+    }
+
     for (ConfigurableWebBrowser browser : browsers) {
       Element entry = new Element("browser");
       entry.setAttribute("id", browser.getId().toString());
       entry.setAttribute("name", browser.getName());
       entry.setAttribute("family", browser.getFamily().name());
-      if (!StringUtil.isEmpty(browser.getPath())) {
-        entry.setAttribute("path", browser.getPath());
+
+      String path = browser.getPath();
+      if (path != null && !path.equals(browser.getFamily().getExecutionPath())) {
+        entry.setAttribute("path", path);
       }
+
       if (!browser.isActive()) {
         entry.setAttribute("active", "false");
       }
@@ -77,7 +107,7 @@ public class WebBrowserManager implements PersistentStateComponent<Element> {
       if (specificSettings != null) {
         Element settingsElement = new Element("settings");
         XmlSerializer.serializeInto(specificSettings, settingsElement, new SkipDefaultValuesSerializationFilters());
-        if (!settingsElement.getContent().isEmpty()) {
+        if (!JDOMUtil.isEmpty(settingsElement)) {
           entry.addContent(settingsElement);
         }
       }
@@ -150,6 +180,16 @@ public class WebBrowserManager implements PersistentStateComponent<Element> {
 
   @Override
   public void loadState(Element element) {
+    String defaultValue = element.getAttributeValue("default");
+    if (!StringUtil.isEmpty(defaultValue)) {
+      try {
+        defaultBrowser = DefaultBrowser.valueOf(defaultValue.toUpperCase());
+      }
+      catch (IllegalArgumentException e) {
+        LOG.warn(e);
+      }
+    }
+
     List<ConfigurableWebBrowser> list = new ArrayList<ConfigurableWebBrowser>();
     for (Element child : element.getChildren("browser")) {
       BrowserFamily family = readFamily(child.getAttributeValue("family"));
@@ -163,8 +203,8 @@ public class WebBrowserManager implements PersistentStateComponent<Element> {
       }
 
       Element settingsElement = child.getChild("settings");
-      BrowserSpecificSettings specificSettings = settingsElement == null ? null : family.createBrowserSpecificSettings();
-      if (specificSettings != null) {
+      BrowserSpecificSettings specificSettings = family.createBrowserSpecificSettings();
+      if (specificSettings != null && settingsElement != null) {
         try {
           XmlSerializer.deserializeInto(specificSettings, settingsElement);
         }
@@ -174,16 +214,21 @@ public class WebBrowserManager implements PersistentStateComponent<Element> {
       }
 
       String activeValue = child.getAttributeValue("active");
+
+      String path = StringUtil.nullize(child.getAttributeValue("path"), true);
+      if (path == null) {
+        path = family.getExecutionPath();
+      }
+
       list.add(new ConfigurableWebBrowser(id,
                                           family,
                                           StringUtil.notNullize(child.getAttributeValue("name"), family.getName()),
-                                          StringUtil.nullize(child.getAttributeValue("path"), true),
+                                          path,
                                           activeValue == null || Boolean.parseBoolean(activeValue),
                                           specificSettings));
     }
 
-    browsers.clear();
-    browsers.addAll(list);
+    setList(list);
   }
 
   @NotNull
@@ -194,6 +239,11 @@ public class WebBrowserManager implements PersistentStateComponent<Element> {
   @NotNull
   List<ConfigurableWebBrowser> getList() {
     return browsers;
+  }
+
+  void setList(@NotNull List<ConfigurableWebBrowser> value) {
+    browsers = value;
+    modificationCount++;
   }
 
   @NotNull
@@ -217,18 +267,29 @@ public class WebBrowserManager implements PersistentStateComponent<Element> {
   }
 
   @Nullable
+  private static UUID parseUuid(@NotNull String id) {
+    if (id.indexOf('-') == -1) {
+      return null;
+    }
+
+    try {
+      return UUID.fromString(id);
+    }
+    catch (IllegalArgumentException ignored) {
+      return null;
+    }
+  }
+
+  @Nullable
   public WebBrowser findBrowserById(@Nullable String idOrName) {
     if (StringUtil.isEmpty(idOrName)) {
       return null;
     }
 
-    UUID id;
-    try {
-      id = UUID.fromString(idOrName);
-    }
-    catch (IllegalArgumentException ignored) {
+    UUID id = parseUuid(idOrName);
+    if (id == null) {
       for (ConfigurableWebBrowser browser : browsers) {
-        if (browser.getFamily().name().equals(idOrName) || browser.getFamily().getName().equals(idOrName)) {
+        if (browser.getFamily().name().equalsIgnoreCase(idOrName) || browser.getFamily().getName().equalsIgnoreCase(idOrName)) {
           return browser;
         }
       }
@@ -245,16 +306,28 @@ public class WebBrowserManager implements PersistentStateComponent<Element> {
 
   @NotNull
   public WebBrowser getBrowser(@NotNull BrowserFamily family) {
+    WebBrowser browser = findBrowser(family);
+    LOG.assertTrue(browser != null, "Must be at least one browser per family");
+    return browser;
+  }
+
+  @Nullable
+  public WebBrowser findBrowser(@NotNull BrowserFamily family) {
     for (ConfigurableWebBrowser browser : browsers) {
       if (family.equals(browser.getFamily())) {
         return browser;
       }
     }
 
-    throw new IllegalStateException("Must be at least one browser per family");
+    return null;
   }
 
   public boolean isActive(@NotNull WebBrowser browser) {
     return !(browser instanceof ConfigurableWebBrowser) || ((ConfigurableWebBrowser)browser).isActive();
+  }
+
+  @Override
+  public long getModificationCount() {
+    return modificationCount;
   }
 }

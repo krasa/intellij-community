@@ -458,7 +458,7 @@ public class PyUnresolvedReferencesInspection extends PyInspection {
         if (PyNames.COMPARISON_OPERATORS.contains(refname)) {
           return;
         }
-        if (refex.getQualifier() != null) {
+        if (refex.isQualified()) {
           final PyClassTypeImpl object_type = (PyClassTypeImpl)PyBuiltinCache.getInstance(node).getObjectType();
           if ((object_type != null) && object_type.getPossibleInstanceMembers().contains(refname)) return;
         }
@@ -476,7 +476,8 @@ public class PyUnresolvedReferencesInspection extends PyInspection {
           }
           addAddSelfFix(node, refex, actions);
           PyCallExpression callExpression = PsiTreeUtil.getParentOfType(element, PyCallExpression.class);
-          if (callExpression != null) {
+          if (callExpression != null && (!(callExpression.getCallee() instanceof PyQualifiedExpression) ||
+              ((PyQualifiedExpression)callExpression.getCallee()).getQualifier() == null)) {
             actions.add(new UnresolvedRefCreateFunctionQuickFix(callExpression, refex));
           }
           PyFunction parentFunction = PsiTreeUtil.getParentOfType(element, PyFunction.class);
@@ -695,7 +696,7 @@ public class PyUnresolvedReferencesInspection extends PyInspection {
         if (overridesGetAttr(cls, myTypeEvalContext)) {
           return true;
         }
-        if (cls.findProperty(name) != null) {
+        if (cls.findProperty(name, true) != null) {
           return true;
         }
         if (PyUtil.hasUnresolvedAncestors(cls, myTypeEvalContext)) {
@@ -984,6 +985,10 @@ public class PyUnresolvedReferencesInspection extends PyInspection {
             final PyImportElement importElement = (PyImportElement)unusedImport;
             final PsiElement element = importElement.resolve();
             if (element == null) {
+              if (importElement.getImportedQName() != null) {
+                //Mark import as unused even if it can't be resolved
+                result.add(importElement.getParent());
+              }
               continue;
             }
             if (dunderAll != null && dunderAll.contains(importElement.getVisibleName())) {
