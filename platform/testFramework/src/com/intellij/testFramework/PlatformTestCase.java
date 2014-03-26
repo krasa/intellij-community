@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2012 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -308,14 +308,14 @@ public abstract class PlatformTestCase extends UsefulTestCase implements DataPro
   protected static Module doCreateRealModuleIn(String moduleName, final Project project, final ModuleType moduleType) {
     final VirtualFile baseDir = project.getBaseDir();
     assertNotNull(baseDir);
-    final File moduleFile = new File(baseDir.getPath().replace('/', File.separatorChar),
-                                     moduleName + ModuleFileType.DOT_DEFAULT_EXTENSION);
+    final File moduleFile = new File(FileUtil.toSystemDependentName(baseDir.getPath()), moduleName + ModuleFileType.DOT_DEFAULT_EXTENSION);
     FileUtil.createIfDoesntExist(moduleFile);
     myFilesToDelete.add(moduleFile);
     return new WriteAction<Module>() {
       @Override
-      protected void run(Result<Module> result) throws Throwable {
-        final VirtualFile virtualFile = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(moduleFile);
+      protected void run(@NotNull Result<Module> result) throws Throwable {
+        VirtualFile virtualFile = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(moduleFile);
+        assertNotNull(virtualFile);
         Module module = ModuleManager.getInstance(project).newModule(virtualFile.getPath(), moduleType.getId());
         module.getModuleFile();
         result.setResult(module);
@@ -402,7 +402,8 @@ public abstract class PlatformTestCase extends UsefulTestCase implements DataPro
     }
 
     try {
-      checkForSettingsDamage();
+      CompositeException damage = checkForSettingsDamage();
+      result.add(damage);
     }
     catch (Throwable e) {
       result.add(e);
@@ -829,6 +830,7 @@ public abstract class PlatformTestCase extends UsefulTestCase implements DataPro
 
   private static void setPlatformPrefix(String prefix) {
     System.setProperty(PlatformUtils.PLATFORM_PREFIX_KEY, prefix);
+    ourPlatformPrefixInitialized = true;
   }
 
   @Retention(RetentionPolicy.RUNTIME)

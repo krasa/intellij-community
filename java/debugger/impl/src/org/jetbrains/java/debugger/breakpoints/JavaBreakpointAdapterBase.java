@@ -2,7 +2,6 @@ package org.jetbrains.java.debugger.breakpoints;
 
 import com.intellij.debugger.ui.breakpoints.LineBreakpoint;
 import com.intellij.openapi.editor.Document;
-import com.intellij.openapi.editor.markup.RangeHighlighter;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -34,10 +33,6 @@ public abstract class JavaBreakpointAdapterBase extends XBreakpointAdapter<XLine
   }
 
   protected void configureCreatedBreakpoint(LineBreakpoint oldBreakpoint, XLineBreakpoint<XBreakpointProperties> breakpoint) {
-    final RangeHighlighter highlighter = oldBreakpoint.getHighlighter();
-    if (highlighter != null) {
-      highlighter.dispose();
-    }
   }
 
   @Override
@@ -56,11 +51,11 @@ public abstract class JavaBreakpointAdapterBase extends XBreakpointAdapter<XLine
     LineBreakpoint oldBreakpoint = doCreateInstance(project, document, breakpoint);
     oldBreakpoint.setVisible(false);
     oldBreakpoint.updateUI();
-    oldBreakpoint.ENABLED = breakpoint.isEnabled();
+    oldBreakpoint.setEnabled(breakpoint.isEnabled());
     return oldBreakpoint;
   }
 
-  protected LineBreakpoint doCreateInstance(Project project, Document document, XLineBreakpoint<XBreakpointProperties> breakpoint) {
-    return LineBreakpoint.create(project, document, breakpoint.getLine());
+  protected LineBreakpoint doCreateInstance(Project project, Document document, XLineBreakpoint<XBreakpointProperties> xBreakpoint) {
+    return LineBreakpoint.create(project, xBreakpoint);
   }
 }

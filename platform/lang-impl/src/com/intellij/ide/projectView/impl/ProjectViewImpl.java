@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -153,7 +153,6 @@ public class ProjectViewImpl extends ProjectView implements PersistentStateCompo
   private final Collection<AbstractProjectViewPane> myUninitializedPanes = new THashSet<AbstractProjectViewPane>();
 
   static final DataKey<ProjectViewImpl> DATA_KEY = DataKey.create("com.intellij.ide.projectView.impl.ProjectViewImpl");
-  @Deprecated static final String PROJECT_VIEW_DATA_CONSTANT = DATA_KEY.getName();
 
   private DefaultActionGroup myActionGroup;
   private String mySavedPaneId = ProjectViewPane.ID;
@@ -189,7 +188,7 @@ public class ProjectViewImpl extends ProjectView implements PersistentStateCompo
   private final SplitterProportionsData splitterProportions = new SplitterProportionsDataImpl();
   private final MessageBusConnection myConnection;
   private final Map<String, Element> myUninitializedPaneState = new HashMap<String, Element>();
-  private final Map<String, SelectInTarget> mySelectInTargets = new HashMap<String, SelectInTarget>();
+  private final Map<String, SelectInTarget> mySelectInTargets = new LinkedHashMap<String, SelectInTarget>();
   private ContentManager myContentManager;
   private boolean myFoldersAlwaysOnTop = true;
 
@@ -569,7 +568,7 @@ public class ProjectViewImpl extends ProjectView implements PersistentStateCompo
     if (toolWindow != null) {
       myContentManager = toolWindow.getContentManager();
       if (!ApplicationManager.getApplication().isUnitTestMode()) {
-        toolWindow.setContentUiType(ToolWindowContentUiType.getInstance("combo"), null);
+        toolWindow.setContentUiType(ToolWindowContentUiType.COMBO, null);
         ((ToolWindowEx)toolWindow).setAdditionalGearActions(myActionGroup);
         toolWindow.getComponent().putClientProperty(ToolWindowContentUi.HIDE_ID_LABEL, "true");
       }
@@ -1404,10 +1403,6 @@ public class ProjectViewImpl extends ProjectView implements PersistentStateCompo
     }
     parentNode.addContent(navigatorElement);
 
-    // for compatibility with idea 5.1
-    @Deprecated @NonNls final String ATTRIBUTE_SPLITTER_PROPORTION = "splitterProportion";
-    navigatorElement.setAttribute(ATTRIBUTE_SPLITTER_PROPORTION, "0.5");
-
     Element panesElement = new Element(ELEMENT_PANES);
     writePaneState(panesElement);
     parentNode.addContent(panesElement);
@@ -1858,6 +1853,7 @@ public class ProjectViewImpl extends ProjectView implements PersistentStateCompo
     return mySelectInTargets.values();
   }
 
+  @NotNull
   @Override
   public ActionCallback getReady(@NotNull Object requestor) {
     AbstractProjectViewPane pane = myId2Pane.get(myCurrentViewSubId);

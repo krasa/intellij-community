@@ -112,6 +112,18 @@
   <action id="FindWordAtCaret">
     <keyboard-shortcut first-keystroke="control F3"/>
   </action>
+  <action id="SelectNextOccurrence">
+    <keyboard-shortcut first-keystroke="alt J"/>
+  </action>
+  <action id="UnselectPreviousOccurrence">
+    <keyboard-shortcut first-keystroke="alt shift J"/>
+  </action>
+  <action id="SelectAllOccurrences">
+    <keyboard-shortcut first-keystroke="control alt shift J"/>
+  </action>
+  <action id="EditorAddOrRemoveCaret">
+    <mouse-shortcut keystroke="alt shift button1"/>
+  </action>
   <action id="GotoDeclaration">
     <keyboard-shortcut first-keystroke="control B"/>
     <mouse-shortcut keystroke="ctrl button1"/>
@@ -924,7 +936,7 @@
     <keyboard-shortcut first-keystroke="alt shift A" />
   </action>
 
-  <action id="DatabaseView.PropertiesAction"><keyboard-shortcut first-keystroke="F4"/><keyboard-shortcut first-keystroke="ENTER"/></action>
+  <action id="DatabaseView.PropertiesAction" />
 
   <action id="Jdbc.OpenConsole"><keyboard-shortcut first-keystroke="control shift F10"/></action>
   <action id="Jpa.OpenConsole"><keyboard-shortcut first-keystroke="control shift F10"/></action>
@@ -949,8 +961,15 @@
   <action id="Jdbc.RunSqlScript"><keyboard-shortcut first-keystroke="control shift F10"/></action>
 
   <action id="Console.Execute"><keyboard-shortcut first-keystroke="ENTER"/></action>
+  <action id="Console.SplitLine">
+    <keyboard-shortcut first-keystroke="control ENTER"/>
+  </action>
   <action id ="Refactorings.QuickListPopupAction">
     <keyboard-shortcut first-keystroke="control alt shift T"/>
+  </action>
+
+  <action id="NewScratchFile">
+    <keyboard-shortcut first-keystroke="control alt shift INSERT"/>
   </action>
 </keymap>
 </component>

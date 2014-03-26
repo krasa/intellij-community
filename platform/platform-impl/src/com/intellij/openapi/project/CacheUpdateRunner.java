@@ -84,8 +84,6 @@ class CacheUpdateRunner {
           synchronized (processed) {
             processed.add(virtualFile);
             indicator.setFraction(processed.size() / total);
-            int percent = (int)(processed.size() * 100 / total);
-            indicator.setText("Indexing... " + percent + "%");
             if (ApplicationManager.getApplication().isInternal()) {
               indicator.setText2(virtualFile.getPresentableUrl());
             }
@@ -144,7 +142,7 @@ class CacheUpdateRunner {
     try {
       int threadsCount = Registry.intValue("caches.indexerThreadsCount");
       if (threadsCount <= 0) {
-        threadsCount = Math.min(PROC_COUNT, 4);
+        threadsCount = Math.max(1, Math.min(PROC_COUNT - 1, 4));
       }
       if (threadsCount == 1) {
         Runnable process = new MyRunnable(innerIndicator, queue, isFinished, progressUpdater, processInReadAction);

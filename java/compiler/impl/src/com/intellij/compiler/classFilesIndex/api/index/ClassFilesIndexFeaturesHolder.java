@@ -79,16 +79,15 @@ public class ClassFilesIndexFeaturesHolder extends AbstractProjectComponent {
     return state == FeatureState.AVAILABLE;
   }
 
-  public synchronized void visitEnabledConfigures(final Processor<ClassFilesIndexConfigure> availableConfiguresVisitor,
-                                                  final Processor<ClassFilesIndexConfigure> notAvailableConfiguresVisitor) {
+  public synchronized void visitConfigures(final ConfigureVisitor visitor) {
     for (final ClassFilesIndexConfigure configure : myEnabledIndexReaders.keySet()) {
-      availableConfiguresVisitor.process(configure);
+      visitor.visit(configure, true);
     }
     for (final ClassFilesIndexFeature feature : ClassFilesIndexFeature.values()) {
       if (feature.isEnabled() && !myEnabledFeatures.containsKey(feature)) {
-        for (final MethodsUsageIndexConfigure configure : feature.getRequiredIndicesConfigures()) {
+        for (final ClassFilesIndexConfigure configure : feature.getRequiredIndicesConfigures()) {
           if (!myEnabledIndexReaders.containsKey(configure)) {
-            notAvailableConfiguresVisitor.process(configure);
+            visitor.visit(configure, false);
           }
         }
       }
@@ -96,7 +95,7 @@ public class ClassFilesIndexFeaturesHolder extends AbstractProjectComponent {
   }
 
   private synchronized void disposeFeature(final ClassFilesIndexFeature featureToRemove) {
-    for (final MethodsUsageIndexConfigure requiredConfigure : featureToRemove.getRequiredIndicesConfigures()) {
+    for (final ClassFilesIndexConfigure requiredConfigure : featureToRemove.getRequiredIndicesConfigures()) {
       boolean needClose = true;
       for (final ClassFilesIndexFeature enabledFeature : myEnabledFeatures.keySet()) {
         if (!enabledFeature.equals(featureToRemove) && enabledFeature.getRequiredIndicesConfigures().contains(requiredConfigure)) {
@@ -116,10 +115,10 @@ public class ClassFilesIndexFeaturesHolder extends AbstractProjectComponent {
     if (myEnabledFeatures.containsKey(feature)) {
       throw new IllegalStateException(String.format("feature %s already contains", feature.getKey()));
     }
-    final Map<MethodsUsageIndexConfigure, ClassFilesIndexReaderBase> newIndices =
-      new HashMap<MethodsUsageIndexConfigure, ClassFilesIndexReaderBase>();
+    final Map<ClassFilesIndexConfigure, ClassFilesIndexReaderBase> newIndices =
+      new HashMap<ClassFilesIndexConfigure, ClassFilesIndexReaderBase>();
     FeatureState newFeatureState = FeatureState.AVAILABLE;
-    for (final MethodsUsageIndexConfigure requiredConfigure : feature.getRequiredIndicesConfigures()) {
+    for (final ClassFilesIndexConfigure requiredConfigure : feature.getRequiredIndicesConfigures()) {
       boolean isIndexAlreadyLoaded = false;
       for (final ClassFilesIndexFeature enabledFeature : myEnabledFeatures.keySet()) {
         if (enabledFeature.getRequiredIndicesConfigures().contains(requiredConfigure)) {

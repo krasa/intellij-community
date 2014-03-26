@@ -34,7 +34,6 @@ import com.intellij.icons.AllIcons;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
-import com.intellij.openapi.editor.markup.RangeHighlighter;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ProjectFileIndex;
@@ -49,12 +48,12 @@ import com.intellij.psi.jsp.JspFile;
 import com.intellij.psi.search.EverythingGlobalScope;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.util.PsiTreeUtil;
-import com.intellij.ui.classFilter.ClassFilter;
 import com.intellij.util.Function;
 import com.intellij.util.Processor;
 import com.intellij.util.StringBuilderSpinAllocator;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.xdebugger.XDebuggerUtil;
+import com.intellij.xdebugger.breakpoints.XBreakpoint;
 import com.sun.jdi.*;
 import com.sun.jdi.event.LocatableEvent;
 import com.sun.jdi.request.BreakpointRequest;
@@ -75,12 +74,8 @@ public class LineBreakpoint extends BreakpointWithHighlighter {
   private String myOwnerMethodName;
   public static final @NonNls Key<LineBreakpoint> CATEGORY = BreakpointCategory.lookup("line_breakpoints");
 
-  protected LineBreakpoint(Project project) {
-    super(project);
-  }
-
-  public LineBreakpoint(Project project, RangeHighlighter highlighter) {
-    super(project, highlighter);
+  protected LineBreakpoint(Project project, XBreakpoint xBreakpoint) {
+    super(project, xBreakpoint);
   }
 
   @Override
@@ -96,7 +91,7 @@ public class LineBreakpoint extends BreakpointWithHighlighter {
 
   @Override
   protected Icon getSetIcon(boolean isMuted) {
-    if (REMOVE_AFTER_HIT) {
+    if (isRemoveAfterHit()) {
       return isMuted ? AllIcons.Debugger.Db_muted_temporary_breakpoint : AllIcons.Debugger.Db_temporary_breakpoint;
     }
     return isMuted? AllIcons.Debugger.Db_muted_breakpoint : AllIcons.Debugger.Db_set_breakpoint;
@@ -109,7 +104,7 @@ public class LineBreakpoint extends BreakpointWithHighlighter {
 
   @Override
   protected Icon getVerifiedIcon(boolean isMuted) {
-    if (REMOVE_AFTER_HIT) {
+    if (isRemoveAfterHit()) {
       return isMuted ? AllIcons.Debugger.Db_muted_temporary_breakpoint : AllIcons.Debugger.Db_temporary_breakpoint;
     }
     return isMuted? AllIcons.Debugger.Db_muted_verified_breakpoint : AllIcons.Debugger.Db_verified_breakpoint;
@@ -128,16 +123,11 @@ public class LineBreakpoint extends BreakpointWithHighlighter {
   @Override
   protected void reload(PsiFile file) {
     super.reload(file);
-    int offset;
     final SourcePosition position = getSourcePosition();
     if (position != null) {
-      offset = position.getOffset();
+      int offset = position.getOffset();
+      myOwnerMethodName = findOwnerMethod(file, offset);
     }
-    else {
-      final RangeHighlighter highlighter = getHighlighter();
-      offset = highlighter != null? highlighter.getStartOffset() : -1;
-    }
-    myOwnerMethodName = findOwnerMethod(file, offset);
   }
 
   @Override
@@ -320,38 +310,19 @@ public class LineBreakpoint extends BreakpointWithHighlighter {
   }
 
   @Override
-  public boolean evaluateCondition(EvaluationContextImpl context, LocatableEvent event) throws EvaluateException {
-    if(CLASS_FILTERS_ENABLED){
-      String className = null;
-      final ObjectReference thisObject = (ObjectReference)context.getThisObject();
-      if(thisObject != null) {
-        className = thisObject.referenceType().name();
-      }
-      else {
-        final StackFrameProxyImpl frame = context.getFrameProxy();
-        if (frame != null) {
-          className = frame.location().declaringType().name();
-        }
-      }
-      if (className != null) {
-        boolean matches = false;
-        for (ClassFilter classFilter : getClassFilters()) {
-          if (classFilter.isEnabled() && classFilter.matches(className)) {
-            matches = true;
-            break;
-          }
-        }
-        if(!matches) {
-          return false;
-        }
-        for (ClassFilter classFilter : getClassExclusionFilters()) {
-          if (classFilter.isEnabled() && classFilter.matches(className)) {
-            return false;
-          }
-        }
+  protected String calculateEventClass(EvaluationContextImpl context, LocatableEvent event) throws EvaluateException {
+    String className = null;
+    final ObjectReference thisObject = (ObjectReference)context.getThisObject();
+    if (thisObject != null) {
+      className = thisObject.referenceType().name();
+    }
+    else {
+      final StackFrameProxyImpl frame = context.getFrameProxy();
+      if (frame != null) {
+        className = frame.location().declaringType().name();
       }
     }
-    return super.evaluateCondition(context, event);
+    return className;
   }
 
   public String toString() {
@@ -369,9 +340,8 @@ public class LineBreakpoint extends BreakpointWithHighlighter {
   }
 
   private String getDisplayInfoInternal(boolean showPackageInfo, int totalTextLength) {
-    final RangeHighlighter highlighter = getHighlighter();
-    if(highlighter != null && highlighter.isValid() && isValid()) {
-      final int lineNumber = (highlighter.getDocument().getLineNumber(highlighter.getStartOffset()) + 1);
+    if(isValid()) {
+      final int lineNumber = getSourcePosition().getLine() + 1;
       String className = getClassName();
       final boolean hasClassInfo = className != null && className.length() > 0;
       final String methodName = getMethodName();
@@ -491,24 +461,19 @@ public class LineBreakpoint extends BreakpointWithHighlighter {
     return ContextUtil.getContextElement(getSourcePosition());
   }
 
-  public static LineBreakpoint create(@NotNull Project project, @NotNull Document document, int lineIndex) {
-    final RangeHighlighter highlighter = createHighlighter(project, document, lineIndex);
-    if (highlighter == null) {
-      return null;
-    }
-
-    LineBreakpoint breakpoint = new LineBreakpoint(project, highlighter);
+  public static LineBreakpoint create(@NotNull Project project, XBreakpoint xBreakpoint) {
+    LineBreakpoint breakpoint = new LineBreakpoint(project, xBreakpoint);
     return (LineBreakpoint)breakpoint.init();
   }
 
-  @Override
-  public boolean canMoveTo(SourcePosition position) {
-    if (!super.canMoveTo(position)) {
-      return false;
-    }
-    final Document document = PsiDocumentManager.getInstance(getProject()).getDocument(position.getFile());
-    return canAddLineBreakpoint(myProject, document, position.getLine());
-  }
+  //@Override
+  //public boolean canMoveTo(SourcePosition position) {
+  //  if (!super.canMoveTo(position)) {
+  //    return false;
+  //  }
+  //  final Document document = PsiDocumentManager.getInstance(getProject()).getDocument(position.getFile());
+  //  return canAddLineBreakpoint(myProject, document, position.getLine());
+  //}
 
   public static boolean canAddLineBreakpoint(Project project, final Document document, final int lineIndex) {
     if (lineIndex < 0 || lineIndex >= document.getLineCount()) {

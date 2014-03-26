@@ -47,16 +47,29 @@ public class SdkSettingsStep extends ModuleWizardStep {
   protected final WizardContext myWizardContext;
   protected final ProjectSdksModel myModel;
   private final ModuleBuilder myModuleBuilder;
+  private final JPanel myJdkPanel;
 
-  public SdkSettingsStep(@NotNull SettingsStep settingsStep, @NotNull ModuleBuilder moduleBuilder, @NotNull Condition<SdkTypeId> sdkFilter) {
+  public SdkSettingsStep(SettingsStep settingsStep, @NotNull ModuleBuilder moduleBuilder,
+                           @NotNull Condition<SdkTypeId> sdkFilter) {
+
+    this(settingsStep.getContext(), moduleBuilder, sdkFilter);
+    if (!isEmpty()) {
+      settingsStep.addSettingsField(getSdkFieldLabel(settingsStep.getContext().getProject()), myJdkPanel);
+    }
+  }
+
+  public SdkSettingsStep(WizardContext context,
+                         @NotNull ModuleBuilder moduleBuilder,
+                         @NotNull Condition<SdkTypeId> sdkFilter) {
     myModuleBuilder = moduleBuilder;
 
-    myWizardContext = settingsStep.getContext();
+    myWizardContext = context;
     myModel = new ProjectSdksModel();
     Project project = myWizardContext.getProject();
     myModel.reset(project);
 
     myJdkComboBox = new JdkComboBox(myModel, sdkFilter);
+    myJdkPanel = new JPanel(new BorderLayout(4, 0));
 
     final PropertiesComponent component = project == null ? PropertiesComponent.getInstance() : PropertiesComponent.getInstance(project);
     ModuleType moduleType = moduleBuilder.getModuleType();
@@ -100,11 +113,13 @@ public class SdkSettingsStep extends ModuleWizardStep {
                                  project == null ? new JdkComboBox.NoneJdkComboBoxItem() : new JdkComboBox.ProjectJdkComboBoxItem(),
                                  null,
                                  false);
-    JPanel jdkPanel = new JPanel(new BorderLayout(4, 0));
-    jdkPanel.add(myJdkComboBox);
-    jdkPanel.add(button, BorderLayout.EAST);
-    settingsStep.addSettingsField(getSdkFieldLabel(project), jdkPanel);
 
+    myJdkPanel.add(myJdkComboBox);
+    myJdkPanel.add(myJdkComboBox.getSetUpButton(), BorderLayout.EAST);
+  }
+
+  public boolean isEmpty() {
+    return myJdkPanel.getComponentCount() == 0;
   }
 
   @NotNull
@@ -112,9 +127,13 @@ public class SdkSettingsStep extends ModuleWizardStep {
     return (project == null ? "Project" : "Module") + " \u001BSDK:";
   }
 
+  public JdkComboBox getJdkComboBox() {
+    return myJdkComboBox;
+  }
+
   @Override
   public JComponent getComponent() {
-    return null;
+    return myJdkPanel;
   }
 
   @Override

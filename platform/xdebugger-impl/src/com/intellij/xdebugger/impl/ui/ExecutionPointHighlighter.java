@@ -72,7 +72,7 @@ public class ExecutionPointHighlighter {
 
   public void navigateTo() {
     if (myOpenFileDescriptor != null) {
-      FileEditorManager.getInstance(myProject).openTextEditor(myOpenFileDescriptor, false);
+      FileEditorManager.getInstance(myProject).openTextEditor(myOpenFileDescriptor, true);
     }
   }
 
@@ -102,7 +102,7 @@ public class ExecutionPointHighlighter {
 
     mySourcePosition = position;
     myOpenFileDescriptor = XSourcePositionImpl.createOpenFileDescriptor(myProject, mySourcePosition);
-    myEditor = FileEditorManager.getInstance(myProject).openTextEditor(myOpenFileDescriptor, false);
+    myEditor = myOpenFileDescriptor.getFile().isValid() ? FileEditorManager.getInstance(myProject).openTextEditor(myOpenFileDescriptor, false) : null;
     myUseSelection = useSelection;
     myGutterIconRenderer = renderer;
     if (myEditor != null) {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,6 +34,7 @@ import com.intellij.psi.codeStyle.JavaCodeStyleManager;
 import com.intellij.psi.codeStyle.SuggestedNameInfo;
 import com.intellij.psi.codeStyle.VariableKind;
 import com.intellij.psi.filters.FilterPositionUtil;
+import com.intellij.psi.impl.light.LightElement;
 import com.intellij.psi.impl.source.tree.LeafPsiElement;
 import com.intellij.psi.scope.PsiScopeProcessor;
 import com.intellij.psi.util.InheritanceUtil;
@@ -65,7 +66,6 @@ import org.jetbrains.plugins.groovy.lang.psi.api.types.GrCodeReferenceElement;
 import org.jetbrains.plugins.groovy.lang.psi.api.types.GrTypeParameter;
 import org.jetbrains.plugins.groovy.lang.psi.api.types.GrTypeParameterList;
 import org.jetbrains.plugins.groovy.lang.psi.impl.statements.expressions.CompleteReferenceExpression;
-import org.jetbrains.plugins.groovy.lang.psi.impl.synthetic.GrBindingVariable;
 import org.jetbrains.plugins.groovy.lang.psi.util.GroovyPropertyUtils;
 import org.jetbrains.plugins.groovy.lang.psi.util.PsiUtil;
 import org.jetbrains.plugins.groovy.refactoring.DefaultGroovyVariableNameValidator;
@@ -78,6 +78,7 @@ import java.util.Set;
 
 import static com.intellij.patterns.PlatformPatterns.psiElement;
 import static com.intellij.patterns.PsiJavaPatterns.elementType;
+import static com.intellij.patterns.StandardPatterns.alwaysFalse;
 import static com.intellij.util.containers.ContainerUtil.*;
 import static org.jetbrains.plugins.groovy.lang.lexer.GroovyTokenTypes.*;
 import static org.jetbrains.plugins.groovy.lang.lexer.TokenSets.SEPARATORS;
@@ -114,7 +115,7 @@ public class GroovyCompletionContributor extends CompletionContributor {
     final PsiManager manager = file.getManager();
     PsiScopeProcessor processor = new PsiScopeProcessor() {
       @Override
-      public boolean execute(@NotNull PsiElement element, ResolveState state) {
+      public boolean execute(@NotNull PsiElement element, @NotNull ResolveState state) {
         return !manager.areElementsEquivalent(element, member);
       }
 
@@ -124,7 +125,7 @@ public class GroovyCompletionContributor extends CompletionContributor {
       }
 
       @Override
-      public void handleEvent(Event event, Object associated) {
+      public void handleEvent(@NotNull Event event, Object associated) {
       }
     };
 
@@ -170,7 +171,8 @@ public class GroovyCompletionContributor extends CompletionContributor {
       ))
     );
 
-  private static final ElementPattern<PsiElement> AFTER_NUMBER_LITERAL = psiElement().afterLeaf(
+  private static final ElementPattern<PsiElement> AFTER_NUMBER_LITERAL = psiElement().afterLeafSkipping(
+    alwaysFalse(),
     psiElement().withElementType(elementType().oneOf(mNUM_DOUBLE, mNUM_INT, mNUM_LONG, mNUM_FLOAT, mNUM_BIG_INT, mNUM_BIG_DECIMAL)));
   public static final ElementPattern<PsiElement> AFTER_AT = psiElement().afterLeaf("@");
   public static final ElementPattern<PsiElement> IN_CATCH_TYPE = psiElement().afterLeaf(psiElement().withText("(").withParent(GrCatchClause.class));
@@ -445,13 +447,14 @@ public class GroovyCompletionContributor extends CompletionContributor {
 
     final List<LookupElement> zeroPriority = newArrayList();
     reference.processVariants(matcher, parameters, new Consumer<LookupElement>() {
+      @Override
       public void consume(LookupElement lookupElement) {
         Object object = lookupElement.getObject();
         if (object instanceof GroovyResolveResult) {
           object = ((GroovyResolveResult)object).getElement();
         }
 
-        if (object instanceof GrBindingVariable && ((GrBindingVariable)object).getName().contains(CompletionInitializationContext.DUMMY_IDENTIFIER_TRIMMED)) {
+        if (isLightElementDeclaredDuringCompletion(object)) {
           return;
         }
 
@@ -494,6 +497,16 @@ public class GroovyCompletionContributor extends CompletionContributor {
     }
     return EmptyRunnable.INSTANCE;
   }
+
+  private static boolean isLightElementDeclaredDuringCompletion(Object object) {
+    if (!(object instanceof LightElement && object instanceof PsiNamedElement)) return false;
+    final String name = ((PsiNamedElement)object).getName();
+    if (name == null) return false;
+
+    return name.contains(CompletionInitializationContext.DUMMY_IDENTIFIER_TRIMMED.trim()) ||
+           name.contains(DUMMY_IDENTIFIER_DECAPITALIZED.trim());
+  }
+
 
   private static Runnable addStaticMembers(CompletionParameters parameters,
                                        final PrefixMatcher matcher,
@@ -654,6 +667,7 @@ public class GroovyCompletionContributor extends CompletionContributor {
 
   private static final String DUMMY_IDENTIFIER_DECAPITALIZED = StringUtil.decapitalize(CompletionUtil.DUMMY_IDENTIFIER);
 
+  @Override
   public void beforeCompletion(@NotNull final CompletionInitializationContext context) {
     final String identifier = getIdentifier(context);
     if (identifier != null) {
@@ -717,7 +731,7 @@ public class GroovyCompletionContributor extends CompletionContributor {
     if (element == null) return DUMMY_IDENTIFIER_DECAPITALIZED;
 
     final String text = element.getText();
-    if (text.length() == 0) return DUMMY_IDENTIFIER_DECAPITALIZED;
+    if (text.isEmpty()) return DUMMY_IDENTIFIER_DECAPITALIZED;
 
     return Character.isUpperCase(text.charAt(0)) ? CompletionInitializationContext.DUMMY_IDENTIFIER : DUMMY_IDENTIFIER_DECAPITALIZED;
   }

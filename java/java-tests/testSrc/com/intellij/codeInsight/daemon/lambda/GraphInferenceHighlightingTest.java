@@ -92,6 +92,10 @@ public class GraphInferenceHighlightingTest extends LightDaemonAnalyzerTestCase 
     doTest();
   }
 
+  public void testClsCapturedReturnTypes() throws Exception {
+    doTest();
+  }
+
   public void testOverloadChooserOfReturnType() throws Exception {
     doTest();
   }
@@ -105,6 +109,74 @@ public class GraphInferenceHighlightingTest extends LightDaemonAnalyzerTestCase 
   }
 
   public void testJDK8028774() throws Exception {
+    doTest();
+  }
+
+  public void testErasedByReturnConstraint() throws Exception {
+    doTest();
+  }
+
+  public void testIDEA104429() throws Exception {
+    doTest();
+  }
+
+  public void testTargetTypeByOverloadedMethod() throws Exception {
+    doTest();
+  }
+
+  public void testTargetTypeByOverloadedMethod2() throws Exception {
+    doTest();
+  }
+
+  public void testGrandParentTypeParams() throws Exception {
+    doTest();
+  }
+
+  public void testDeepCallsChain() throws Exception {
+    doTest();
+  }
+
+  public void testArrayPassedToVarargsMethod() throws Exception {
+    doTest();
+  }
+
+  public void testIDEA121055() throws Exception {
+    doTest();
+  }
+
+  public void testTargetTypeByAnonymousClass() throws Exception {
+    doTest();
+  }
+
+  public void testStaticInheritorsAmbiguity() throws Exception {
+    doTest();
+  }
+
+  public void testNestedCalls1() throws Exception {
+    doTest();
+  }
+
+  public void testMostSpecificVarargsCase() throws Exception {
+    doTest();
+  }
+
+  public void testLiftedCaptureToOuterCall() throws Exception {
+    doTest();
+  }
+
+  public void testSiteSubstitutionForReturnConstraint() throws Exception {
+    doTest();
+  }
+
+  public void testIncorporationWithEqualsBoundsSubstitution() throws Exception {
+    doTest();
+  }
+
+  public void testOuterCallConflictResolution() throws Exception {
+    doTest();
+  }
+
+  public void testVarargsOnNonPertinentPlace() throws Exception {
     doTest();
   }
 

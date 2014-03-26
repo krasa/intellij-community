@@ -55,38 +55,56 @@ public class MavenJUnitPatcher extends JUnitPatcher {
           path = MavenPropertyResolver.resolve(path, domModel);
         }
 
-        javaParameters.getClassPath().add(path);
+        javaParameters.getClassPath().add(resolveSurefireProperties(path));
       }
     }
 
     Element systemPropertyVariables = config.getChild("systemPropertyVariables");
-    if (systemPropertyVariables != null) {
+    if (systemPropertyVariables != null && isEnabled("systemPropertyVariables")) {
       for (Element element : systemPropertyVariables.getChildren()) {
         String propertyName = element.getName();
 
         if (!javaParameters.getVMParametersList().hasProperty(propertyName)) {
-          javaParameters.getVMParametersList().addProperty(propertyName, element.getValue());
+          String value = resolveSurefireProperties(element.getValue());
+          if (isResolved(value)) {
+            javaParameters.getVMParametersList().addProperty(propertyName, value);
+          }
         }
       }
     }
 
     Element environmentVariables = config.getChild("environmentVariables");
-    if (environmentVariables != null) {
+    if (environmentVariables != null && isEnabled("environmentVariables")) {
       for (Element element : environmentVariables.getChildren()) {
         String variableName = element.getName();
 
         if (javaParameters.getEnv() == null || !javaParameters.getEnv().containsKey(variableName)) {
-          javaParameters.addEnv(variableName, element.getValue());
+          String value = resolveSurefireProperties(element.getValue());
+          if (isResolved(value)) {
+            javaParameters.addEnv(variableName, value);
+          }
         }
       }
     }
 
     Element argLine = config.getChild("argLine");
-    if (argLine != null) {
-      String value = argLine.getTextTrim();
-      if (StringUtil.isNotEmpty(value)) {
-        javaParameters.getVMParametersList().add(value);
+    if (argLine != null && isEnabled("argLine")) {
+      String value = resolveSurefireProperties(argLine.getTextTrim());
+      if (StringUtil.isNotEmpty(value) && isResolved(value)) {
+        javaParameters.getVMParametersList().addParametersString(value);
       }
     }
+  }
+
+  private static String resolveSurefireProperties(String value) {
+    return value.replaceAll("\\$\\{surefire\\.(forkNumber|threadNumber)\\}", "1");
+  }
+
+  private static boolean isEnabled(String s) {
+    return !Boolean.valueOf(System.getProperty("idea.maven.surefire.disable." + s));
+  }
+
+  private static boolean isResolved(String s) {
+    return !s.contains("${") || Boolean.valueOf(System.getProperty("idea.maven.surefire.allPropertiesAreResolved"));
   }
 }

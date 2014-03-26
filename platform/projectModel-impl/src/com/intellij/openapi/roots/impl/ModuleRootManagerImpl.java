@@ -52,6 +52,7 @@ public class ModuleRootManagerImpl extends ModuleRootManager implements ModuleCo
   private RootModelImpl myRootModel;
   private final ModuleFileIndexImpl myFileIndex;
   private boolean myIsDisposed = false;
+  private boolean myLoaded = false;
   private boolean isModuleAdded = false;
   private final OrderRootsCache myOrderRootsCache;
   private final Map<RootModelImpl, Throwable> myModelCreations = new THashMap<RootModelImpl, Throwable>();
@@ -344,12 +345,13 @@ public class ModuleRootManagerImpl extends ModuleRootManager implements ModuleCo
   }
 
   public void loadState(ModuleRootManagerState object) {
-    loadState(object, myRootModel != null);
+    loadState(object, myLoaded || isModuleAdded);
+    myLoaded = true;
   }
 
   protected void loadState(ModuleRootManagerState object, boolean throwEvent) {
     try {
-      final RootModelImpl newModel = new RootModelImpl(object.getRootModelElement(), this, myProjectRootManager, myFilePointerManager);
+      final RootModelImpl newModel = new RootModelImpl(object.getRootModelElement(), this, myProjectRootManager, myFilePointerManager, throwEvent);
 
       if (throwEvent) {
         makeRootsChange(new Runnable() {
@@ -360,6 +362,7 @@ public class ModuleRootManagerImpl extends ModuleRootManager implements ModuleCo
         });
       }
       else {
+        myRootModel.dispose();
         myRootModel = newModel;
       }
 

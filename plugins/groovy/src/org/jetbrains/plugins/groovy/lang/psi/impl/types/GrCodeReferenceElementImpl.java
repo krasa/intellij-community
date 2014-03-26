@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -90,10 +90,11 @@ public class GrCodeReferenceElementImpl extends GrReferenceElementImpl<GrCodeRef
 
   @Override
   protected GrCodeReferenceElement bindWithQualifiedRef(@NotNull String qName) {
-    final GrTypeArgumentList list = getTypeArgumentList();
-    final String typeArgs = (list != null) ? list.getText() : "";
-    final String text = qName + typeArgs;
-    final GrCodeReferenceElement qualifiedRef = GroovyPsiElementFactory.getInstance(getProject()).createTypeOrPackageReference(text);
+    final GrCodeReferenceElement qualifiedRef = GroovyPsiElementFactory.getInstance(getProject()).createTypeOrPackageReference(qName);
+    final PsiElement list = getTypeArgumentList();
+    if (list != null) {
+      qualifiedRef.getNode().addChild(list.copy().getNode());
+    }
     getNode().getTreeParent().replaceChild(getNode(), qualifiedRef.getNode());
     return qualifiedRef;
   }
@@ -464,7 +465,9 @@ public class GrCodeReferenceElementImpl extends GrReferenceElementImpl<GrCodeRef
     }
 
     @NotNull
-    private static GroovyResolveResult[] _resolve(GrCodeReferenceElementImpl ref, PsiManager manager, ReferenceKind kind) {
+    private static GroovyResolveResult[] _resolve(@NotNull GrCodeReferenceElementImpl ref,
+                                                  @NotNull PsiManager manager,
+                                                  @NotNull ReferenceKind kind) {
       final String refName = ref.getReferenceName();
       if (refName == null) {
         return GroovyResolveResult.EMPTY_ARRAY;
@@ -512,10 +515,12 @@ public class GrCodeReferenceElementImpl extends GrReferenceElementImpl<GrCodeRef
           else {
             // if ref is an annotation name reference we should not process declarations of annotated elements
             // because inner annotations are not permitted and it can cause infinite recursion
-            PsiElement placeToStartWalking = isAnnotationRef(ref) ? getContextFile(ref) : ref;
-            ResolveUtil.treeWalkUp(placeToStartWalking, processor, false);
-            GroovyResolveResult[] candidates = processor.getCandidates();
-            if (candidates.length > 0) return candidates;
+            PsiElement placeToStartWalking = isAnnotationRef(ref) ? getContainingFileSkippingStubFiles(ref) : ref;
+            if (placeToStartWalking != null) {
+              ResolveUtil.treeWalkUp(placeToStartWalking, processor, false);
+              GroovyResolveResult[] candidates = processor.getCandidates();
+              if (candidates.length > 0) return candidates;
+            }
 
             if (kind == CLASS_OR_PACKAGE) {
               PsiPackage pkg = JavaPsiFacade.getInstance(ref.getProject()).findPackage(refName);
@@ -595,19 +600,18 @@ public class GrCodeReferenceElementImpl extends GrReferenceElementImpl<GrCodeRef
       return GroovyResolveResult.EMPTY_ARRAY;
     }
 
+    private static PsiFile getContainingFileSkippingStubFiles(GrCodeReferenceElementImpl ref) {
+      PsiFile file = ref.getContainingFile();
+      while (file != null && !file.isPhysical() && file.getContext() != null) {
+        PsiElement context = file.getContext();
+        file = context.getContainingFile();
+      }
+      return file;
+    }
+
     private static boolean isAnnotationRef(GrCodeReferenceElement ref) {
       final PsiElement parent = ref.getParent();
       return parent instanceof GrAnnotation || parent instanceof GrCodeReferenceElement && isAnnotationRef((GrCodeReferenceElement)parent);
-    }
-
-    private static PsiFile getContextFile(PsiElement ref) {
-      final PsiFile file = ref.getContainingFile();
-      if (file.isPhysical()) {
-        return file;
-      }
-      else {
-        return getContextFile(file.getContext());
-      }
     }
 
     private static void processAccessors(GrCodeReferenceElementImpl ref,

@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -176,7 +176,7 @@ public class DaemonListeners implements Disposable {
       }
     }, this);
 
-    eventMulticaster.addCaretListener(new CaretListener() {
+    eventMulticaster.addCaretListener(new CaretAdapter() {
       @Override
       public void caretPositionChanged(CaretEvent e) {
         final Editor editor = e.getEditor();
@@ -184,17 +184,17 @@ public class DaemonListeners implements Disposable {
             !worthBothering(editor.getDocument(), editor.getProject())) {
           return; //no need to stop daemon if something happened in the console
         }
-
-        ApplicationManager.getApplication().invokeLater(new Runnable() {
-          @Override
-          public void run() {
-            if (!editor.getComponent().isShowing() && !application.isUnitTestMode() ||
-                myProject.isDisposed()) {
-              return;
+        if (!application.isUnitTestMode()) {
+          ApplicationManager.getApplication().invokeLater(new Runnable() {
+            @Override
+            public void run() {
+              if (!editor.getComponent().isShowing() || myProject.isDisposed()) {
+                return;
+              }
+              myDaemonCodeAnalyzer.hideLastIntentionHint();
             }
-            myDaemonCodeAnalyzer.hideLastIntentionHint();
-          }
-        }, ModalityState.current());
+          }, ModalityState.current());
+        }
       }
     }, this);
 
@@ -211,7 +211,7 @@ public class DaemonListeners implements Disposable {
         }
         myActiveEditors = activeEditors;
         stopDaemon(true, "Active editor change");  // do not stop daemon if idea loses/gains focus
-        if (LaterInvocator.isInModalContext()) {
+        if (ApplicationManager.getApplication().isDispatchThread() && LaterInvocator.isInModalContext()) {
           // editor appear in modal context, re-enable the daemon
           myDaemonCodeAnalyzer.setUpdateByTimerEnabled(true);
         }
@@ -305,7 +305,7 @@ public class DaemonListeners implements Disposable {
     actionManagerEx.addAnActionListener(new MyAnActionListener(), this);
     virtualFileManager.addVirtualFileListener(new VirtualFileAdapter() {
       @Override
-      public void propertyChanged(VirtualFilePropertyEvent event) {
+      public void propertyChanged(@NotNull VirtualFilePropertyEvent event) {
         String propertyName = event.getPropertyName();
         if (VirtualFile.PROP_NAME.equals(propertyName)) {
           stopDaemonAndRestartAllFiles();

@@ -19,7 +19,9 @@ package com.intellij.analysis;
 import com.intellij.codeInsight.FileModificationService;
 import com.intellij.codeInsight.daemon.ProblemHighlightFilter;
 import com.intellij.lang.injection.InjectedLanguageManager;
+import com.intellij.openapi.application.AccessToken;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.module.ModuleManager;
@@ -345,23 +347,44 @@ public class AnalysisScope {
                               final boolean needReadAction) {
     if (fileOrDir.isDirectory()) return true;
     if (ProjectCoreUtil.isProjectOrWorkspaceFile(fileOrDir)) return true;
-    if (projectFileIndex.isInContent(fileOrDir) && (myIncludeTestSource || !projectFileIndex.isInTestSourceContent(fileOrDir))) {
+    if (projectFileIndex.isInContent(fileOrDir) && (myIncludeTestSource || !projectFileIndex.isInTestSourceContent(fileOrDir))
+        && !isInGeneratedSources(fileOrDir, psiManager.getProject())) {
       return processFile(fileOrDir, visitor, psiManager, needReadAction);
     }
     return true;
+  }
+
+  private static boolean isInGeneratedSources(@NotNull VirtualFile file, @NotNull Project project) {
+    for (GeneratedSourcesFilter filter : GeneratedSourcesFilter.EP_NAME.getExtensions()) {
+      if (filter.isGeneratedSource(file, project)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static boolean processFile(@NotNull final VirtualFile fileOrDir,
                                      @NotNull final PsiElementVisitor visitor,
                                      @NotNull final PsiManager psiManager,
                                      final boolean needReadAction) {
-    if (!fileOrDir.isValid()) return false;
-    final PsiFile file = getPsiFileInReadAction(psiManager, fileOrDir);
-    if (file == null){
-      //skip .class files under src directory
-      return true;
+    final PsiFile file;
+
+    AccessToken accessToken = ReadAction.start();
+    try {
+      if (!fileOrDir.isValid()) return false;
+
+      file = psiManager.findFile(fileOrDir);
+      if (file == null) {
+        //skip .class files under src directory
+        return true;
+      }
+
+      if (!shouldHighlightFile(file)) return true;
     }
-    if (!shouldHighlightFile(file)) return true;
+    finally {
+      accessToken.finish();
+    }
+
     if (needReadAction) {
       PsiDocumentManager.getInstance(psiManager.getProject()).commitAndRunReadAction(new Runnable(){
         @Override
@@ -552,22 +575,6 @@ public class AnalysisScope {
         }
       }
     }
-  }
-
-  private static PsiFile getPsiFileInReadAction(@NotNull final PsiManager psiManager, @NotNull final VirtualFile file) {
-    return ApplicationManager.getApplication().runReadAction(new Computable<PsiFile>() {
-      @Override
-      @Nullable
-      public PsiFile compute() {
-        if (file.isValid()) {
-          PsiFile psiFile = psiManager.findFile(file);
-          if (psiFile != null && psiFile.isValid()) {
-            return psiFile;
-          }
-        }
-        return null;
-      }
-    });
   }
 
   public boolean containsSources(boolean isTest) {

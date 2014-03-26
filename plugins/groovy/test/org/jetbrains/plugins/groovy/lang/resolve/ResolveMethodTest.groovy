@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -906,7 +906,7 @@ class A {
 
     def resolved = ref.resolve()
     assertInstanceOf resolved, PsiMethod
-    assertEquals 'Other', resolved.containingClass.name
+    assertEquals 'A', resolved.containingClass.name
   }
 
   public void testInapplicableStaticallyImportedMethodsVsCurrentClassMethod() {
@@ -1889,6 +1889,37 @@ class GrTypeDefinition  {
 
     assert expr.multiResolve(false).length == 1
     assert expr.multiResolve(true).length > 1
+  }
+
+  void testStaticMethodInInstanceContext() {
+    GrMethod resolved = resolveByText('''\
+class Foo {
+    def foo(String s){}
+    static def foo(File f){}
+}
+
+new Foo().f<caret>oo(new File(''))
+''', GrMethod)
+
+    assertTrue(resolved.hasModifierProperty(PsiModifier.STATIC))
+  }
+
+  void testBaseScript() {
+    addBaseScript()
+
+    myFixture.addClass '''
+class CustomScript extends Script {
+  void foo() {}
+}'''
+
+    resolveByText('''
+import groovy.transform.BaseScript
+
+@BaseScript
+CustomScript myScript;
+
+f<caret>oo()
+''', PsiMethod)
   }
 
 }

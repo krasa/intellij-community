@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,9 +15,14 @@
  */
 package com.intellij.vcs.log.data;
 
+import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.PathManager;
+import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.Condition;
+import com.intellij.openapi.util.Ref;
 import com.intellij.openapi.util.ThrowableComputable;
+import com.intellij.util.CommonProcessors;
 import com.intellij.util.io.IOUtil;
 import com.intellij.util.io.KeyDescriptor;
 import com.intellij.util.io.Page;
@@ -35,9 +40,10 @@ import java.io.IOException;
 /**
  * Supports the int <-> Hash persistent mapping.
  */
-class VcsLogHashMap {
+class VcsLogHashMap implements Disposable {
 
   private static final File LOG_CACHE_APP_DIR = new File(PathManager.getSystemPath(), "vcs-log");
+  private static final Logger LOG = Logger.getInstance(VcsLogHashMap.class);
 
   private final PersistentEnumerator<Hash> myPersistentEnumerator;
 
@@ -60,14 +66,44 @@ class VcsLogHashMap {
     return myPersistentEnumerator.enumerate(hash);
   }
 
+  void flush() {
+    myPersistentEnumerator.force();
+  }
+
+  @Override
+  public void dispose() {
+    try {
+      myPersistentEnumerator.close();
+    }
+    catch (IOException e) {
+      LOG.warn(e);
+    }
+  }
+
+  @Nullable
+  Hash findHash(@NotNull final Condition<Hash> condition) throws IOException {
+    final Ref<Hash> hashRef = Ref.create();
+    myPersistentEnumerator.iterateData(new CommonProcessors.FindProcessor<Hash>() {
+      @Override
+      protected boolean accept(Hash hash) {
+        boolean matches = condition.value(hash);
+        if (matches) {
+          hashRef.set(hash);
+        }
+        return matches;
+      }
+    });
+    return hashRef.get();
+  }
+
   private static class MyHashKeyDescriptor implements KeyDescriptor<Hash> {
     @Override
-    public void save(DataOutput out, Hash value) throws IOException {
+    public void save(@NotNull DataOutput out, Hash value) throws IOException {
       out.writeUTF(value.asString());
     }
 
     @Override
-    public Hash read(DataInput in) throws IOException {
+    public Hash read(@NotNull DataInput in) throws IOException {
       return HashImpl.build(in.readUTF());
     }
 

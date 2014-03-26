@@ -16,7 +16,6 @@
 package hg4idea.test.version;
 
 import com.intellij.openapi.vcs.VcsTestUtil;
-import com.intellij.util.containers.HashSet;
 import hg4idea.test.HgPlatformTest;
 import org.zmlx.hg4idea.util.HgVersion;
 
@@ -24,7 +23,6 @@ import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 
 /**
  * @author Nadya Zabrodina
@@ -43,23 +41,22 @@ public class HgVersionTest extends HgPlatformTest {
     new TestHgVersion("Распределенная SCM Mercurial (версия 2.6.1)", 2, 6, 1),
     new TestHgVersion("[Mercurial Distributed SCM (version 2.6.2+20130606)]", 2, 6, 2),
     new TestHgVersion("[Mercurial Distributed SCM (version 2.4.2+20130203)]\n", 2, 4, 2),
-    new TestHgVersion("Mercurial Distributed SCM (version 2.6.2)\n", 2, 6, 2)
+    new TestHgVersion("Mercurial Distributed SCM (version 2.6.2)\n", 2, 6, 2),
+    new TestHgVersion("Mercurial Distributed SCM (version 2.7+93-f959b60e3025)", 2, 7, 0)
   };
 
   public void testParseSupported() throws Exception {
-    Set<String> unsupportedExceptions = new HashSet<String>();
     for (TestHgVersion test : commonTests) {
-      HgVersion version = HgVersion.parseVersionAndExtensionInfo(test.output, Collections.<String>emptyList(), unsupportedExceptions);
+      HgVersion version = HgVersion.parseVersionAndExtensionInfo(test.output, Collections.<String>emptyList());
       assertEqualVersions(version, test);
       assertTrue(version.isSupported());
     }
   }
 
   public void testParseUnsupported() throws Exception {
-    Set<String> unsupportedExceptions = new HashSet<String>();
     TestHgVersion unsupportedVersion = new TestHgVersion("Mercurial Distributed SCM (version 1.5.1)", 1, 5, 1);
     HgVersion parsedVersion =
-      HgVersion.parseVersionAndExtensionInfo(unsupportedVersion.output, Collections.<String>emptyList(), unsupportedExceptions);
+      HgVersion.parseVersionAndExtensionInfo(unsupportedVersion.output, Collections.<String>emptyList());
     assertEqualVersions(parsedVersion, unsupportedVersion);
     assertFalse(parsedVersion.isSupported());
   }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2011 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiMethod
 import com.intellij.psi.codeStyle.CodeStyleSettingsManager
 import com.intellij.psi.codeStyle.CommonCodeStyleSettings
+import com.intellij.testFramework.EditorTestUtil
 
 public class NormalCompletionTest extends LightFixtureCompletionTestCase {
   @Override
@@ -755,6 +756,13 @@ public class ListUtils {
     assertStringItems("bar", "foo");
   }
 
+  public void testAddExplicitValueInAnnotation() throws Throwable {
+    configureByTestName()
+    assertStringItems("bar", "goo")
+    selectItem(myItems[0])
+    checkResult()
+  }
+
   public void testUnnecessaryMethodMerging() throws Throwable {
     configureByFile(getTestName(false) + ".java");
     assertStringItems("fofoo", "fofoo");
@@ -1143,6 +1151,7 @@ class XInternalError {}
     """)
     assertOneElement myFixture.completeBasic()
   }
+  public void testStaticallyImportedFieldsTwiceSwitch() { doTest() }
 
   public void testStatementKeywords() {
     myFixture.configureByText("a.java", """
@@ -1347,21 +1356,44 @@ class XInternalError {}
   }
 
   public void "test block selection from bottom to top with single-item insertion"() {
-    myFixture.configureByText "a.java", """
-class Foo {{
-  ret<caret>;
-  ret;
-}}"""
-    edt {
-      def caret = myFixture.editor.offsetToLogicalPosition(myFixture.editor.caretModel.offset)
-      myFixture.editor.selectionModel.setBlockSelection(new LogicalPosition(caret.line + 1, caret.column), caret)
+    EditorTestUtil.disableMultipleCarets()
+    try {
+      myFixture.configureByText "a.java", """
+  class Foo {{
+    ret<caret>;
+    ret;
+  }}"""
+      edt {
+        def caret = myFixture.editor.offsetToLogicalPosition(myFixture.editor.caretModel.offset)
+        myFixture.editor.selectionModel.setBlockSelection(new LogicalPosition(caret.line + 1, caret.column), caret)
+      }
+      myFixture.completeBasic()
+      myFixture.checkResult '''
+  class Foo {{
+    return<caret>;
+    return;
+  }}'''
     }
-    myFixture.completeBasic()
-    myFixture.checkResult '''
-class Foo {{
-  return<caret>;
-  return;
-}}'''
+    finally {
+      EditorTestUtil.enableMultipleCarets()
+    }
+  }
+
+  public void testMulticaretSingleItemInsertion() {
+    doTest()
+  }
+
+  public void testMulticaretMethodWithParen() {
+    doTest()
+  }
+
+  public void testMulticaretTyping() {
+    configure()
+    assert lookup
+    type('p')
+    assert lookup
+    type('\n')
+    checkResult()
   }
 
   public void "test complete lowercase class name"() {
@@ -1369,8 +1401,7 @@ class Foo {{
     myFixture.configureByText "a.java", """
 class Foo extends my<caret>
 """
-    myFixture.completeBasic()
-    myFixture.type('\n')
+    myFixture.complete(CompletionType.BASIC, 2)
     myFixture.checkResult '''import foo.myClass;
 
 class Foo extends myClass
@@ -1403,5 +1434,12 @@ class Bar {
   }
 
   public void testNoMathTargetMethods() { doAntiTest() }
+
+  public void testNoLowercaseClasses() {
+    myFixture.addClass("package foo; public class abcdefgXxx {}")
+    doAntiTest()
+    myFixture.complete(CompletionType.BASIC, 2)
+    assertStringItems('abcdefgXxx')
+  }
 
 }

@@ -47,10 +47,7 @@ import com.sun.jdi.Value;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 public class EvaluatorBuilderImpl implements EvaluatorBuilder {
   private static final EvaluatorBuilderImpl ourInstance = new EvaluatorBuilderImpl();
@@ -62,7 +59,7 @@ public class EvaluatorBuilderImpl implements EvaluatorBuilder {
     return ourInstance;
   }
 
-  public static ExpressionEvaluator build(final TextWithImports text, final PsiElement contextElement, final SourcePosition position) throws EvaluateException {
+  public static ExpressionEvaluator build(final TextWithImports text, @Nullable PsiElement contextElement, final SourcePosition position) throws EvaluateException {
     if (contextElement == null) {
       throw EvaluateExceptionUtil.CANNOT_FIND_SOURCE_CLASS;
     }
@@ -71,17 +68,16 @@ public class EvaluatorBuilderImpl implements EvaluatorBuilder {
 
     CodeFragmentFactory factory = DebuggerEditorImpl.findAppropriateFactory(text, contextElement);
     PsiCodeFragment codeFragment = new CodeFragmentFactoryContextWrapper(factory).createCodeFragment(text, contextElement, project);
-    if(codeFragment == null) {
+    if (codeFragment == null) {
       throw EvaluateExceptionUtil.createEvaluateException(DebuggerBundle.message("evaluation.error.invalid.expression", text.getText()));
     }
     codeFragment.forceResolveScope(GlobalSearchScope.allScope(project));
     DebuggerUtils.checkSyntax(codeFragment);
 
-    EvaluatorBuilder evaluatorBuilder = factory.getEvaluatorBuilder();
-
-    return evaluatorBuilder.build(codeFragment, position);
+    return factory.getEvaluatorBuilder().build(codeFragment, position);
   }
 
+  @Override
   public ExpressionEvaluator build(final PsiElement codeFragment, final SourcePosition position) throws EvaluateException {
     return new Builder(position).buildElement(codeFragment);
   }
@@ -342,7 +338,7 @@ public class EvaluatorBuilderImpl implements EvaluatorBuilder {
                                                                    @NotNull PsiType rType,
                                                                    @NotNull IElementType operation,
                                                                    @NotNull PsiType expressionExpectedType) {
-      // handle unboxing if neccesary
+      // handle unboxing if necessary
       if (isUnboxingInBinaryExpressionApplicable(lType, rType, operation)) {
         if (rType instanceof PsiClassType && UnBoxingEvaluator.isTypeUnboxable(rType.getCanonicalText())) {
           rResult = new UnBoxingEvaluator(rResult);
@@ -866,7 +862,7 @@ public class EvaluatorBuilderImpl implements EvaluatorBuilder {
       }
       final PsiExpressionList argumentList = expression.getArgumentList();
       final PsiExpression[] argExpressions = argumentList.getExpressions();
-      final Evaluator[] argumentEvaluators = new Evaluator[argExpressions.length];
+      Evaluator[] argumentEvaluators = new Evaluator[argExpressions.length];
       // evaluate arguments
       for (int idx = 0; idx < argExpressions.length; idx++) {
         final PsiExpression psiExpression = argExpressions[idx];
@@ -957,6 +953,7 @@ public class EvaluatorBuilderImpl implements EvaluatorBuilder {
 
       if (psiMethod != null) {
         processBoxingConversions(psiMethod.getParameterList().getParameters(), argExpressions, resolveResult.getSubstitutor(), argumentEvaluators);
+        argumentEvaluators = wrapVarargs(psiMethod.getParameterList().getParameters(), argExpressions, resolveResult.getSubstitutor(), argumentEvaluators);
       }
 
       myResult = new MethodEvaluator(objectEvaluator, contextClass, methodExpr.getReferenceName(), psiMethod != null ? JVMNameUtil.getJVMSignature(psiMethod) : null, argumentEvaluators);
@@ -997,12 +994,12 @@ public class EvaluatorBuilderImpl implements EvaluatorBuilder {
 
     /**
      * Handles unboxing and numeric promotion issues for
-     * - array diumention expressions
+     * - array dimension expressions
      * - array index expression
      * - unary +, -, and ~ operations
      * @param operandExpressionType
-     * @param operandEvaluator  @return operandEvaluator possibly 'wrapped' with neccesary unboxing and type-casting evaluators to make returning value
-     * sutable for mentioned contexts
+     * @param operandEvaluator  @return operandEvaluator possibly 'wrapped' with necessary unboxing and type-casting evaluators to make returning value
+     * suitable for mentioned contexts
      */
     private static Evaluator handleUnaryNumericPromotion(final PsiType operandExpressionType, Evaluator operandEvaluator) {
       final PsiPrimitiveType unboxedType = PsiPrimitiveType.getUnboxedType(operandExpressionType);
@@ -1162,6 +1159,7 @@ public class EvaluatorBuilderImpl implements EvaluatorBuilder {
 
         if (constructor != null) {
           processBoxingConversions(constructor.getParameterList().getParameters(), argExpressions, constructorResolveResult.getSubstitutor(), argumentEvaluators);
+          argumentEvaluators = wrapVarargs(constructor.getParameterList().getParameters(), argExpressions, constructorResolveResult.getSubstitutor(), argumentEvaluators);
         }
 
         //noinspection HardCodedStringLiteral
@@ -1233,6 +1231,34 @@ public class EvaluatorBuilderImpl implements EvaluatorBuilder {
       }
       return new ExpressionEvaluatorImpl(myResult);
     }
+  }
+
+  private static Evaluator[] wrapVarargs(final PsiParameter[] declaredParams,
+                                         final PsiExpression[] actualArgumentExpressions,
+                                         final PsiSubstitutor methodResolveSubstitutor,
+                                         final Evaluator[] argumentEvaluators) {
+    int lastParam = declaredParams.length - 1;
+    if (lastParam >= 0 && declaredParams[lastParam].isVarArgs() && argumentEvaluators.length > lastParam) {
+      // only wrap if the first varargs parameter is null for now
+      if (!TypeConversionUtil.isNullType(actualArgumentExpressions[lastParam].getType())) {
+        return argumentEvaluators;
+      }
+      // do not wrap arrays twice
+      if (argumentEvaluators.length - lastParam == 1 && actualArgumentExpressions[lastParam].getType() instanceof PsiArrayType) {
+        return argumentEvaluators;
+      }
+      PsiEllipsisType declaredParamType = (PsiEllipsisType)methodResolveSubstitutor.substitute(declaredParams[lastParam].getType());
+      ArrayInitializerEvaluator varargArrayEvaluator =
+        new ArrayInitializerEvaluator(Arrays.copyOfRange(argumentEvaluators, lastParam, argumentEvaluators.length));
+      NewArrayInstanceEvaluator evaluator =
+        new NewArrayInstanceEvaluator(new TypeEvaluator(JVMNameUtil.getJVMQualifiedName(declaredParamType.toArrayType())), null,
+                                      varargArrayEvaluator);
+      Evaluator[] res = new Evaluator[declaredParams.length];
+      System.arraycopy(argumentEvaluators, 0, res, 0, lastParam);
+      res[lastParam] = new DisableGC(evaluator);
+      return res;
+    }
+    return argumentEvaluators;
   }
 
   private static void processBoxingConversions(final PsiParameter[] declaredParams,

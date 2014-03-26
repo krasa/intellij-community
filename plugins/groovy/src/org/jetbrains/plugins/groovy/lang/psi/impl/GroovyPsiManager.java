@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,7 +36,6 @@ import com.intellij.util.Function;
 import com.intellij.util.IncorrectOperationException;
 import com.intellij.util.containers.*;
 import com.intellij.util.messages.MessageBusConnection;
-import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.plugins.groovy.lang.psi.GroovyPsiElement;
@@ -78,11 +77,13 @@ public class GroovyPsiManager {
     myProject = project;
 
     ((PsiManagerEx)PsiManager.getInstance(myProject)).registerRunnableToRunOnAnyChange(new Runnable() {
+      @Override
       public void run() {
         dropTypesCache();
       }
     });
     ((PsiManagerEx)PsiManager.getInstance(myProject)).registerRunnableToRunOnChange(new Runnable() {
+      @Override
       public void run() {
         myClassCache.clear();
       }
@@ -90,6 +91,7 @@ public class GroovyPsiManager {
 
     final MessageBusConnection connection = myProject.getMessageBus().connect();
     connection.subscribe(ProjectTopics.PROJECT_ROOTS, new ModuleRootAdapter() {
+      @Override
       public void rootsChanged(ModuleRootEvent event) {
         dropTypesCache();
         myClassCache.clear();
@@ -186,50 +188,8 @@ public class GroovyPsiManager {
     return result;
   }
 
+  private static final PsiType UNKNOWN_TYPE = new GrPsiTypeStub();
 
-  private static final PsiType UNKNOWN_TYPE = new PsiType(PsiAnnotation.EMPTY_ARRAY) {
-    @Override
-    public String getPresentableText() {
-      return null;
-    }
-
-    @Override
-    public String getCanonicalText() {
-      return null;
-    }
-
-    @Override
-    public String getInternalCanonicalText() {
-      return null;
-    }
-
-    @Override
-    public boolean isValid() {
-      return true;
-    }
-
-    @Override
-    public boolean equalsToText(@NonNls String text) {
-      return false;
-    }
-
-    @Override
-    public <A> A accept(@NotNull PsiTypeVisitor<A> visitor) {
-      return null;
-    }
-
-    @Nullable
-    @Override
-    public GlobalSearchScope getResolveScope() {
-      return null;
-    }
-
-    @NotNull
-    @Override
-    public PsiType[] getSuperTypes() {
-      return PsiType.EMPTY_ARRAY;
-    }
-  };
   @Nullable
   public <T extends GroovyPsiElement> PsiType getType(@NotNull T element, @NotNull Function<T, PsiType> calculator) {
     PsiType type = myCalculatedTypes.get(element);

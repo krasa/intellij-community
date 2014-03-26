@@ -8,6 +8,7 @@ import com.intellij.openapi.application.AccessToken;
 import com.intellij.openapi.application.ReadAction;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.roots.ProjectRootManager;
 import com.intellij.openapi.ui.TextBrowseFolderListener;
 import com.intellij.openapi.ui.TextFieldWithBrowseButton;
@@ -53,7 +54,10 @@ public class StartBrowserPanel {
             @Override
             public void consume(DataContext context) {
               Project project = CommonDataKeys.PROJECT.getData(context);
-              assert project != null;
+              if (project == null) {
+                // IDEA-118202
+                project = ProjectManager.getInstance().getDefaultProject();
+              }
               setupUrlField(myUrlField, project);
             }
           });
@@ -70,17 +74,20 @@ public class StartBrowserPanel {
     return myRoot;
   }
 
-  @NotNull
+  @Nullable
   public String getUrl() {
-    String url = myUrlField.getText();
-    if (!url.isEmpty() && !URLUtil.containsScheme(url)) {
-      return VirtualFileManager.constructUrl(URLUtil.HTTP_PROTOCOL, url);
+    String url = StringUtil.nullize(myUrlField.getText(), true);
+    if (url != null) {
+      url = url.trim();
+      if (!URLUtil.containsScheme(url)) {
+        return VirtualFileManager.constructUrl(URLUtil.HTTP_PROTOCOL, url);
+      }
     }
     return url;
   }
 
   public void setUrl(@Nullable String url) {
-    myUrlField.setText(StringUtil.notNullize(url));
+    myUrlField.setText(url);
   }
 
   public void clearBorder() {
@@ -104,14 +111,15 @@ public class StartBrowserPanel {
   }
 
   private void createUIComponents() {
-    myBrowserSelector = new BrowserSelector(true);
+    myBrowserSelector = new BrowserSelector();
     myBrowserComboBox = myBrowserSelector.getMainComponent();
     if (UIUtil.isUnderAquaLookAndFeel()) {
       myBrowserComboBox.setBorder(new EmptyBorder(3, 0, 0, 0));
     }
   }
 
-  private static Url virtualFileToUrl(VirtualFile file, Project project) {
+  @Nullable
+  private static Url virtualFileToUrl(@NotNull VirtualFile file, @NotNull Project project) {
     PsiFile psiFile;
     AccessToken token = ReadAction.start();
     try {
@@ -123,6 +131,16 @@ public class StartBrowserPanel {
     return psiFile != null && !(psiFile instanceof PsiBinaryFile) ? WebBrowserServiceImpl.getUrlForContext(psiFile) : null;
   }
 
+  @NotNull
+  public StartBrowserSettings createSettings() {
+    StartBrowserSettings browserSettings = new StartBrowserSettings();
+    browserSettings.setSelected(isSelected());
+    browserSettings.setBrowser(myBrowserSelector.getSelected());
+    browserSettings.setStartJavaScriptDebugger(myStartJavaScriptDebuggerCheckBox.isSelected());
+    browserSettings.setUrl(getUrl());
+    return browserSettings;
+  }
+
   public static void setupUrlField(@NotNull TextFieldWithBrowseButton field, @NotNull final Project project) {
     FileChooserDescriptor descriptor = new FileChooserDescriptor(true, false, false, false, false, false) {
       @Override
@@ -132,14 +150,18 @@ public class StartBrowserPanel {
     };
     descriptor.setTitle(XmlBundle.message("javascript.debugger.settings.choose.file.title"));
     descriptor.setDescription(XmlBundle.message("javascript.debugger.settings.choose.file.subtitle"));
-    //descriptor.setShowFileSystemRoots(false);
     descriptor.setRoots(ProjectRootManager.getInstance(project).getContentRoots());
 
     field.addBrowseFolderListener(new TextBrowseFolderListener(descriptor, project) {
       @NotNull
       @Override
       protected String chosenFileToResultingText(@NotNull VirtualFile chosenFile) {
-        return virtualFileToUrl(chosenFile, project).toDecodedForm();
+        if (chosenFile.isDirectory()) {
+          return chosenFile.getPath();
+        }
+
+        Url url = virtualFileToUrl(chosenFile, project);
+        return url == null ? chosenFile.getUrl() : url.toDecodedForm();
       }
     });
   }

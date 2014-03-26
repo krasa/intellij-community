@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,8 +49,9 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.openapi.vfs.newvfs.BulkFileListener;
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent;
-import com.intellij.remotesdk.RemoteFile;
-import com.intellij.remotesdk.RemoteSdkData;
+import com.intellij.remote.RemoteSdkAdditionalData;
+import com.intellij.remote.RemoteFile;
+import com.intellij.remote.RemoteSdkCredentials;
 import com.intellij.util.ArrayUtil;
 import com.intellij.util.Function;
 import com.intellij.util.SystemProperties;
@@ -752,10 +753,10 @@ public class PyPackageManagerImpl extends PyPackageManager {
   private String getHelperPath(String helper) {
     String helperPath;
     final SdkAdditionalData sdkData = mySdk.getSdkAdditionalData();
-    if (sdkData instanceof RemoteSdkData) {
-      final RemoteSdkData remoteSdkData = (RemoteSdkData)sdkData;
-      if (!StringUtil.isEmpty(remoteSdkData.getHelpersPath())) {
-        helperPath = new RemoteFile(remoteSdkData.getHelpersPath(),
+    if (sdkData instanceof RemoteSdkCredentials) {
+      final RemoteSdkCredentials remoteSdkCredentials = (RemoteSdkCredentials)sdkData;
+      if (!StringUtil.isEmpty(remoteSdkCredentials.getHelpersPath())) {
+        helperPath = new RemoteFile(remoteSdkCredentials.getHelpersPath(),
                                     helper).getPath();
       }
       else {
@@ -778,10 +779,17 @@ public class PyPackageManagerImpl extends PyPackageManager {
     if (homePath == null) {
       throw new PyExternalProcessException(ERROR_INVALID_SDK, helperPath, args, "Cannot find interpreter for SDK");
     }
-    if (sdkData instanceof RemoteSdkData) { //remote interpreter
-      final RemoteSdkData remoteSdkData = (RemoteSdkData)sdkData;
+    if (sdkData instanceof RemoteSdkAdditionalData) { //remote interpreter
+      RemoteSdkCredentials remoteSdkCredentials;
+      try {
+        remoteSdkCredentials = ((RemoteSdkAdditionalData)sdkData).getRemoteSdkCredentials();
+      }
+      catch (InterruptedException e) {
+        LOG.error(e);
+        remoteSdkCredentials = null;
+      }
       final PythonRemoteInterpreterManager manager = PythonRemoteInterpreterManager.getInstance();
-      if (manager != null) {
+      if (manager != null && remoteSdkCredentials != null) {
         final List<String> cmdline = new ArrayList<String>();
         cmdline.add(homePath);
         cmdline.add(RemoteFile.detectSystemByPath(homePath).createRemoteFile(helperPath).getPath());
@@ -793,11 +801,11 @@ public class PyPackageManagerImpl extends PyPackageManager {
         }));
         try {
           if (askForSudo) {
-            askForSudo = !manager.ensureCanWrite(null, remoteSdkData, remoteSdkData.getInterpreterPath());
+            askForSudo = !manager.ensureCanWrite(null, remoteSdkCredentials, remoteSdkCredentials.getInterpreterPath());
           }
           ProcessOutput processOutput;
           do {
-            processOutput = manager.runRemoteProcess(null, remoteSdkData, ArrayUtil.toStringArray(cmdline), workingDir, askForSudo);
+            processOutput = manager.runRemoteProcess(null, remoteSdkCredentials, ArrayUtil.toStringArray(cmdline), workingDir, askForSudo);
             if (askForSudo && processOutput.getStderr().contains("sudo: 3 incorrect password attempts")) {
               continue;
             }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,7 +30,6 @@ import com.intellij.util.IncorrectOperationException;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.plugins.groovy.codeInspection.GrInspectionUtil;
-import org.jetbrains.plugins.groovy.codeInspection.untypedUnresolvedAccess.GrUnresolvedAccessInspection;
 import org.jetbrains.plugins.groovy.codeInspection.utils.ControlFlowUtils;
 import org.jetbrains.plugins.groovy.intentions.conversions.strings.ConvertGStringToStringIntention;
 import org.jetbrains.plugins.groovy.lang.psi.GrControlFlowOwner;
@@ -55,6 +54,7 @@ import org.jetbrains.plugins.groovy.lang.psi.api.statements.expressions.literals
 import org.jetbrains.plugins.groovy.lang.psi.api.statements.expressions.literals.GrString;
 import org.jetbrains.plugins.groovy.lang.psi.api.statements.expressions.path.GrIndexProperty;
 import org.jetbrains.plugins.groovy.lang.psi.api.statements.expressions.path.GrMethodCallExpression;
+import org.jetbrains.plugins.groovy.lang.psi.api.statements.expressions.path.GrPropertySelection;
 import org.jetbrains.plugins.groovy.lang.psi.api.statements.typedef.GrAnonymousClassDefinition;
 import org.jetbrains.plugins.groovy.lang.psi.api.statements.typedef.members.GrGdkMethod;
 import org.jetbrains.plugins.groovy.lang.psi.api.statements.typedef.members.GrMethod;
@@ -93,8 +93,8 @@ import static org.jetbrains.plugins.groovy.refactoring.convertToJava.TypeWriter.
 public class ExpressionGenerator extends Generator {
   private static final Logger LOG = Logger.getInstance("#org.jetbrains.plugins.groovy.refactoring.convertToJava.ExpressionGenerator");
 
-  private StringBuilder builder;
-  private GroovyPsiElementFactory factory;
+  private final StringBuilder builder;
+  private final GroovyPsiElementFactory factory;
 
   private final ExpressionContext context;
 
@@ -128,6 +128,7 @@ public class ExpressionGenerator extends Generator {
   }
 
 
+  @Override
   public void visitExpression(GrExpression expression) {
     LOG.error("this method should not be invoked");
   }
@@ -956,7 +957,7 @@ public class ExpressionGenerator extends Generator {
       return;
     }
 
-    if (GrUnresolvedAccessInspection.isClassReference(referenceExpression)) {
+    if (GrReferenceResolveUtil.isClassReference(referenceExpression)) {
       LOG.assertTrue(qualifier != null);
       qualifier.accept(this);
       builder.append(".class");
@@ -1271,6 +1272,13 @@ public class ExpressionGenerator extends Generator {
   }
 
   @Override
+  public void visitPropertySelection(GrPropertySelection expression) {
+    expression.getQualifier().accept(this);
+    builder.append('.');
+    builder.append(expression.getReferenceNameElement().getText());
+  }
+
+  @Override
   public void visitIndexProperty(GrIndexProperty expression) {
     final GrExpression selectedExpression = expression.getInvokedExpression();
     final PsiType thisType = selectedExpression.getType();
@@ -1403,7 +1411,7 @@ public class ExpressionGenerator extends Generator {
         final CheckProcessElement processor = new CheckProcessElement(method);
         ResolveUtil.processAllDeclarationsSeparately(conjunct, processor, new BaseScopeProcessor() {
           @Override
-          public boolean execute(@NotNull PsiElement element, ResolveState state) {
+          public boolean execute(@NotNull PsiElement element, @NotNull ResolveState state) {
             return false;
           }
         }, ResolveState.initial(), context);

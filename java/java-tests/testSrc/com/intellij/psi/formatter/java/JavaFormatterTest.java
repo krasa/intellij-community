@@ -25,10 +25,7 @@ import com.intellij.psi.JavaCodeFragmentFactory;
 import com.intellij.psi.JavaPsiFacade;
 import com.intellij.psi.PsiCodeFragment;
 import com.intellij.psi.PsiElement;
-import com.intellij.psi.codeStyle.CodeStyleManager;
-import com.intellij.psi.codeStyle.CodeStyleSettings;
-import com.intellij.psi.codeStyle.CodeStyleSettingsManager;
-import com.intellij.psi.codeStyle.CommonCodeStyleSettings;
+import com.intellij.psi.codeStyle.*;
 import com.intellij.util.IncorrectOperationException;
 import org.jetbrains.annotations.NonNls;
 
@@ -3018,5 +3015,37 @@ public void testSCR260() throws Exception {
     settings.FORMATTER_OFF_TAG = "not.*format";
     settings.FORMATTER_ON_TAG = "end.*fragment";
     doTest();
+  }
+
+  public void testDoNotIndentNotSelectedStatement_AfterSelectedOne() {
+    myTextRange = new TextRange(0, 73);
+    doTextTest(
+      "class Test {\n" +
+      "    public static void main(String[] args) {\n" +
+      "    int a = 3;\n" +
+      "    System.out.println(\"AAA\");\n" +
+      "    }\n" +
+      "}",
+      "class Test {\n" +
+      "    public static void main(String[] args) {\n" +
+      "        int a = 3;\n" +
+      "    System.out.println(\"AAA\");\n" +
+      "    }\n" +
+      "}"
+    );
+
+    myTextRange = new TextRange(0, 67);
+    doTextTest(
+      "    import java.lang.Override;\n" +
+      "    import java.lang.Exception;\n" +
+      "    \n" +
+      "    class Foo {\n" +
+      "}",
+      "import java.lang.Override;\n" +
+      "import java.lang.Exception;\n" +
+      "    \n" +
+      "    class Foo {\n" +
+      "}"
+    );
   }
 }

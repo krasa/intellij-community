@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2009 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -84,11 +84,13 @@ public class DomFileIndex extends ScalarIndexExtension<String>{
     return myDataIndexer;
   }
 
+  @NotNull
   @Override
   public KeyDescriptor<String> getKeyDescriptor() {
     return new EnumeratorStringDescriptor();
   }
 
+  @NotNull
   @Override
   public FileBasedIndex.InputFilter getInputFilter() {
     return new DefaultFileTypeSpecificInputFilter(StdFileTypes.XML);
@@ -101,13 +103,6 @@ public class DomFileIndex extends ScalarIndexExtension<String>{
 
   @Override
   public int getVersion() {
-    final DomApplicationComponent component = DomApplicationComponent.getInstance();
-    int result = 0;
-    for (DomFileDescription description : component.getAllFileDescriptions()) {
-      result += description.getVersion();
-      result += description.getRootTagName().hashCode(); // so that a plugin enabling/disabling could trigger the reindexing
-    }
-    return result;
+    return DomApplicationComponent.getInstance().getCumulativeVersion();
   }
-
 }

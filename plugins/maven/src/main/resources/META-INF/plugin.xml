@@ -2,7 +2,21 @@
   <id>org.jetbrains.idea.maven</id>
 
   <name>Maven Integration</name>
-  <description>Import Maven projects and execute Maven goals</description>
+  <description>
+      <![CDATA[
+      This plugin provides <a href="http://maven.apache.org/">Maven</a> support.
+      The following features are available:
+        <ul>
+        <li>Maven Projects tool window.</li>
+        <li>Dedicated module type.</li>
+        <li>Maven repositories support.</li>
+        <li>Full editing support for pom.xml file.</li>
+        <li>Possibility to import Maven projects.</li>
+        <li>Running and debugging Maven goals.</li>
+        <li>Compiling.</li>
+        </ul>
+      ]]>
+   </description>
   <vendor>JetBrains</vendor>
 
   <extensionPoints>
@@ -169,6 +183,9 @@
       <param name="reportFormat" values="brief, plain" soft="true"/>
       <param name="runOrder" values="alphabetical, reversealphabetical, random, hourly, failedfirst, balanced, filesystem" soft="true"/>
       <param name="testNGArtifactName" refProvider="org.jetbrains.idea.maven.plugins.api.common.MavenCommonParamReferenceProviders$DependencyWithoutVersion"/>
+
+      <property name="surefire.threadNumber" insideConfigurationOnly="true" />
+      <property name="surefire.forkNumber" insideConfigurationOnly="true" />
     </pluginDescriptor>
 
     <pluginDescriptor mavenId="org.apache.maven.plugins:maven-failsafe-plugin">
@@ -437,9 +454,6 @@
             icon="AllIcons.Nodes.ExceptionClass">
     </action>
 
-    <action id="Maven.Help"
-            class="com.intellij.ide.actions.ContextHelpAction" text="Help"/>
-
     <action id="Maven.ExpandAll" class="org.jetbrains.idea.maven.navigator.actions.MavenTreeAction$ExpandAll" text="Expand All"
             icon="AllIcons.Actions.Expandall"
             use-shortcut-of="ExpandAll"/>
@@ -527,7 +541,6 @@
       <reference id="Maven.CollapseAll"/>
       <separator/>
       <reference id="Maven.ShowSettings"/>
-      <reference id="Maven.Help"/>
     </group>
 
     <group id="Maven.DependencyMenu">

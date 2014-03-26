@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,6 +48,7 @@ import org.jetbrains.plugins.groovy.lang.psi.api.statements.*;
 import org.jetbrains.plugins.groovy.lang.psi.api.statements.arguments.GrArgumentList;
 import org.jetbrains.plugins.groovy.lang.psi.api.statements.arguments.GrNamedArgument;
 import org.jetbrains.plugins.groovy.lang.psi.api.statements.blocks.GrClosableBlock;
+import org.jetbrains.plugins.groovy.lang.psi.api.statements.expressions.GrCall;
 import org.jetbrains.plugins.groovy.lang.psi.api.statements.expressions.GrExpression;
 import org.jetbrains.plugins.groovy.lang.psi.api.statements.expressions.GrMethodCall;
 import org.jetbrains.plugins.groovy.lang.psi.api.statements.expressions.GrReferenceExpression;
@@ -788,7 +789,7 @@ public class ResolveUtil {
       ContainerUtil.addAll(allCandidates, applicable);
     }
 
-    if (allCandidates.size() > 0) {
+    if (!allCandidates.isEmpty()) {
       return allCandidates.toArray(new GroovyResolveResult[allCandidates.size()]);
     }
     else if (!hasApplicableMethods) {
@@ -849,7 +850,7 @@ public class ResolveUtil {
 
   @Nullable
   public static PsiClass resolveAnnotation(PsiElement insideAnnotation) {
-    final GrAnnotation annotation = PsiTreeUtil.getParentOfType(insideAnnotation, GrAnnotation.class);
+    final GrAnnotation annotation = PsiTreeUtil.getParentOfType(insideAnnotation, GrAnnotation.class, false);
     if (annotation == null) return null;
 
     final GrCodeReferenceElement reference = annotation.getClassReference();
@@ -916,6 +917,33 @@ public class ResolveUtil {
     }
   }
 
+  @NotNull
+  public static List<Pair<PsiParameter, PsiType>> collectExpectedParamsByArg(@NotNull PsiElement place,
+                                                                             @NotNull GroovyResolveResult[] variants,
+                                                                             @NotNull GrNamedArgument[] namedArguments,
+                                                                             @NotNull GrExpression[] expressionArguments,
+                                                                             @NotNull GrClosableBlock[] closureArguments,
+                                                                             @NotNull GrExpression arg) {
+    List<Pair<PsiParameter, PsiType>> expectedParams = ContainerUtil.newArrayList();
+
+    for (GroovyResolveResult variant : variants) {
+      final Map<GrExpression, Pair<PsiParameter, PsiType>> map = GrClosureSignatureUtil.mapArgumentsToParameters(
+        variant, place, true, true, namedArguments, expressionArguments, closureArguments
+      );
+
+      if (map != null) {
+        final Pair<PsiParameter, PsiType> pair = map.get(arg);
+        ContainerUtil.addIfNotNull(expectedParams, pair);
+      }
+    }
+    return expectedParams;
+  }
+
+  @NotNull
+  public static List<Pair<PsiParameter, PsiType>> collectExpectedParamsByArg(@NotNull GrCall call, @NotNull GrExpression arg) {
+    return collectExpectedParamsByArg(arg, call.getCallVariants(arg), call.getNamedArguments(), call.getExpressionArguments(), call.getClosureArguments(), arg);
+  }
+
   private static class DuplicateVariablesProcessor extends PropertyResolverProcessor {
     private boolean myBorderPassed;
     private final boolean myHasVisibilityModifier;
@@ -932,7 +960,7 @@ public class ResolveUtil {
     }
 
     @Override
-    public boolean execute(@NotNull PsiElement element, ResolveState state) {
+    public boolean execute(@NotNull PsiElement element, @NotNull ResolveState state) {
       if (myBorderPassed) {
         return false;
       }
@@ -944,7 +972,7 @@ public class ResolveUtil {
     }
 
     @Override
-    public void handleEvent(Event event, Object associated) {
+    public void handleEvent(@NotNull Event event, Object associated) {
       if (event == DECLARATION_SCOPE_PASSED) {
         myBorderPassed = true;
       }

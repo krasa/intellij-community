@@ -32,10 +32,12 @@ import com.intellij.openapi.vcs.CalledInAwt;
 import com.intellij.openapi.vcs.changes.committed.AbstractCalledLater;
 import com.intellij.openapi.vcs.ui.VcsBalloonProblemNotifier;
 import com.intellij.util.EventDispatcher;
+import com.intellij.util.SystemProperties;
 import com.intellij.util.messages.Topic;
 import com.intellij.util.net.HttpConfigurable;
 import com.intellij.util.proxy.CommonProxy;
 import com.intellij.util.ui.UIUtil;
+import com.trilead.ssh2.auth.AgentProxy;
 import org.intellij.lang.annotations.MagicConstant;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.idea.svn.auth.ProviderType;
@@ -117,6 +119,40 @@ public class SvnAuthenticationManager extends DefaultSVNAuthenticationManager im
 
       }
     });
+  }
+
+  public String getDefaultUsername(String kind, SVNURL url) {
+    String result = SystemProperties.getUserName();
+
+    // USERNAME authentication is also requested in SVNSSHConnector.open()
+    if (ISVNAuthenticationManager.SSH.equals(kind) ||
+        (ISVNAuthenticationManager.USERNAME.equals(kind) && SVN_SSH.equals(url.getProtocol()))) {
+      result = url != null && !StringUtil.isEmpty(url.getUserInfo()) ? url.getUserInfo() : getDefaultOptions().getDefaultSSHUserName();
+    }
+
+    return result;
+  }
+
+  @Override
+  protected SVNSSHAuthentication getDefaultSSHAuthentication(SVNURL url) {
+    String userName = getDefaultUsername(ISVNAuthenticationManager.SSH, url);
+
+    // This is fully copied from base class - DefaultSVNAuthenticationManager - as there are no setters in Authentication classes
+    // and there is no url parameter if overriding getDefaultOptions()
+    String password = getDefaultOptions().getDefaultSSHPassword();
+    String keyFile = getDefaultOptions().getDefaultSSHKeyFile();
+    int port = getDefaultOptions().getDefaultSSHPortNumber();
+    String passphrase = getDefaultOptions().getDefaultSSHPassphrase();
+
+    if (userName != null && password != null) {
+      return new SVNSSHAuthentication(userName, password, port, getHostOptionsProvider().getHostOptions(url).isAuthStorageEnabled(), url,
+                                      false);
+    }
+    else if (userName != null && keyFile != null) {
+      return new SVNSSHAuthentication(userName, new File(keyFile), passphrase, port,
+                                      getHostOptionsProvider().getHostOptions(url).isAuthStorageEnabled(), url, false);
+    }
+    return null;
   }
 
   private class AuthenticationProviderProxy implements ISVNAuthenticationProvider {
@@ -452,7 +488,7 @@ public class SvnAuthenticationManager extends DefaultSVNAuthenticationManager im
   }
 
   @Override
-  public void acknowledgeConnectionSuccessful(SVNURL url) {
+  public void acknowledgeConnectionSuccessful(SVNURL url, String method) {
     CommonProxy.getInstance().removeNoProxy(url.getProtocol(), url.getHost(), url.getPort());
     SSLExceptionsHelper.removeInfo();
     ourThreadLocalProvider.remove();
@@ -474,6 +510,8 @@ public class SvnAuthenticationManager extends DefaultSVNAuthenticationManager im
                                         SVNErrorMessage errorMessage,
                                         SVNAuthentication authentication,
                                         SVNURL url) throws SVNException {
+    showSshAgentErrorIfAny(errorMessage, authentication);
+
     SSLExceptionsHelper.removeInfo();
     ourThreadLocalProvider.remove();
     if (url != null) {
@@ -491,6 +529,22 @@ public class SvnAuthenticationManager extends DefaultSVNAuthenticationManager im
       if (myArtificialSaving) {
         myArtificialSaving = false;
         throw new CredentialsSavedException(successSaving);
+      }
+    }
+  }
+
+  /**
+   * "Pageant is not running" error thrown in PageantConnector.query() method is caught and "eaten" in SVNKit logic.
+   * So for both cases "Pageant is not running" and "There are no valid keys in agent (both no keys at all and no valid keys for host)"
+   * we will get same "Credentials rejected by SSH server" error.
+   */
+  private void showSshAgentErrorIfAny(@Nullable SVNErrorMessage errorMessage, @Nullable SVNAuthentication authentication) {
+    if (errorMessage != null && authentication instanceof SVNSSHAuthentication) {
+      AgentProxy agentProxy = ((SVNSSHAuthentication)authentication).getAgentProxy();
+
+      if (agentProxy != null) {
+        // TODO: Most likely this should be updated with new VcsNotifier api.
+        VcsBalloonProblemNotifier.showOverChangesView(myProject, errorMessage.getFullMessage(), MessageType.ERROR);
       }
     }
   }
@@ -674,7 +728,7 @@ public class SvnAuthenticationManager extends DefaultSVNAuthenticationManager im
         return DEFAULT_READ_TIMEOUT;
     }
     if (SVN_SSH.equals(protocol)) {
-      return (int) getConfig().mySSHReadTimeout;
+      return (int)getConfig().getSshReadTimeout();
     }
     return 0;
   }
@@ -683,7 +737,7 @@ public class SvnAuthenticationManager extends DefaultSVNAuthenticationManager im
   public int getConnectTimeout(SVNRepository repository) {
     String protocol = repository.getLocation().getProtocol();
     if (SVN_SSH.equals(protocol)) {
-      return (int) getConfig().mySSHConnectionTimeout;
+      return (int)getConfig().getSshConnectionTimeout();
     }
     final int connectTimeout = super.getConnectTimeout(repository);
     if ((HTTP.equals(protocol) || HTTPS.equals(protocol)) && (connectTimeout <= 0)) {

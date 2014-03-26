@@ -44,7 +44,7 @@ public class PropertyUtil {
   private PropertyUtil() {
   }
 
-  public static boolean isSimplePropertyGetter(PsiMethod method) {
+  public static boolean isSimplePropertyGetter(@NotNull PsiMethod method) {
     return hasGetterName(method) && method.getParameterList().getParametersCount() == 0;
   }
 
@@ -103,7 +103,7 @@ public class PropertyUtil {
     return Comparing.equal(PsiUtil.resolveClassInType(TypeConversionUtil.erasure(returnType)), method.getContainingClass());
   }
 
-  @Nullable public static String getPropertyName(PsiMethod method) {
+  @Nullable public static String getPropertyName(@NotNull PsiMethod method) {
     if (isSimplePropertyGetter(method)) {
       return getPropertyNameByGetter(method);
     }
@@ -308,7 +308,8 @@ public class PropertyUtil {
   }
 
   public static String suggestGetterName(@NotNull String propertyName, @Nullable PsiType propertyType, @NonNls String existingGetterName) {
-    @NonNls StringBuilder name = new StringBuilder(StringUtil.capitalizeWithJavaBeanConvention(propertyName));
+    @NonNls StringBuilder name =
+      new StringBuilder(StringUtil.capitalizeWithJavaBeanConvention(StringUtil.sanitizeJavaIdentifier(propertyName)));
     if (isBoolean(propertyType)) {
       if (existingGetterName == null || !existingGetterName.startsWith("get")) {
         name.insert(0, IS_PREFIX);
@@ -330,12 +331,13 @@ public class PropertyUtil {
 
   @NonNls
   public static String[] suggestGetterNames(String propertyName) {
-    final String str = StringUtil.capitalizeWithJavaBeanConvention(propertyName);
+    final String str = StringUtil.capitalizeWithJavaBeanConvention(StringUtil.sanitizeJavaIdentifier(propertyName));
     return new String[] { IS_PREFIX + str, "get" + str };
   }
 
   public static String suggestSetterName(@NonNls String propertyName) {
-    @NonNls StringBuilder name = new StringBuilder(StringUtil.capitalizeWithJavaBeanConvention(propertyName));
+    @NonNls StringBuilder name =
+      new StringBuilder(StringUtil.capitalizeWithJavaBeanConvention(StringUtil.sanitizeJavaIdentifier(propertyName)));
     name.insert(0, "set");
     return name.toString();
   }

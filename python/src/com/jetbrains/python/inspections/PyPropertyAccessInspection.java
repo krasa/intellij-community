@@ -22,6 +22,7 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiElementVisitor;
 import com.intellij.util.containers.HashMap;
 import com.jetbrains.python.PyBundle;
+import com.jetbrains.python.inspections.quickfix.PyCreatePropertyQuickFix;
 import com.jetbrains.python.psi.*;
 import com.jetbrains.python.psi.types.PyClassType;
 import com.jetbrains.python.psi.types.PyType;
@@ -86,7 +87,7 @@ public class PyPropertyAccessInspection extends PyInspection {
               property = myPropertyCache.get(key);
             }
             else {
-              property = cls.findProperty(name);
+              property = cls.findProperty(name, true);
             }
             myPropertyCache.put(key, property); // we store nulls, too, to know that a property does not exist
             if (property != null) {
@@ -117,7 +118,7 @@ public class PyPropertyAccessInspection extends PyInspection {
         else {
           message = PyBundle.message("INSP.property.$0.cant.be.read", name);
         }
-        registerProblem(node, message);
+        registerProblem(node, message, new PyCreatePropertyQuickFix(dir));
       }
     }
 

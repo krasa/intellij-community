@@ -45,12 +45,14 @@ import com.intellij.openapi.util.io.FileSystemUtil;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.text.CharFilter;
 import com.intellij.openapi.util.text.StringUtil;
-import com.intellij.openapi.vfs.*;
+import com.intellij.openapi.vfs.JarFileSystem;
+import com.intellij.openapi.vfs.LocalFileSystem;
+import com.intellij.openapi.vfs.VfsUtilCore;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.PsiElement;
 import com.intellij.reference.SoftReference;
-import com.intellij.remotesdk.RemoteSdkData;
-import com.intellij.remotesdk.RemoteSdkDataHolder;
-import com.intellij.ui.awt.RelativePoint;
+import com.intellij.remote.RemoteSdkCredentials;
+import com.intellij.remote.RemoteSdkCredentialsHolder;
 import com.intellij.util.ArrayUtil;
 import com.intellij.util.Consumer;
 import com.intellij.util.NullableConsumer;
@@ -277,15 +279,18 @@ public class PythonSdkType extends SdkType {
 
   public void showCustomCreateUI(SdkModel sdkModel, final JComponent parentComponent, final Consumer<Sdk> sdkCreatedCallback) {
     Project project = CommonDataKeys.PROJECT.getData(DataManager.getInstance().getDataContext(parentComponent));
-    InterpreterPathChooser.show(project, sdkModel.getSdks(), RelativePoint.getCenterOf(parentComponent), true, new NullableConsumer<Sdk>() {
-      @Override
-      public void consume(@Nullable Sdk sdk) {
-        if (sdk != null) {
-          sdk.putUserData(SDK_CREATOR_COMPONENT_KEY, new WeakReference<Component>(parentComponent));
-          sdkCreatedCallback.consume(sdk);
+    final Point point = parentComponent.getMousePosition();
+    SwingUtilities.convertPointToScreen(point, parentComponent);
+    PythonSdkDetailsStep
+      .show(project, sdkModel.getSdks(), null, parentComponent, point, new NullableConsumer<Sdk>() {
+        @Override
+        public void consume(@Nullable Sdk sdk) {
+          if (sdk != null) {
+            sdk.putUserData(SDK_CREATOR_COMPONENT_KEY, new WeakReference<Component>(parentComponent));
+            sdkCreatedCallback.consume(sdk);
+          }
         }
-      }
-    });
+      });
   }
 
   public static boolean isVirtualEnv(Sdk sdk) {
@@ -402,18 +407,19 @@ public class PythonSdkType extends SdkType {
   }
 
   public static String suggestSdkNameFromVersion(String sdkHome, String version) {
-    final String short_home_name = FileUtil.getLocationRelativeToUserHome(sdkHome);
+    sdkHome = FileUtil.toSystemDependentName(sdkHome);
+    final String shortHomeName = FileUtil.getLocationRelativeToUserHome(sdkHome);
     if (version != null) {
-      File virtualenv_root = getVirtualEnvRoot(sdkHome);
-      if (virtualenv_root != null) {
-        version += " virtualenv at " + FileUtil.getLocationRelativeToUserHome(virtualenv_root.getAbsolutePath());
+      File virtualEnvRoot = getVirtualEnvRoot(sdkHome);
+      if (virtualEnvRoot != null) {
+        version += " virtualenv at " + FileUtil.getLocationRelativeToUserHome(virtualEnvRoot.getAbsolutePath());
       }
       else {
-        version += " (" + short_home_name + ")";
+        version += " (" + shortHomeName + ")";
       }
     }
     else {
-      version = "Unknown at " + short_home_name;
+      version = "Unknown at " + shortHomeName;
     } // last resort
     return version;
   }
@@ -432,7 +438,7 @@ public class PythonSdkType extends SdkType {
 
   @Override
   public SdkAdditionalData loadAdditionalData(@NotNull final Sdk currentSdk, final Element additional) {
-    if (RemoteSdkDataHolder.isRemoteSdk(currentSdk.getHomePath())) {
+    if (RemoteSdkCredentialsHolder.isRemoteSdk(currentSdk.getHomePath())) {
       PythonRemoteInterpreterManager manager = PythonRemoteInterpreterManager.getInstance();
       if (manager != null) {
         return manager.loadRemoteSdkData(currentSdk, additional);
@@ -475,10 +481,10 @@ public class PythonSdkType extends SdkType {
     if (flavor != null) {
       VirtualFile sdkPath = flavor.getSdkPath(homePath);
       if (sdkPath != null) {
-        return sdkPath.getPath();
+        return FileUtil.toSystemDependentName(sdkPath.getPath());
       }
     }
-    return path;
+    return FileUtil.toSystemDependentName(path);
   }
 
   public void setupSdkPaths(@NotNull final Sdk sdk) {
@@ -653,9 +659,9 @@ public class PythonSdkType extends SdkType {
   }
 
   public static void addSdkRoot(SdkModificator sdkModificator, String path) {
-    VirtualFile child = LocalFileSystem.getInstance().refreshAndFindFileByPath(path);
-    if (child != null) {
-      addSdkRoot(sdkModificator, child);
+    final VirtualFile file = LocalFileSystem.getInstance().refreshAndFindFileByPath(path);
+    if (file != null) {
+      addSdkRoot(sdkModificator, file);
     }
     else {
       LOG.info("Bogus sys.path entry " + path);
@@ -663,19 +669,26 @@ public class PythonSdkType extends SdkType {
   }
 
   private static void addSdkRoot(@NotNull SdkModificator sdkModificator, @NotNull VirtualFile child) {
-    @NonNls String suffix = child.getExtension();
-    if (suffix != null) suffix = suffix.toLowerCase(); // Why on earth empty suffix is null and not ""?
-    VirtualFile toAdd = child;
-    if ((!child.isDirectory()) && ("zip".equals(suffix) || "egg".equals(suffix))) {
+    // NOTE: Files marked as library sources are not considered part of project source. Since the directory of the project the
+    // user is working on is included in PYTHONPATH with many configurations (e.g. virtualenv), we must not mark SDK paths as
+    // library sources, only as classes.
+    sdkModificator.addRoot(getSdkRootVirtualFile(child), OrderRootType.CLASSES);
+  }
+
+  @NotNull
+  public static VirtualFile getSdkRootVirtualFile(@NotNull VirtualFile path) {
+    String suffix = path.getExtension();
+    if (suffix != null) {
+      suffix = suffix.toLowerCase(); // Why on earth empty suffix is null and not ""?
+    }
+    if ((!path.isDirectory()) && ("zip".equals(suffix) || "egg".equals(suffix))) {
       // a .zip / .egg file must have its root extracted first
-      toAdd = JarFileSystem.getInstance().getJarRootForLocalFile(child);
+      final VirtualFile jar = JarFileSystem.getInstance().getJarRootForLocalFile(path);
+      if (jar != null) {
+        return jar;
+      }
     }
-    if (toAdd != null) {
-      // NOTE: Files marked as library sources are not considered part of project source. Since the directory of the project the
-      // user is working on is included in PYTHONPATH with many configurations (e.g. virtualenv), we must not mark SDK paths as
-      // library sources, only as classes.
-      sdkModificator.addRoot(toAdd, OrderRootType.CLASSES);
-    }
+    return path;
   }
 
   public static String getSkeletonsPath(String basePath, String sdkHome) {
@@ -933,9 +946,9 @@ public class PythonSdkType extends SdkType {
   }
 
   public static boolean isIncompleteRemote(Sdk sdk) {
-    if (sdk.getSdkAdditionalData() instanceof RemoteSdkData) {
+    if (sdk.getSdkAdditionalData() instanceof RemoteSdkCredentials) {
       //noinspection ConstantConditions
-      if (!((RemoteSdkData)sdk.getSdkAdditionalData()).isInitialized()) {
+      if (!((RemoteSdkCredentials)sdk.getSdkAdditionalData()).isInitialized()) {
         return true;
       }
     }

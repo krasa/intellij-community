@@ -26,15 +26,12 @@ import com.jetbrains.python.PyTokenTypes;
 import com.jetbrains.python.PythonDialectsTokenSetProvider;
 import com.jetbrains.python.psi.*;
 import com.jetbrains.python.psi.resolve.PyResolveContext;
-import com.jetbrains.python.psi.resolve.PyResolveUtil;
 import com.jetbrains.python.psi.stubs.PyDecoratorStub;
 import com.jetbrains.python.psi.types.PyType;
 import com.jetbrains.python.psi.types.TypeEvalContext;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-
-import java.util.List;
 
 /**
  * @author dcheryasov
@@ -68,14 +65,14 @@ public class PyDecoratorImpl extends StubBasedPsiElementBase<PyDecoratorStub> im
     if (node != null) {
       PyReferenceExpression ref = (PyReferenceExpression)node.getPsi();
       PsiElement target = ref.getReference().resolve();
-      return PyBuiltinCache.getInstance(this).hasInBuiltins(target);
+      return PyBuiltinCache.getInstance(this).isBuiltin(target);
     }
     return false;
   }
 
   public boolean hasArgumentList() {
-    ASTNode arglist_node = getNode().findChildByType(PyElementTypes.ARGUMENT_LIST);
-    return (arglist_node != null) && (arglist_node.findChildByType(PyTokenTypes.LPAR) != null);
+    final ASTNode arglistNode = getNode().findChildByType(PyElementTypes.ARGUMENT_LIST);
+    return (arglistNode != null) && (arglistNode.findChildByType(PyTokenTypes.LPAR) != null);
   }
 
   public QualifiedName getQualifiedName() {
@@ -84,13 +81,9 @@ public class PyDecoratorImpl extends StubBasedPsiElementBase<PyDecoratorStub> im
       return stub.getQualifiedName();
     }
     else {
-      PyReferenceExpression node = PsiTreeUtil.getChildOfType(this, PyReferenceExpression.class);
+      final PyReferenceExpression node = PsiTreeUtil.getChildOfType(this, PyReferenceExpression.class);
       if (node != null) {
-        List<PyExpression> parts = PyResolveUtil.unwindQualifiers(node);
-        if (parts != null) {
-          //Collections.reverse(parts);
-          return PyQualifiedNameFactory.fromReferenceChain(parts);
-        }
+        return node.asQualifiedName();
       }
       return null;
     }
@@ -122,7 +115,7 @@ public class PyDecoratorImpl extends StubBasedPsiElementBase<PyDecoratorStub> im
   @Override
   public <T extends PsiElement> T getArgument(int index, Class<T> argClass) {
     PyExpression[] args = getArguments();
-    return args.length >= index && argClass.isInstance(args[index]) ? argClass.cast(args[index]) : null;
+    return args.length > index && argClass.isInstance(args[index]) ? argClass.cast(args[index]) : null;
   }
 
   @Override

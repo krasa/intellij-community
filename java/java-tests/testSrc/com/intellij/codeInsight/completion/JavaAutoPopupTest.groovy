@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import com.intellij.codeInsight.lookup.LookupManager
 import com.intellij.codeInsight.lookup.PsiTypeLookupItem
 import com.intellij.codeInsight.lookup.impl.LookupImpl
 import com.intellij.codeInsight.template.*
+import com.intellij.codeInsight.template.impl.LiveTemplateDocumentationProvider
 import com.intellij.codeInsight.template.impl.TemplateImpl
 import com.intellij.codeInsight.template.impl.TemplateManagerImpl
 import com.intellij.codeInsight.template.impl.TemplateSettings
@@ -51,7 +52,9 @@ import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiJavaFile
 import com.intellij.psi.statistics.StatisticsManager
 import com.intellij.psi.statistics.impl.StatisticsManagerImpl
+import com.intellij.testFramework.EditorTestUtil
 import com.intellij.util.containers.ContainerUtil
+import org.jetbrains.annotations.NotNull
 
 import java.awt.event.KeyEvent
 /**
@@ -546,7 +549,7 @@ public interface Test {
 
   static class LongReplacementOffsetContributor extends CompletionContributor {
     @Override
-    void duringCompletion(CompletionInitializationContext cxt) {
+    void duringCompletion(@NotNull CompletionInitializationContext cxt) {
       Thread.sleep 500
       ProgressManager.checkCanceled()
       cxt.replacementOffset--;
@@ -1139,21 +1142,71 @@ class Foo {{
 }}'''
   }
 
-  private doTestBlockSelection(final String textBefore, final String toType, final String textAfter) {
+  public void testMulticaret() {
+    doTestMulticaret """
+class Foo {{
+  <selection>t<caret></selection>x;
+  <selection>t<caret></selection>x;
+}}""", '\n', '''
+class Foo {{
+  toString()<caret>x;
+  toString()<caret>x;
+}}'''
+  }
+
+  public void testMulticaretTab() {
+    doTestMulticaret """
+class Foo {{
+  <selection>t<caret></selection>x;
+  <selection>t<caret></selection>x;
+}}""", '\t', '''
+class Foo {{
+  toString()<caret>;
+  toString()<caret>;
+}}'''
+  }
+
+  public void testMulticaretBackspace() {
+    doTestMulticaret """
+class Foo {{
+  <selection>t<caret></selection>;
+  <selection>t<caret></selection>;
+}}""", '\b\t', '''
+class Foo {{
+  toString()<caret>;
+  toString()<caret>;
+}}'''
+  }
+
+  private doTestMulticaret(final String textBefore, final String toType, final String textAfter) {
     myFixture.configureByText "a.java", textBefore
-    edt {
-      def caret = myFixture.editor.offsetToLogicalPosition(myFixture.editor.caretModel.offset)
-      myFixture.editor.selectionModel.setBlockSelection(caret, new LogicalPosition(caret.line + 1, caret.column + 1))
-    }
     type 'toStr'
     assert lookup
     type toType
     myFixture.checkResult textAfter
-    def start = myFixture.editor.selectionModel.blockStart
-    def end = myFixture.editor.selectionModel.blockEnd
-    assert start.line == end.line - 1
-    assert start.column == end.column
-    assert end == myFixture.editor.caretModel.logicalPosition
+  }
+
+  private doTestBlockSelection(final String textBefore, final String toType, final String textAfter) {
+    EditorTestUtil.disableMultipleCarets()
+    try {
+      myFixture.configureByText "a.java", textBefore
+      edt {
+        def caret = myFixture.editor.offsetToLogicalPosition(myFixture.editor.caretModel.offset)
+        myFixture.editor.selectionModel.setBlockSelection(caret, new LogicalPosition(caret.line + 1, caret.column + 1))
+      }
+      type 'toStr'
+      assert lookup
+      type toType
+      myFixture.checkResult textAfter
+      def start = myFixture.editor.selectionModel.blockStart
+      def end = myFixture.editor.selectionModel.blockEnd
+      assert start.line == end.line - 1
+      assert start.column == end.column
+      assert end == myFixture.editor.caretModel.logicalPosition
+    }
+    finally {
+      EditorTestUtil.enableMultipleCarets()
+    }
   }
 
   public void "test two non-imported classes when space selects first autopopup item"() {
@@ -1518,6 +1571,25 @@ class X extends Foo {
     assert myFixture.lookupElementStrings == ['public int getField']
   }
 
+  public void "test live template quick doc"() {
+    myFixture.configureByText "a.java", """
+class Cls {
+  void foo() {
+    <caret>
+  }
+  void mySout() {}
+}
+""" 
+    type('sout')
+    assert lookup
+    assert 'sout' in myFixture.lookupElementStrings
+
+    def docProvider = new LiveTemplateDocumentationProvider()
+    def docElement = docProvider.getDocumentationElementForLookupItem(myFixture.psiManager, lookup.currentItem, null)
+    assert docElement.presentation.presentableText == 'sout'
+    assert docProvider.generateDoc(docElement, docElement).contains('System.out')
+  }
+
   public void "test finishing class reference property value completion with dot opens autopopup"() {
     myFixture.configureByText "a.properties", "myprop=ja<caret>"
     type 'v'
@@ -1552,5 +1624,4 @@ class Foo {
     def tabKeyPresentation = KeyEvent.getKeyText(TemplateSettings.TAB_CHAR as int)
     assert p.typeText == "  [$tabKeyPresentation] "
   }
-
 }

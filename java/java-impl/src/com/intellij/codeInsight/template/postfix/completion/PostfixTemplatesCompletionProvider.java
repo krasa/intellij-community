@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,10 +19,10 @@ import com.intellij.codeInsight.completion.CompletionParameters;
 import com.intellij.codeInsight.completion.CompletionProvider;
 import com.intellij.codeInsight.completion.CompletionResultSet;
 import com.intellij.codeInsight.template.CustomTemplateCallback;
+import com.intellij.codeInsight.template.impl.LiveTemplateCompletionContributor;
 import com.intellij.codeInsight.template.postfix.settings.PostfixTemplatesSettings;
 import com.intellij.codeInsight.template.postfix.templates.PostfixLiveTemplate;
 import com.intellij.codeInsight.template.postfix.templates.PostfixTemplate;
-import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.patterns.StandardPatterns;
 import com.intellij.psi.PsiFile;
 import com.intellij.util.ProcessingContext;
@@ -33,7 +33,10 @@ import static com.intellij.codeInsight.template.postfix.completion.PostfixTempla
 class PostfixTemplatesCompletionProvider extends CompletionProvider<CompletionParameters> {
   @Override
   protected void addCompletions(@NotNull CompletionParameters parameters, ProcessingContext context, @NotNull CompletionResultSet result) {
-    if (!isCompletionEnabled(parameters)) {
+    if (!isCompletionEnabled(parameters) || LiveTemplateCompletionContributor.shouldShowAllTemplates()) {
+      /**
+       * disabled or covered with {@link com.intellij.codeInsight.template.impl.LiveTemplateCompletionContributor}
+       */
       return;
     }
 
@@ -46,15 +49,15 @@ class PostfixTemplatesCompletionProvider extends CompletionProvider<CompletionPa
         PostfixTemplate template = postfixLiveTemplate.getTemplateByKey(computedKey);
         if (template != null) {
           result = result.withPrefixMatcher(computedKey);
-          result.addElement(new PostfixTemplateLookupElement(template, postfixLiveTemplate.getShortcut()));
+          result.addElement(new PostfixTemplateLookupElement(postfixLiveTemplate, template, computedKey, true));
         }
       }
 
       CharSequence documentContent = parameters.getEditor().getDocument().getCharsSequence();
       String possibleKey = postfixLiveTemplate.computeTemplateKeyWithoutContextChecking(documentContent, parameters.getOffset());
-      if (StringUtil.isNotEmpty(possibleKey)) {
+      if (possibleKey != null) {
         result = result.withPrefixMatcher(possibleKey);
-        result.restartCompletionOnPrefixChange(StandardPatterns.string().startsWith(possibleKey));
+        result.restartCompletionOnPrefixChange(StandardPatterns.string().oneOf(postfixLiveTemplate.getAllTemplateKeys()));
       }
     }
   }

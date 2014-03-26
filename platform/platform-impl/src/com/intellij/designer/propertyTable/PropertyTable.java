@@ -25,6 +25,7 @@ import com.intellij.lang.annotation.HighlightSeverity;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.colors.EditorColorsManager;
 import com.intellij.openapi.editor.colors.TextAttributesKey;
+import com.intellij.openapi.ui.ComboBox;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.Comparing;
 import com.intellij.openapi.util.Pair;
@@ -847,7 +848,7 @@ public abstract class PropertyTable extends JBTable {
 
     if (isSetValue) {
       if (property.needRefreshPropertyList() || needRefresh[0]) {
-        update(myContainers, null, false);
+        update(myContainers, null, property.closeEditorDuringRefresh());
       }
       else {
         myModel.fireTableRowsUpdated(row, row);
@@ -1112,7 +1113,7 @@ public abstract class PropertyTable extends JBTable {
         }
 
         if (setValueAtRow(editingRow, value)) {
-          if (!continueEditing) {
+          if (!continueEditing && editingRow != -1) {
             PropertyEditor editor = myProperties.get(editingRow).getEditor();
             editor.removePropertyEditorListener(myPropertyEditorListener);
             removeEditor();
@@ -1149,8 +1150,7 @@ public abstract class PropertyTable extends JBTable {
         JComponent component = myEditor.getComponent(getCurrentComponent(), getPropertyContext(), getValue((Property)value), null);
 
         if (component instanceof JComboBox) {
-          component.putClientProperty("JComboBox.isTableCellEditor", Boolean.TRUE);
-          component.putClientProperty("tableCellEditor", this);
+          ComboBox.registerTableCellEditor((JComboBox)component, this);
         }
         else if (component instanceof JCheckBox) {
           component.putClientProperty("JComponent.sizeVariant", UIUtil.isUnderAquaLookAndFeel() ? "small" : null);

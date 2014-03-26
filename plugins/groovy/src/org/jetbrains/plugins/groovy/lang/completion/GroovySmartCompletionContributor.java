@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -287,8 +287,7 @@ public class GroovySmartCompletionContributor extends CompletionContributor {
       placeToInferType = (GrExpression)expression.getParent();
     }
 
-    final Set<PsiType> types = GroovyExpectedTypesProvider.getDefaultExpectedTypes(placeToInferType);
-    for (PsiType type : types) {
+    for (PsiType type : GroovyExpectedTypesProvider.getDefaultExpectedTypes(placeToInferType)) {
       if (type instanceof PsiArrayType) {
         final PsiType _type = GenericsUtil.eliminateWildcards(type);
         final LookupItem item = PsiTypeLookupItem.createLookupItem(_type, place, PsiTypeLookupItem.isDiamond(_type), ChooseTypeExpression.IMPORT_FIXER);
@@ -307,7 +306,7 @@ public class GroovySmartCompletionContributor extends CompletionContributor {
 
     final List<PsiClassType> expectedClassTypes = new SmartList<PsiClassType>();
 
-    for (PsiType psiType : types) {
+    for (PsiType psiType : GroovyExpectedTypesProvider.getDefaultExpectedTypes(placeToInferType)) {
       if (psiType instanceof PsiClassType) {
         PsiType type = GenericsUtil.eliminateWildcards(JavaCompletionUtil.originalize(psiType));
         final PsiClassType classType = (PsiClassType)type;
@@ -411,7 +410,9 @@ public class GroovySmartCompletionContributor extends CompletionContributor {
     }
 
     final LookupItem item = PsiTypeLookupItem.createLookupItem(GenericsUtil.eliminateWildcards(type), place, isDiamond, ChooseTypeExpression.IMPORT_FIXER);
-    JavaCompletionUtil.setShowFQN(item);
+    if (item.getObject() instanceof PsiClass) {
+      JavaCompletionUtil.setShowFQN(item);
+    }
     item.setInsertHandler(new AfterNewClassInsertHandler((PsiClassType)type, true));
     return item;
   }

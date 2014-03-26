@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -157,6 +157,7 @@ public abstract class ChooseByNameBase {
   protected boolean myInitIsDone;
   static final boolean ourLoadNamesEachTime = FileBasedIndex.ourEnableTracingOfKeyHashToVirtualFileMapping;
   private boolean myFixLostTyping = true;
+  private boolean myAlwaysHasMore = false;
 
   public boolean checkDisposed() {
     if (myDisposedFlag && myPostponedOkAction != null && !myPostponedOkAction.isProcessed()) {
@@ -188,12 +189,15 @@ public abstract class ChooseByNameBase {
   }
 
   @SuppressWarnings("UnusedDeclaration") // Used in MPS
-  protected ChooseByNameBase(Project project, @NotNull ChooseByNameModel model, @NotNull ChooseByNameItemProvider provider, String initialText) {
+  protected ChooseByNameBase(Project project,
+                             @NotNull ChooseByNameModel model,
+                             @NotNull ChooseByNameItemProvider provider,
+                             String initialText) {
     this(project, model, provider, initialText, 0);
   }
 
   /**
-   * @param initialText  initial text which will be in the lookup text field
+   * @param initialText initial text which will be in the lookup text field
    */
   protected ChooseByNameBase(Project project,
                              @NotNull ChooseByNameModel model,
@@ -631,7 +635,7 @@ public abstract class ChooseByNameBase {
                             ListSelectionModel.SINGLE_SELECTION);
     new ClickListener() {
       @Override
-      public boolean onClick(MouseEvent e, int clickCount) {
+      public boolean onClick(@NotNull MouseEvent e, int clickCount) {
         if (!myTextField.hasFocus()) {
           myTextField.requestFocus();
         }
@@ -1586,6 +1590,9 @@ public abstract class ChooseByNameBase {
           }
         }
       );
+      if (myAlwaysHasMore) {
+        elements.add(EXTRA_ELEM);
+      }
       if (ContributorsBasedGotoByModel.LOG.isDebugEnabled()) {
         long end = System.currentTimeMillis();
         ContributorsBasedGotoByModel.LOG.debug("addElementsByPattern("+pattern+"): "+(end-start)+"ms; "+elements.size()+" elements");
@@ -1649,6 +1656,19 @@ public abstract class ChooseByNameBase {
     myListSizeIncreasing = listSizeIncreasing;
   }
 
+  public boolean isAlwaysHasMore() {
+    return myAlwaysHasMore;
+  }
+
+  /**
+   * Display <tt>...</tt> item at the end of the list regardless of whether it was filled up or not.
+   * This option can be useful in cases, when it can't be said beforehand, that the next call to {@link ChooseByNameItemProvider}
+   * won't give new items.
+   */
+  public void setAlwaysHasMore(boolean enabled) {
+    myAlwaysHasMore = enabled;
+  }
+
   private static final String ACTION_NAME = "Show All in View";
 
   private abstract class ShowFindUsagesAction extends AnAction {
@@ -1698,7 +1718,7 @@ public abstract class ChooseByNameBase {
                   protected boolean isOverflow(@NotNull Set<Object> elementsArray) {
                     if (elementsArray.size() > UsageLimitUtil.USAGES_LIMIT - myMaximumListSizeLimit && !userAskedToAbort.getAndSet(true)) {
                       final UsageLimitUtil.Result ret = UsageLimitUtil.showTooManyUsagesWarning(myProject, UsageViewBundle
-                        .message("find.excessive.usage.count.prompt", elementsArray.size() + myMaximumListSizeLimit));
+                        .message("find.excessive.usage.count.prompt", elementsArray.size() + myMaximumListSizeLimit, StringUtil.pluralize(presentation.getUsagesWord())), presentation);
                       if (ret == UsageLimitUtil.Result.ABORT) {
                         overFlow[0] = true;
                         return true;

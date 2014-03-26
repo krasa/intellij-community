@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2009 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,11 +45,13 @@ import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.OpenFileDescriptor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.MessageType;
+import com.intellij.openapi.util.Comparing;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.wm.ToolWindowId;
 import com.intellij.ui.AppUIUtil;
 import com.intellij.util.EventDispatcher;
 import com.intellij.util.SmartList;
+import com.intellij.util.containers.SmartHashSet;
 import com.intellij.util.ui.UIUtil;
 import com.intellij.xdebugger.*;
 import com.intellij.xdebugger.breakpoints.*;
@@ -66,6 +68,7 @@ import com.intellij.xdebugger.impl.ui.XDebugSessionTab;
 import com.intellij.xdebugger.impl.ui.XDebuggerUIConstants;
 import com.intellij.xdebugger.stepping.XSmartStepIntoHandler;
 import com.intellij.xdebugger.stepping.XSmartStepIntoVariant;
+import gnu.trove.THashMap;
 import gnu.trove.THashSet;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -85,8 +88,8 @@ public class XDebugSessionImpl implements XDebugSession {
                                                                                                false);
   private XDebugProcess myDebugProcess;
   private final Map<XBreakpoint<?>, CustomizedBreakpointPresentation> myRegisteredBreakpoints =
-    new HashMap<XBreakpoint<?>, CustomizedBreakpointPresentation>();
-  private final Set<XBreakpoint<?>> myInactiveSlaveBreakpoints = new HashSet<XBreakpoint<?>>();
+    new THashMap<XBreakpoint<?>, CustomizedBreakpointPresentation>();
+  private final Set<XBreakpoint<?>> myInactiveSlaveBreakpoints = new SmartHashSet<XBreakpoint<?>>();
   private boolean myBreakpointsMuted;
   private boolean myBreakpointsDisabled;
   private final XDebuggerManagerImpl myDebuggerManager;
@@ -114,6 +117,7 @@ public class XDebugSessionImpl implements XDebugSession {
   private final Icon myIcon;
 
   private volatile boolean breakpointsInitialized;
+  private boolean autoInitBreakpoints = true;
 
   public XDebugSessionImpl(final @NotNull ExecutionEnvironment env, final @NotNull ProgramRunner runner,
                            XDebuggerManagerImpl debuggerManager) {
@@ -154,6 +158,11 @@ public class XDebugSessionImpl implements XDebugSession {
     else {
       LOG.assertTrue(mySessionTab != null, "Debug tool window not initialized yet!");
     }
+  }
+
+  @Override
+  public void setAutoInitBreakpoints(boolean value) {
+    autoInitBreakpoints = value;
   }
 
   @Override
@@ -230,7 +239,7 @@ public class XDebugSessionImpl implements XDebugSession {
     myDebugProcess = process;
     mySessionData = sessionData;
 
-    if (myDebugProcess.checkCanInitBreakpoints()) {
+    if (autoInitBreakpoints && myDebugProcess.checkCanInitBreakpoints()) {
       initBreakpoints();
     }
 
@@ -322,7 +331,8 @@ public class XDebugSessionImpl implements XDebugSession {
     return myValueMarkers;
   }
 
-  private static <B extends XBreakpoint<?>> XBreakpointType<?, ?> getBreakpointTypeClass(final XBreakpointHandler<B> handler) {
+  @SuppressWarnings("unchecked") //need to compile under 1.8, please do not remove before checking
+  private static XBreakpointType getBreakpointTypeClass(final XBreakpointHandler handler) {
     return XDebuggerUtil.getInstance().findBreakpointType(handler.getBreakpointTypeClass());
   }
 
@@ -344,12 +354,9 @@ public class XDebugSessionImpl implements XDebugSession {
       handler.registerBreakpoint(b);
     }
     if (!register) {
-      boolean removed = false;
+      boolean removed;
       synchronized (myRegisteredBreakpoints) {
-        if (myRegisteredBreakpoints.containsKey(b)) {
-          myRegisteredBreakpoints.remove(b);
-          removed = true;
-        }
+        removed = myRegisteredBreakpoints.remove(b) != null;
       }
       if (removed) {
         handler.unregisterBreakpoint(b, temporary);
@@ -595,14 +602,15 @@ public class XDebugSessionImpl implements XDebugSession {
     CustomizedBreakpointPresentation presentation;
     synchronized (myRegisteredBreakpoints) {
       presentation = myRegisteredBreakpoints.get(breakpoint);
-      if (presentation != null) {
-        presentation.setErrorMessage(errorMessage);
-        presentation.setIcon(icon);
+      if (presentation == null ||
+          (Comparing.equal(presentation.getIcon(), icon) && Comparing.strEqual(presentation.getErrorMessage(), errorMessage))) {
+        return;
       }
+
+      presentation.setErrorMessage(errorMessage);
+      presentation.setIcon(icon);
     }
-    if (presentation != null) {
-      myDebuggerManager.getBreakpointManager().getLineBreakpointManager().queueBreakpointUpdate((XLineBreakpointImpl<?>)breakpoint);
-    }
+    myDebuggerManager.getBreakpointManager().getLineBreakpointManager().queueBreakpointUpdate((XLineBreakpointImpl<?>)breakpoint);
   }
 
   @Override
@@ -772,7 +780,7 @@ public class XDebugSessionImpl implements XDebugSession {
       myBreakpointsDisabled = false;
       new ReadAction() {
         @Override
-        protected void run(final Result result) {
+        protected void run(@NotNull Result result) {
           processAllBreakpoints(true, false);
         }
       }.execute();

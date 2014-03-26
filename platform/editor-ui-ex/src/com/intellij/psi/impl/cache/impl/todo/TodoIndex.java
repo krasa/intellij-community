@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2009 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import com.intellij.psi.search.IndexPatternProvider;
 import com.intellij.psi.tree.TokenSet;
 import com.intellij.util.indexing.*;
 import com.intellij.util.io.DataExternalizer;
+import com.intellij.util.io.IntInlineKeyDescriptor;
 import com.intellij.util.io.KeyDescriptor;
 import com.intellij.util.messages.MessageBus;
 import org.jetbrains.annotations.NonNls;
@@ -69,28 +70,23 @@ public class TodoIndex extends FileBasedIndexExtension<TodoIndexEntry, Integer> 
     }
 
     @Override
-    public void save(final DataOutput out, final TodoIndexEntry value) throws IOException {
+    public void save(@NotNull final DataOutput out, final TodoIndexEntry value) throws IOException {
       out.writeUTF(value.pattern);
       out.writeBoolean(value.caseSensitive);
     }
 
     @Override
-    public TodoIndexEntry read(final DataInput in) throws IOException {
+    public TodoIndexEntry read(@NotNull final DataInput in) throws IOException {
       final String pattern = in.readUTF();
       final boolean caseSensitive = in.readBoolean();
       return new TodoIndexEntry(pattern, caseSensitive);
     }
   };
   
-  private final DataExternalizer<Integer> myValueExternalizer = new DataExternalizer<Integer>() {
+  private final DataExternalizer<Integer> myValueExternalizer = new IntInlineKeyDescriptor() {
     @Override
-    public void save(final DataOutput out, final Integer value) throws IOException {
-      out.writeInt(value.intValue());
-    }
-
-    @Override
-    public Integer read(final DataInput in) throws IOException {
-      return Integer.valueOf(in.readInt());
+    protected boolean isCompactFormat() {
+      return true;
     }
   };
 
@@ -110,7 +106,7 @@ public class TodoIndex extends FileBasedIndexExtension<TodoIndexEntry, Integer> 
   
   private final FileBasedIndex.InputFilter myInputFilter = new FileBasedIndex.InputFilter() {
     @Override
-    public boolean acceptInput(final VirtualFile file) {
+    public boolean acceptInput(@NotNull final VirtualFile file) {
       if (!file.isInLocalFileSystem()) {
         return false; // do not index TODOs in library sources
       }
@@ -131,7 +127,7 @@ public class TodoIndex extends FileBasedIndexExtension<TodoIndexEntry, Integer> 
 
   @Override
   public int getVersion() {
-    return 5;
+    return 6;
   }
 
   @Override
@@ -151,16 +147,19 @@ public class TodoIndex extends FileBasedIndexExtension<TodoIndexEntry, Integer> 
     return myIndexer;
   }
 
+  @NotNull
   @Override
   public KeyDescriptor<TodoIndexEntry> getKeyDescriptor() {
     return myKeyDescriptor;
   }
 
+  @NotNull
   @Override
   public DataExternalizer<Integer> getValueExternalizer() {
     return myValueExternalizer;
   }
 
+  @NotNull
   @Override
   public FileBasedIndex.InputFilter getInputFilter() {
     return myInputFilter;

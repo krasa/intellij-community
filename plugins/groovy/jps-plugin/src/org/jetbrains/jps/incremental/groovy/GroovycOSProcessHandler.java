@@ -65,7 +65,7 @@ public class GroovycOSProcessHandler extends BaseOSProcessHandler {
       return;
     }
 
-    if (outputType == ProcessOutputTypes.STDERR) {
+    if (outputType == ProcessOutputTypes.STDERR && !text.startsWith("Picked up JAVA_TOOL_OPTIONS")) {
       stdErr.append(StringUtil.convertLineSeparators(text));
       return;
     }
@@ -219,10 +219,12 @@ public class GroovycOSProcessHandler extends BaseOSProcessHandler {
     if (unparsedBuffer.length() != 0) {
       String msg = unparsedBuffer.toString();
       if (msg.contains(GroovyRtConstants.NO_GROOVY)) {
-        msg = "Cannot compile Groovy files: no Groovy library is defined for module '" + moduleName + "'";
+        messages.add(new CompilerMessage("", BuildMessage.Kind.ERROR,
+                                         "Cannot compile Groovy files: no Groovy library is defined for module '" + moduleName + "'"));
+      } else {
+        messages.add(new CompilerMessage("Groovyc", BuildMessage.Kind.INFO, msg));
       }
 
-      messages.add(new CompilerMessage("Groovyc", BuildMessage.Kind.INFO, msg));
     }
 
     final int exitValue = getProcess().exitValue();
@@ -244,12 +246,18 @@ public class GroovycOSProcessHandler extends BaseOSProcessHandler {
 
   public static File fillFileWithGroovycParameters(final String outputDir,
                                                    final Collection<String> changedSources,
-                                                   String finalOutput,
-                                                   Map<String, String> class2Src, @Nullable final String encoding, List<String> patchers) throws IOException {
+                                                   Collection<String> finalOutputs,
+                                                   Map<String, String> class2Src,
+                                                   @Nullable final String encoding,
+                                                   List<String> patchers,
+                                                   String classpath) throws IOException {
     File tempFile = FileUtil.createTempFile("ideaGroovyToCompile", ".txt", true);
 
     final Writer writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(tempFile)));
     try {
+      writer.write(classpath);
+      writer.write("\n");
+
       for (String file : changedSources) {
         writer.write(GroovyRtConstants.SRC_FILE + "\n");
         writer.write(file);
@@ -276,7 +284,7 @@ public class GroovycOSProcessHandler extends BaseOSProcessHandler {
       writer.write(outputDir);
       writer.write("\n");
       writer.write(GroovyRtConstants.FINAL_OUTPUTPATH + "\n");
-      writer.write(finalOutput);
+      writer.write(StringUtil.join(finalOutputs, File.pathSeparator));
       writer.write("\n");
     }
     finally {

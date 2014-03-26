@@ -83,10 +83,11 @@ public class SvnUpdateEnvironment extends AbstractSvnUpdateIntegrateEnvironment 
       if (isSwitch) {
         final UpdateClient updateClient = createUpdateClient(configuration, root, true, sourceUrl);
         myHandler.addToSwitch(root, sourceUrl);
-        rev = updateClient.doSwitch(root, rootInfo.getUrl(), SVNRevision.UNDEFINED, updateTo, configuration.UPDATE_DEPTH, configuration.FORCE_UPDATE, false);
+        rev = updateClient.doSwitch(root, rootInfo.getUrl(), SVNRevision.UNDEFINED, updateTo, configuration.getUpdateDepth(),
+                                    configuration.isForceUpdate(), false);
       } else {
         final UpdateClient updateClient = createUpdateClient(configuration, root, false, sourceUrl);
-        rev = updateClient.doUpdate(root, updateTo, configuration.UPDATE_DEPTH, configuration.FORCE_UPDATE, false);
+        rev = updateClient.doUpdate(root, updateTo, configuration.getUpdateDepth(), configuration.isForceUpdate(), false);
       }
 
       myPostUpdateFiles.setRevisions(root.getAbsolutePath(), myVcs, new SvnRevisionNumber(SVNRevision.create(rev)));
@@ -95,19 +96,13 @@ public class SvnUpdateEnvironment extends AbstractSvnUpdateIntegrateEnvironment 
     }
 
     private UpdateClient createUpdateClient(SvnConfiguration configuration, File root, boolean isSwitch, SVNURL sourceUrl) {
-      boolean is17 = WorkingCopyFormat.ONE_DOT_SEVEN.equals(myVcs.getWorkingCopyFormat(root));
-      boolean isSupportedProtocol =
-        SvnAuthenticationManager.HTTP.equals(sourceUrl.getProtocol()) || SvnAuthenticationManager.HTTPS.equals(sourceUrl.getProtocol());
-
-      // TODO: Update this with just myVcs.getFactory(root) when switch and authentication protocols are implemented for command line
-      ClientFactory factory = is17 && (isSwitch || !isSupportedProtocol) ? myVcs.getSvnKitFactory() : myVcs.getFactory(root);
-      final UpdateClient updateClient = factory.createUpdateClient();
+      final UpdateClient updateClient = myVcs.getFactory(root).createUpdateClient();
 
       if (! isSwitch) {
-        updateClient.setIgnoreExternals(configuration.IGNORE_EXTERNALS);
+        updateClient.setIgnoreExternals(configuration.isIgnoreExternals());
       }
       updateClient.setEventHandler(myHandler);
-      updateClient.setUpdateLocksOnDemand(configuration.UPDATE_LOCK_ON_DEMAND);
+      updateClient.setUpdateLocksOnDemand(configuration.isUpdateLockOnDemand());
 
       return updateClient;
     }

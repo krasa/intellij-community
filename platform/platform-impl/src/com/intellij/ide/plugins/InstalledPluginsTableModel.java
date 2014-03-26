@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -65,9 +65,11 @@ public class InstalledPluginsTableModel extends PluginTableModel {
   private final Map<PluginId, Set<PluginId>> myDependentToRequiredListMap = new HashMap<PluginId, Set<PluginId>>();
 
   private static final String ENABLED_DISABLED = "All plugins";
-  private static final String ENABLED = "Enabled plugins";
-  private static final String DISABLED = "Disabled plugins";
-  public static final String[] ENABLED_VALUES = new String[] {ENABLED_DISABLED, ENABLED, DISABLED};
+  private static final String ENABLED = "Enabled";
+  private static final String DISABLED = "Disabled";
+  private static final String BUNDLED = "Bundled";
+  private static final String CUSTOM = "Custom";
+  public static final String[] ENABLED_VALUES = new String[] {ENABLED_DISABLED, ENABLED, DISABLED, BUNDLED, CUSTOM};
   private String myEnabledFilter = ENABLED_DISABLED;
 
   private final Map<String, String> myPlugin2host = new HashMap<String, String>();
@@ -75,7 +77,7 @@ public class InstalledPluginsTableModel extends PluginTableModel {
 
 
   public InstalledPluginsTableModel() {
-    super.columns = new ColumnInfo[]{new EnabledPluginInfo(), new MyPluginManagerColumnInfo()};
+    super.columns = new ColumnInfo[]{new MyPluginManagerColumnInfo(), new EnabledPluginInfo()};
     view = new ArrayList<IdeaPluginDescriptor>(Arrays.asList(PluginManager.getPlugins()));
     view.addAll(myInstalled);
     reset(view);
@@ -87,6 +89,11 @@ public class InstalledPluginsTableModel extends PluginTableModel {
     }
 
     setSortKey(new RowSorter.SortKey(getNameColumn(), SortOrder.ASCENDING));
+  }
+
+  public boolean hasProblematicDependencies(PluginId pluginId) {
+    final Set<PluginId> ids = myDependentToRequiredListMap.get(pluginId);
+    return ids != null && !ids.isEmpty();
   }
 
   public boolean appendOrUpdateDescriptor(IdeaPluginDescriptor descriptor) {
@@ -117,11 +124,11 @@ public class InstalledPluginsTableModel extends PluginTableModel {
   }
 
   public static int getCheckboxColumn() {
-    return 0;
+    return 1;
   }
 
   public int getNameColumn() {
-    return 1;
+    return 0;
   }
 
   private void reset(final List<IdeaPluginDescriptor> list) {
@@ -361,6 +368,9 @@ public class InstalledPluginsTableModel extends PluginTableModel {
       final boolean enabled = isEnabled(descriptor.getPluginId());
       if (enabled && myEnabledFilter.equals(DISABLED)) return false;
       if (!enabled && myEnabledFilter.equals(ENABLED)) return false;
+      final boolean bundled = descriptor.isBundled();
+      if (bundled && myEnabledFilter.equals(CUSTOM)) return false;
+      if (!bundled && myEnabledFilter.equals(BUNDLED)) return false;
     }
     return true;
   }
@@ -368,7 +378,7 @@ public class InstalledPluginsTableModel extends PluginTableModel {
   private class EnabledPluginInfo extends ColumnInfo<IdeaPluginDescriptor, Boolean> {
 
     public EnabledPluginInfo() {
-      super(IdeBundle.message("plugin.manager.enable.column.title"));
+      super(/*IdeBundle.message("plugin.manager.enable.column.title")*/"");
     }
 
     public Boolean valueOf(IdeaPluginDescriptor ideaPluginDescriptor) {
@@ -430,6 +440,11 @@ public class InstalledPluginsTableModel extends PluginTableModel {
           }
         }
       };
+    }
+
+    @Override
+    public int getWidth(JTable table) {
+      return new JCheckBox().getPreferredSize().width;
     }
   }
 
@@ -637,7 +652,7 @@ public class InstalledPluginsTableModel extends PluginTableModel {
 
     @Override
     public TableCellRenderer getRenderer(final IdeaPluginDescriptor pluginDescriptor) {
-      return new InstalledPluginsTableRenderer(pluginDescriptor);
+      return new PluginsTableRenderer(pluginDescriptor, false);
     }
 
     @Override
@@ -701,6 +716,11 @@ public class InstalledPluginsTableModel extends PluginTableModel {
           return comparator.compare(o1, o2);
         }
       };
+    }
+
+    @Override
+    public int getWidth(JTable table) {
+      return super.getWidth(table);
     }
   }
 }

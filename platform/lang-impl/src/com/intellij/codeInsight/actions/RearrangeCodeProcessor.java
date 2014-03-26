@@ -44,6 +44,14 @@ public class RearrangeCodeProcessor extends AbstractLayoutCodeProcessor {
     myAcceptCondition = acceptCondition;
   }
 
+  public RearrangeCodeProcessor(@NotNull Project project,
+                                @NotNull PsiFile[] files,
+                                @NotNull String commandName,
+                                @Nullable Runnable postRunnable)
+  {
+    super(project, files, PROGRESS_TEXT, commandName, postRunnable, false);
+  }
+
   public boolean shouldRearrangeFile(@NotNull PsiFile file) {
     return myAcceptCondition == null || myAcceptCondition.value(file);
   }
@@ -59,9 +67,8 @@ public class RearrangeCodeProcessor extends AbstractLayoutCodeProcessor {
         RearrangeCommand rearranger = new RearrangeCommand(myProject, file, COMMAND_NAME);
         if (rearranger.couldRearrange()) {
           rearranger.run();
-          return true;
         }
-        return false;
+        return true;
       }
     });
   }

@@ -71,10 +71,12 @@ public class JavaDocInfoGenerator {
   @NonNls private static final String INHERITDOC_TAG = "inheritDoc";
   @NonNls private static final String DOCROOT_TAG    = "docRoot";
   @NonNls private static final String VALUE_TAG      = "value";
-  
+  private static final String LT = "&lt;";
+  private static final String GT = "&gt;";
+
   private final Project    myProject;
   private final PsiElement myElement;
-  
+
   interface InheritDocProvider<T> {
     Pair<T, InheritDocProvider<T>> getInheritDoc();
 
@@ -593,6 +595,48 @@ public class JavaDocInfoGenerator {
       generateEpilogue(buffer);
   }
 
+  public static @Nullable PsiExpression calcInitializerExpression(PsiVariable variable) {
+    PsiExpression initializer = variable.getInitializer();
+    if (initializer != null) {
+      PsiModifierList modifierList = variable.getModifierList();
+      if (modifierList != null && modifierList.hasModifierProperty(PsiModifier.FINAL) && !(initializer instanceof PsiLiteralExpression)) {
+        JavaPsiFacade instance = JavaPsiFacade.getInstance(variable.getProject());
+        Object o = instance.getConstantEvaluationHelper().computeConstantExpression(initializer);
+        if (o != null) {
+          String text = o.toString();
+          PsiType type = variable.getType();
+          if (type.equalsToText(CommonClassNames.JAVA_LANG_STRING)) {
+            text = "\"" + StringUtil.trimLog(text, 120) + "\"";
+          }
+          else if (type.equalsToText("char")) text = "'" + text + "'";
+          try {
+            return instance.getElementFactory().createExpressionFromText(text, variable);
+          } catch (IncorrectOperationException ex) {
+            LOG.error(text, ex);
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  public static boolean appendExpressionValue(StringBuilder buffer, PsiExpression initializer, String label) {
+    String text = initializer.getText().trim();
+    int index1 = text.indexOf('\n');
+    if (index1 < 0) index1 = text.length();
+    int index2 = text.indexOf('\r');
+    if (index2 < 0) index2 = text.length();
+    int index = Math.min(index1, index2);
+    boolean trunc = index < text.length();
+    text = text.substring(0, index);
+    buffer.append(label);
+    buffer.append(StringUtil.escapeXml(text));
+    if (trunc) {
+      buffer.append("...");
+    }
+    return trunc;
+  }
+
   private static void appendInitializer(StringBuilder buffer, PsiVariable variable) {
     PsiExpression initializer = variable.getInitializer();
     if (initializer != null) {
@@ -613,6 +657,11 @@ public class JavaDocInfoGenerator {
       }
       else {
         initializer.accept(new MyVisitor(buffer));
+      }
+      PsiExpression constantInitializer = calcInitializerExpression(variable);
+      if (constantInitializer != null) {
+        buffer.append("\n");
+        appendExpressionValue(buffer, constantInitializer, CodeInsightBundle.message("javadoc.resolved.value"));
       }
     }
   }
@@ -732,7 +781,7 @@ public class JavaDocInfoGenerator {
     }
 
     final String typeParamsString = generateTypeParameters(method);
-    indent += typeParamsString.length();
+    indent += StringUtil.unescapeXml(StringUtil.stripHtml(typeParamsString, true)).length();
     if (!typeParamsString.isEmpty()) {
       buffer.append(typeParamsString);
       buffer.append("&nbsp;");
@@ -1083,8 +1132,8 @@ public class JavaDocInfoGenerator {
   }
 
   private static void appendPlainText(@NonNls String text, final StringBuilder buffer) {
-    text = text.replaceAll("<", "&lt;");
-    text = text.replaceAll(">", "&gt;");
+    text = text.replaceAll("<", LT);
+    text = text.replaceAll(">", GT);
 
     buffer.append(text);
   }
@@ -1540,12 +1589,12 @@ public class JavaDocInfoGenerator {
       buffer.append("<font color=red>");
       buffer.append(label);
       buffer.append("</font>");
-      return label.length();
+      return StringUtil.stripHtml(label, true).length();
     }
 
 
     generateLink(buffer, target, label, plainLink);
-    return label.length();
+    return StringUtil.stripHtml(label, true).length();
   }
 
   /**
@@ -1605,9 +1654,10 @@ public class JavaDocInfoGenerator {
       PsiSubstitutor psiSubst = result.getSubstitutor();
 
       if (psiClass == null) {
-        String text = "<font color=red>" + StringUtil.escapeXml(type.getCanonicalText()) + "</font>";
+        String canonicalText = type.getCanonicalText();
+        String text = "<font color=red>" + StringUtil.escapeXml(canonicalText) + "</font>";
         buffer.append(text);
-        return text.length();
+        return canonicalText.length();
       }
 
       String qName = psiClass.getQualifiedName();
@@ -1632,7 +1682,8 @@ public class JavaDocInfoGenerator {
 
         PsiTypeParameter[] params = psiClass.getTypeParameters();
 
-        subst.append("&lt;");
+        subst.append(LT);
+        length += 1;
         boolean goodSubst = true;
         for (int i = 0; i < params.length; i++) {
           PsiType t = psiSubst.substitute(params[i]);
@@ -1649,7 +1700,8 @@ public class JavaDocInfoGenerator {
           }
         }
 
-        subst.append("&gt;");
+        subst.append(GT);
+        length += 1;
         if (goodSubst) {
           String text = subst.toString();
 
@@ -1662,9 +1714,10 @@ public class JavaDocInfoGenerator {
 
     if (type instanceof PsiDisjunctionType || type instanceof PsiIntersectionType) {
       if (!generateLink) {
-        final String text = StringUtil.escapeXml(type.getCanonicalText());
+        String canonicalText = type.getCanonicalText();
+        final String text = StringUtil.escapeXml(canonicalText);
         buffer.append(text);
-        return text.length();
+        return canonicalText.length();
       }
       else {
         final String separator = type instanceof PsiDisjunctionType ? " | " : " & ";
@@ -1697,7 +1750,7 @@ public class JavaDocInfoGenerator {
 
       StringBuilder buffer = new StringBuilder();
 
-      buffer.append("&lt;");
+      buffer.append(LT);
 
       for (int i = 0; i < parms.length; i++) {
         PsiTypeParameter p = parms[i];
@@ -1723,7 +1776,7 @@ public class JavaDocInfoGenerator {
         }
       }
 
-      buffer.append("&gt;");
+      buffer.append(GT);
 
       return buffer.toString();
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,14 +16,19 @@
 
 package com.intellij.util;
 
+import com.intellij.Patches;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.util.Condition;
+import com.intellij.util.containers.ContainerUtil;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import sun.reflect.ConstructorAccessor;
 
 import java.lang.reflect.*;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 
 public class ReflectionUtil {
@@ -40,20 +45,20 @@ public class ReflectionUtil {
   @Nullable
   public static Type resolveVariable(@NotNull TypeVariable variable, @NotNull Class classType, boolean resolveInInterfacesOnly) {
     final Class aClass = getRawType(classType);
-    int index = ArrayUtilRt.find(ReflectionCache.getTypeParameters(aClass), variable);
+    int index = ArrayUtilRt.find(aClass.getTypeParameters(), variable);
     if (index >= 0) {
       return variable;
     }
 
-    final Class[] classes = ReflectionCache.getInterfaces(aClass);
-    final Type[] genericInterfaces = ReflectionCache.getGenericInterfaces(aClass);
+    final Class[] classes = aClass.getInterfaces();
+    final Type[] genericInterfaces = aClass.getGenericInterfaces();
     for (int i = 0; i <= classes.length; i++) {
       Class anInterface;
       if (i < classes.length) {
         anInterface = classes[i];
       }
       else {
-        anInterface = ReflectionCache.getSuperClass(aClass);
+        anInterface = aClass.getSuperclass();
         if (resolveInInterfacesOnly || anInterface == null) {
           continue;
         }
@@ -64,7 +69,7 @@ public class ReflectionUtil {
       }
       if (resolved instanceof TypeVariable) {
         final TypeVariable typeVariable = (TypeVariable)resolved;
-        index = ArrayUtilRt.find(ReflectionCache.getTypeParameters(anInterface), typeVariable);
+        index = ArrayUtilRt.find(anInterface.getTypeParameters(), typeVariable);
         if (index < 0) {
           LOG.error("Cannot resolve type variable:\n" + "typeVariable = " + typeVariable + "\n" + "genericDeclaration = " +
                     declarationToString(typeVariable.getGenericDeclaration()) + "\n" + "searching in " + declarationToString(anInterface));
@@ -82,6 +87,7 @@ public class ReflectionUtil {
     return null;
   }
 
+  @SuppressWarnings("HardCodedStringLiteral")
   @NotNull
   public static String declarationToString(@NotNull GenericDeclaration anInterface) {
     return anInterface.toString()
@@ -106,7 +112,7 @@ public class ReflectionUtil {
 
   @NotNull
   public static Type[] getActualTypeArguments(@NotNull ParameterizedType parameterizedType) {
-    return ReflectionCache.getActualTypeArguments(parameterizedType);
+    return parameterizedType.getActualTypeArguments();
   }
 
   @Nullable
@@ -121,12 +127,13 @@ public class ReflectionUtil {
         return (Class<?>)((ParameterizedType)type).getRawType();
       }
       if (type instanceof TypeVariable && classType instanceof ParameterizedType) {
-        final int index = ArrayUtilRt.find(ReflectionCache.getTypeParameters(aClass), type);
+        final int index = ArrayUtilRt.find(aClass.getTypeParameters(), type);
         if (index >= 0) {
           return getRawType(getActualTypeArguments((ParameterizedType)classType)[index]);
         }
       }
-    } else {
+    }
+    else {
       return getRawType(genericType);
     }
     return null;
@@ -140,23 +147,28 @@ public class ReflectionUtil {
   }
 
   @NotNull
-  public static Field findField(@NotNull Class clazz, @Nullable Class type, @NotNull String name) throws NoSuchFieldException {
-    List<Field> fields = collectFields(clazz);
-    for (Field each : fields) {
-      if (name.equals(each.getName()) && (type == null || each.getType().equals(type))) return each;
-    }
+  public static Field findField(@NotNull Class clazz, @Nullable final Class type, @NotNull final String name) throws NoSuchFieldException {
+    Field result = processFields(clazz, new Condition<Field>() {
+      @Override
+      public boolean value(Field field) {
+        return name.equals(field.getName()) && (type == null || field.getType().equals(type));
+      }
+    });
+    if (result != null) return result;
 
     throw new NoSuchFieldException("Class: " + clazz + " name: " + name + " type: " + type);
   }
 
   @NotNull
-  public static Field findAssignableField(@NotNull Class clazz, @NotNull Class type, @NotNull String name) throws NoSuchFieldException {
-    List<Field> fields = collectFields(clazz);
-    for (Field each : fields) {
-      if (name.equals(each.getName()) && type.isAssignableFrom(each.getType())) return each;
-    }
-
-    throw new NoSuchFieldException("Class: " + clazz + " name: " + name + " type: " + type);
+  public static Field findAssignableField(@NotNull Class<?> clazz, @NotNull final Class<?> fieldType, @NotNull final String fieldName) throws NoSuchFieldException {
+    Field result = processFields(clazz, new Condition<Field>() {
+      @Override
+      public boolean value(Field field) {
+        return fieldName.equals(field.getName()) && fieldType.isAssignableFrom(field.getType());
+      }
+    });
+    if (result != null) return result;
+    throw new NoSuchFieldException("Class: " + clazz + " fieldName: " + fieldName + " fieldType: " + fieldType);
   }
 
   private static void collectFields(@NotNull Class clazz, @NotNull List<Field> result) {
@@ -170,6 +182,23 @@ public class ReflectionUtil {
     for (Class each : interfaces) {
       collectFields(each, result);
     }
+  }
+
+  private static Field processFields(@NotNull Class clazz, @NotNull Condition<Field> checker) {
+    for (Field field : clazz.getDeclaredFields()) {
+      if (checker.value(field)) return field;
+    }
+    final Class superClass = clazz.getSuperclass();
+    if (superClass != null) {
+      Field result = processFields(superClass, checker);
+      if (result != null) return result;
+    }
+    final Class[] interfaces = clazz.getInterfaces();
+    for (Class each : interfaces) {
+      Field result = processFields(each, checker);
+      if (result != null) return result;
+    }
+    return null;
   }
 
   public static void resetField(@NotNull Class clazz, @NotNull Class type, @NotNull String name)  {
@@ -207,13 +236,13 @@ public class ReflectionUtil {
           field.set(object, Boolean.FALSE);
         }
         else if (int.class.equals(type)) {
-          field.set(object, new Integer(0));
+          field.set(object, Integer.valueOf(0));
         }
         else if (double.class.equals(type)) {
-          field.set(object, new Double(0));
+          field.set(object, Double.valueOf(0));
         }
         else if (float.class.equals(type)) {
-          field.set(object, new Float(0));
+          field.set(object, Float.valueOf(0));
         }
       }
       else {
@@ -226,7 +255,7 @@ public class ReflectionUtil {
   }
 
   @Nullable
-  public static Method findMethod(@NotNull Method[] methods, @NonNls @NotNull String name, @NotNull Class... parameters) {
+  public static Method findMethod(@NotNull Collection<Method> methods, @NonNls @NotNull String name, @NotNull Class... parameters) {
     for (final Method method : methods) {
       if (name.equals(method.getName()) && Arrays.equals(parameters, method.getParameterTypes())) return method;
     }
@@ -235,17 +264,51 @@ public class ReflectionUtil {
 
   @Nullable
   public static Method getMethod(@NotNull Class aClass, @NonNls @NotNull String name, @NotNull Class... parameters) {
-    return findMethod(ReflectionCache.getMethods(aClass), name, parameters);
+    return findMethod(getClassPublicMethods(aClass, false), name, parameters);
   }
 
   @Nullable
   public static Method getDeclaredMethod(@NotNull Class aClass, @NonNls @NotNull String name, @NotNull Class... parameters) {
-    return findMethod(aClass.getDeclaredMethods(), name, parameters);
+    return findMethod(getClassDeclaredMethods(aClass, false), name, parameters);
   }
 
-  public static <T> T getField(@NotNull Class objectClass, Object object, @NotNull Class<T> type, @NotNull @NonNls String name) {
+  public static List<Method> getClassPublicMethods(@NotNull Class aClass) {
+    return getClassPublicMethods(aClass, false);
+  }
+  
+  public static List<Method> getClassPublicMethods(@NotNull Class aClass, boolean includeSynthetic) {
+    Method[] methods = aClass.getMethods();
+    return includeSynthetic ? Arrays.asList(methods) : filterRealMethods(methods);
+  }
+
+  public static List<Method> getClassDeclaredMethods(@NotNull Class aClass) {
+    return getClassDeclaredMethods(aClass, false);
+  }
+  
+  public static List<Method> getClassDeclaredMethods(@NotNull Class aClass, boolean includeSynthetic) {
+    Method[] methods = aClass.getDeclaredMethods();
+    return includeSynthetic ? Arrays.asList(methods) : filterRealMethods(methods);
+  }
+
+  private static List<Method> filterRealMethods(Method[] methods) {
+    List<Method> result = ContainerUtil.newArrayList();
+    for (Method method : methods) {
+      if (!method.isSynthetic()) {
+        result.add(method);
+      }
+    }
+    return result;
+  }
+
+  @Nullable
+  public static Class getMethodDeclaringClass(@NotNull Class<?> instanceClass, @NonNls @NotNull String name, @NotNull Class... parameters) {
+    Method method = getMethod(instanceClass, name, parameters);
+    return method == null ? null : method.getDeclaringClass();
+  }
+
+  public static <T> T getField(@NotNull Class objectClass, Object object, @NotNull Class<T> fieldType, @NotNull @NonNls String fieldName) {
     try {
-      final Field field = findAssignableField(objectClass, type, name);
+      final Field field = findAssignableField(objectClass, fieldType, fieldName);
       field.setAccessible(true);
       return (T)field.get(object);
     }
@@ -263,7 +326,7 @@ public class ReflectionUtil {
     Type type;
     Class current = aClass;
     while ((type = resolveVariable(variable, current, false)) == null) {
-      current = ReflectionCache.getSuperClass(current);
+      current = current.getSuperclass();
       if (current == null) {
         return null;
       }
@@ -283,6 +346,59 @@ public class ReflectionUtil {
     }
     catch (NoSuchMethodException e) {
       throw new RuntimeException("No default constructor in " + aClass, e);
+    }
+  }
+
+  static {
+    // method getConstructorAccessorMethod is not necessary since JDK7, use acquireConstructorAccessor return value instead
+    assert Patches.USE_REFLECTION_TO_ACCESS_JDK7;
+  }
+  private static final Method acquireConstructorAccessorMethod;
+  private static final Method getConstructorAccessorMethod;
+  static {
+    try {
+      Method accessor = Constructor.class.getDeclaredMethod("acquireConstructorAccessor");
+      accessor.setAccessible(true);
+      acquireConstructorAccessorMethod = accessor;
+      Method get = Constructor.class.getDeclaredMethod("getConstructorAccessor");
+      get.setAccessible(true);
+      getConstructorAccessorMethod = get;
+    }
+    catch (NoSuchMethodException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @NotNull
+  public static ConstructorAccessor getConstructorAccessor(@NotNull Constructor constructor) {
+    constructor.setAccessible(true);
+    // it is faster to invoke constructor via sun.reflect.ConstructorAccessor; it avoids AccessibleObject.checkAccess()
+    try {
+      acquireConstructorAccessorMethod.invoke(constructor);
+      return (ConstructorAccessor)getConstructorAccessorMethod.invoke(constructor);
+    }
+    catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @NotNull
+  public static <T> T createInstanceViaConstructorAccessor(@NotNull ConstructorAccessor constructorAccessor,
+                                                           @NotNull Object... arguments) {
+    try {
+      return (T)constructorAccessor.newInstance(arguments);
+    }
+    catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+  @NotNull
+  public static <T> T createInstanceViaConstructorAccessor(@NotNull ConstructorAccessor constructorAccessor) {
+    try {
+      return (T)constructorAccessor.newInstance(ArrayUtil.EMPTY_OBJECT_ARRAY);
+    }
+    catch (Exception e) {
+      throw new RuntimeException(e);
     }
   }
 
@@ -334,5 +450,9 @@ public class ReflectionUtil {
       LOG.warn(e);
       return null;
     }
+  }
+
+  public static boolean isAssignable(@NotNull Class<?> ancestor, @NotNull Class<?> descendant) {
+    return ancestor == descendant || ancestor.isAssignableFrom(descendant);
   }
 }

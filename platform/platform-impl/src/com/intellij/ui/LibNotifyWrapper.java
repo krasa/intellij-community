@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,17 +15,63 @@
  */
 package com.intellij.ui;
 
+import com.intellij.ide.AppLifecycleListener;
+import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ApplicationNamesInfo;
 import com.intellij.openapi.application.PathManager;
-import com.intellij.util.lang.UrlClassLoader;
+import com.intellij.util.messages.MessageBusConnection;
+import com.sun.jna.Library;
+import com.sun.jna.Native;
+import com.sun.jna.Pointer;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.Set;
 
 /**
  * @author Denis Fokin
  */
-public class LibNotifyWrapper {
+class LibNotifyWrapper implements SystemNotificationsImpl.Notifier {
+  private static LibNotifyWrapper ourInstance;
 
-  static{
-    UrlClassLoader.loadPlatformLibrary("notifywrapper");
+  public static synchronized LibNotifyWrapper getInstance() {
+    if (ourInstance == null) {
+      ourInstance = new LibNotifyWrapper();
+    }
+    return ourInstance;
   }
 
-  native public static void showNotification(String title, String description);
+  @SuppressWarnings("SpellCheckingInspection")
+  private interface LibNotify extends Library {
+    int notify_init(String appName);
+    void notify_uninit();
+    Pointer notify_notification_new(String summary, String body, String icon);
+    int notify_notification_show(Pointer notification, Pointer error);
+  }
+
+  private final LibNotify myLibNotify;
+
+  private LibNotifyWrapper() {
+    myLibNotify = (LibNotify)Native.loadLibrary("libnotify.so.4", LibNotify.class);
+
+    String appName = ApplicationNamesInfo.getInstance().getProductName();
+    if (myLibNotify.notify_init(appName) == 0) {
+      throw new IllegalStateException("notify_init failed");
+    }
+
+    MessageBusConnection connection = ApplicationManager.getApplication().getMessageBus().connect();
+    connection.subscribe(AppLifecycleListener.TOPIC, new AppLifecycleListener.Adapter() {
+      @Override
+      public void appClosing() {
+        myLibNotify.notify_uninit();
+      }
+    });
+  }
+
+  @Override
+  public void notify(@NotNull Set<String> allNames, @NotNull String name, @NotNull String title, @NotNull String description) {
+    String icon = AppUIUtil.findIcon(PathManager.getBinPath());
+    if (icon == null) icon = "dialog-information";
+    Pointer notification = myLibNotify.notify_notification_new(title, description, icon);
+    myLibNotify.notify_notification_show(notification, null);
+  }
 }

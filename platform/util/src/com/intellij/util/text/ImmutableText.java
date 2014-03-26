@@ -64,7 +64,7 @@ import java.io.Writer;
  * @version 5.3, January 10, 2007
  */
 @SuppressWarnings("AssignmentToForLoopParameter")
-public final class ImmutableText extends ImmutableCharSequence {
+public final class ImmutableText extends ImmutableCharSequence implements CharArrayExternalizable {
 
   /**
    * Holds the default size for primitive blocks of characters.
@@ -121,24 +121,23 @@ public final class ImmutableText extends ImmutableCharSequence {
    */
   public static ImmutableText valueOf(@NotNull Object obj) {
     if (obj instanceof ImmutableText) return (ImmutableText)obj;
-    if (obj instanceof CharSequence && ((CharSequence)obj).length() == 0) return EMPTY;
+    if (obj instanceof CharSequence) return ((CharSequence)obj).length() == 0 ? EMPTY : valueOf((CharSequence)obj);
     return valueOf(String.valueOf(obj));
   }
 
-  private static ImmutableText valueOf(@NotNull String str) {
+  private static ImmutableText valueOf(@NotNull CharSequence str) {
     return valueOf(str, 0, str.length());
   }
 
-  private static ImmutableText valueOf(@NotNull String str, int start, int end) {
+  private static ImmutableText valueOf(@NotNull CharSequence str, int start, int end) {
     int length = end - start;
     if (length <= BLOCK_SIZE) {
-      char[] chars = new char[length];
-      str.getChars(start, end, chars, 0);
-      return new ImmutableText(chars);
-    } else { // Splits on a block boundary.
-      int half = ((length + BLOCK_SIZE) >> 1) & BLOCK_MASK;
-      return new ImmutableText(valueOf(str, start, start + half), valueOf(str, start + half, end));
+      return new ImmutableText(CharArrayUtil.fromSequence(str, start, end));
     }
+
+    // Splits on a block boundary.
+    int half = ((length + BLOCK_SIZE) >> 1) & BLOCK_MASK;
+    return new ImmutableText(valueOf(str, start, start + half), valueOf(str, start + half, end));
   }
 
   /**
@@ -379,17 +378,9 @@ public final class ImmutableText extends ImmutableCharSequence {
                                                   replacement));
   }
 
-  public ImmutableCharSequence subSequence(final int start, final int end) {
+  public CharSequence subSequence(final int start, final int end) {
     if (start == 0 && end == length()) return this;
-    return new ImmutableSubSequence(this, start, end) {
-      @NotNull
-      @Override
-      public String toString() {
-        char[] chars = new char[end - start];
-        getChars(start, end, chars, 0);
-        return StringFactory.createShared(chars);
-      }
-    };
+    return new CharSequenceSubSequence(this, start, end);
   }
 
   /**
@@ -823,7 +814,7 @@ public final class ImmutableText extends ImmutableCharSequence {
    * @throws IndexOutOfBoundsException if <code>(start < 0) || (end < 0) ||
    *         (start > end) || (end > this.length())</code>
    */
-  public void getChars(int start, int end, char[] dest, int destPos) {
+  public void getChars(int start, int end, @NotNull char[] dest, int destPos) {
     if (_data != null) { // Primitive.
       if ((start < 0) || (end > _count) || (start > end))
         throw new IndexOutOfBoundsException();

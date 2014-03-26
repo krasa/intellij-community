@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2009 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
  */
 package com.intellij.openapi.wm.impl;
 
+import com.intellij.featureStatistics.FeatureUsageTracker;
 import com.intellij.ide.actions.ActivateToolWindowAction;
 import com.intellij.ide.ui.UISettings;
 import com.intellij.openapi.actionSystem.ActionGroup;
@@ -102,6 +103,7 @@ public final class StripeButton extends AnchoredButton implements ActionListener
     return getWindowInfo().getAnchor();
   }
 
+  @NotNull
   WindowInfoImpl getWindowInfo() {
     return myDecorator.getWindowInfo();
   }
@@ -288,9 +290,10 @@ public final class StripeButton extends AnchoredButton implements ActionListener
       myDecorator.fireActivated();
     }
     myPressedWhenSelected = false;
+    FeatureUsageTracker.getInstance().triggerFeatureUsed("toolwindow.clickstat." + myDecorator.getToolWindow().getId());
   }
 
-  public void apply(final WindowInfoImpl info) {
+  public void apply(@NotNull WindowInfoImpl info) {
     setSelected(info.isVisible() || info.isActive());
   }
 
@@ -322,7 +325,7 @@ public final class StripeButton extends AnchoredButton implements ActionListener
    * and short cut registered in the key map.
    */
   void updateText() {
-    final String toolWindowId = getWindowInfo().getId();
+    String toolWindowId = myDecorator.getToolWindow().getStripeTitle();
     String text = toolWindowId;
     if (UISettings.getInstance().SHOW_TOOL_WINDOW_NUMBERS) {
       final int mnemonic = ActivateToolWindowAction.getMnemonicForToolWindow(toolWindowId);
@@ -363,7 +366,7 @@ public final class StripeButton extends AnchoredButton implements ActionListener
       if (ToolWindowEx.PROP_AVAILABLE.equals(name)) {
         updateState();
       }
-      else if (ToolWindowEx.PROP_TITLE.equals(name)) {
+      else if (ToolWindowEx.PROP_STRIPE_TITLE.equals(name)) {
         updateText();
       }
       else if (ToolWindowEx.PROP_ICON.equals(name)) {

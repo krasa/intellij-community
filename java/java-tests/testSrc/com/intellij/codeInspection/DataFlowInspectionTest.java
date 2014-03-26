@@ -79,6 +79,7 @@ public class DataFlowInspectionTest extends LightCodeInsightFixtureTestCase {
 
   public void testIDEA84489() throws Throwable { doTest(); }
   public void testComparingToNotNullShouldNotAffectNullity() throws Throwable { doTest(); }
+  public void testComparingToNullableShouldNotAffectNullity() throws Throwable { doTest(); }
   public void testStringTernaryAlwaysTrue() throws Throwable { doTest(); }
   public void testStringConcatAlwaysNotNull() throws Throwable { doTest(); }
 
@@ -104,6 +105,7 @@ public class DataFlowInspectionTest extends LightCodeInsightFixtureTestCase {
   public void testChainedFinalFieldAccessorsDfa() throws Throwable { doTest(); }
   public void testAccessorPlusMutator() throws Throwable { doTest(); }
   public void testClosureVariableField() throws Throwable { doTest(); }
+  public void testOptionalThis() { doTest(); }
 
   public void testAssigningNullableToNotNull() throws Throwable { doTest(); }
   public void testAssigningUnknownToNullable() throws Throwable { doTest(); }
@@ -125,7 +127,7 @@ public class DataFlowInspectionTest extends LightCodeInsightFixtureTestCase {
   public void testPrimitiveCastMayChangeValue() throws Throwable { doTest(); }
 
   public void testPassingNullableIntoVararg() throws Throwable { doTest(); }
-  public void testEqualsImpliesNotNull() throws Throwable { doTest(); }
+  public void testEqualsImpliesNotNull() throws Throwable { doTestReportConstantReferences(); }
   public void testEffectivelyUnqualified() throws Throwable { doTest(); }
 
   public void testSkipAssertions() {
@@ -302,6 +304,22 @@ public class DataFlowInspectionTest extends LightCodeInsightFixtureTestCase {
   public void testDontLoseInequalityInformation() { doTest(); }
   
   public void testNotEqualsTypo() { doTest(); }
+  public void testAndEquals() { doTest(); }
+
+  public void testUnusedCallDoesNotMakeUnknown() { doTest(); }
+  public void testGettersAndPureNoFlushing() { doTest(); }
+
+  public void testSameComparisonTwice() { doTest(); }
+
+  public void testParametersAreNonnullByDefault() {
+    myFixture.addClass("package javax.annotation; public @interface ParametersAreNonnullByDefault {}");
+    myFixture.addClass("package javax.annotation; public @interface ParametersAreNullableByDefault {}");
+    
+    myFixture.addClass("package foo; public class AnotherPackageNotNull { public static void foo(String s) {}}");
+    myFixture.addFileToProject("foo/package-info.java", "@javax.annotation.ParametersAreNonnullByDefault package foo;");
+    
+    doTest(); 
+  }
   
   public void _testNullCheckBeforeInstanceof() { doTest(); } // http://youtrack.jetbrains.com/issue/IDEA-113220
 }

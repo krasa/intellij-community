@@ -147,6 +147,8 @@ public class CompleteStatementTest extends EditorActionTestCase {
 
   public void testFieldBeforeAnnotation() throws Exception { doTest(); }
   public void testMethodBeforeAnnotation() throws Exception { doTest(); }
+  public void testMethodBeforeCommentField() throws Exception { doTest(); }
+  public void testMethodBeforeCommentMethod() throws Exception { doTest(); }
 
   public void testParenthesized() throws Exception { doTest(); }
 
@@ -257,6 +259,8 @@ public class CompleteStatementTest extends EditorActionTestCase {
   public void testCompleteMethodCallAtReturn() throws Exception { doTest(); }
   
   public void testGenericMethodBody() throws Exception { doTest(); }
+  
+  public void testArrayInitializerRBracket() throws Exception { doTest(); }
   
   private void doTestBracesNextLineStyle() throws Exception {
     CodeStyleSettings settings = CodeStyleSettingsManager.getSettings(getProject());

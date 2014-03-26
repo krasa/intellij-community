@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,39 +49,22 @@ public class DomElementClassIndex extends StringStubIndexExtension<PsiFile> {
 
     final String clazzName = clazz.getName();
     final int virtualFileId = ((VirtualFileWithId)file).getId();
-    CommonProcessors.FindFirstProcessor<String> processor =
-      new CommonProcessors.FindFirstProcessor<String>() {
-        @Override
-        protected boolean accept(String s) {
-          return clazzName.equals(s);
-        }
-      };
 
-
-    /*
     CommonProcessors.FindFirstProcessor<? super PsiFile> processor =
       new CommonProcessors.FindFirstProcessor<PsiFile>();
-    StubIndex.getInstance().process(KEY, clazzName,
-                                    domFileElement.getFile().getProject(),
-                                    GlobalSearchScope.fileScope(domFileElement.getFile()),
-                                    new IdFilter() {
-                                      @Override
-                                      public boolean containsFileId(int id) {
-                                        return id == virtualFileId;
-                                      }
-                                    },
-                                    processor
+    StubIndex.getInstance().processElements(KEY, clazzName,
+                                            domFileElement.getFile().getProject(),
+                                            GlobalSearchScope.fileScope(domFileElement.getFile()),
+                                            new IdFilter() {
+                                              @Override
+                                              public boolean containsFileId(int id) {
+                                                return id == virtualFileId;
+                                              }
+                                            },
+                                            PsiFile.class, 
+                                            processor
     );
-    */
-    StubIndex.getInstance().processAllKeys(KEY, processor,
-                                           GlobalSearchScope.fileScope(domFileElement.getFile()),
-                                           new IdFilter() {
-                                             @Override
-                                             public boolean containsFileId(int id) {
-                                               return id == virtualFileId;
-                                             }
-                                           }
-    );
+
     return processor.isFound();
   }
 

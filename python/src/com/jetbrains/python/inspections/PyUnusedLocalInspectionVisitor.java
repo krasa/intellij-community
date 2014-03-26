@@ -42,7 +42,6 @@ import com.jetbrains.python.psi.impl.PyImportStatementNavigator;
 import com.jetbrains.python.psi.resolve.PyResolveContext;
 import com.jetbrains.python.psi.search.PyOverridingMethodsSearch;
 import com.jetbrains.python.psi.search.PySuperMethodsSearch;
-import com.jetbrains.python.psi.types.PyClassTypeImpl;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
@@ -207,7 +206,8 @@ public class PyUnusedLocalInspectionVisitor extends PyInspectionVisitor {
       owner.acceptChildren(new PyRecursiveElementVisitor(){
         @Override
         public void visitPyCallExpression(final PyCallExpression node) {
-          if ("locals".equals(node.getCallee().getName())){
+          final PyExpression callee = node.getCallee();
+          if (callee != null && "locals".equals(callee.getName())){
             throw new DontPerformException();
           }
           node.acceptChildren(this); // look at call expr in arguments
@@ -290,13 +290,13 @@ public class PyUnusedLocalInspectionVisitor extends PyInspectionVisitor {
                 isEmpty = isEmptyFunction(func);
                 emptyFunctions.put(func, isEmpty);
               }
-              if (isEmpty) {
+              if (isEmpty && !mayBeField) {
                 continue;
               }
             }
           }
           final LocalQuickFix[] fixes = mayBeField
-                                  ? new LocalQuickFix[] { new AddFieldQuickFix(name, new PyClassTypeImpl(containingClass, false), name) }
+                                  ? new LocalQuickFix[] { new AddFieldQuickFix(name, name, containingClass.getName()) }
                                   : LocalQuickFix.EMPTY_ARRAY;
           registerWarning(element, PyBundle.message("INSP.unused.locals.parameter.isnot.used", name), fixes);
         }
@@ -327,7 +327,7 @@ public class PyUnusedLocalInspectionVisitor extends PyInspectionVisitor {
     PyCallExpression expr = (PyCallExpression) source;
     if (expr.isCalleeText("range", "xrange")) {
       final Callable callee = expr.resolveCalleeFunction(PyResolveContext.noImplicits().withTypeEvalContext(myTypeEvalContext));
-      if (callee != null && PyBuiltinCache.getInstance(forStatement).hasInBuiltins(callee)) {
+      if (callee != null && PyBuiltinCache.getInstance(forStatement).isBuiltin(callee)) {
         return true;
       }
     }
@@ -415,9 +415,6 @@ public class PyUnusedLocalInspectionVisitor extends PyInspectionVisitor {
 
   private static boolean isEmptyFunction(@NotNull PyFunction f) {
     final PyStatementList statementList = f.getStatementList();
-    if (statementList == null) {
-      return true;
-    }
     final PyStatement[] statements = statementList.getStatements();
     if (statements.length == 0) {
       return true;

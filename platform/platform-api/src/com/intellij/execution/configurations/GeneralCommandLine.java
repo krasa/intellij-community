@@ -240,7 +240,7 @@ public class GeneralCommandLine implements UserDataHolder {
       commands = CommandLineUtil.toCommandLine(myExePath, myProgramParams.getList());
     }
     catch (ExecutionException e) {
-      LOG.warn(e);
+      LOG.info(e);
       throw e;
     }
 
@@ -248,7 +248,7 @@ public class GeneralCommandLine implements UserDataHolder {
       return startProcess(commands);
     }
     catch (IOException e) {
-      LOG.warn(e);
+      LOG.info(e);
       throw new ProcessNotCreatedException(e.getMessage(), e, this);
     }
   }
@@ -281,7 +281,7 @@ public class GeneralCommandLine implements UserDataHolder {
       environment.putAll(PlatformUtils.isAppCode() ? System.getenv() // Temporarily fix for OC-8606
                                                    : EnvironmentUtil.getEnvironmentMap());
     }
-
+    
     if (!myEnvParams.isEmpty()) {
       if (SystemInfo.isWindows) {
         THashMap<String, String> envVars = new THashMap<String, String>(CaseInsensitiveStringHashingStrategy.INSTANCE);

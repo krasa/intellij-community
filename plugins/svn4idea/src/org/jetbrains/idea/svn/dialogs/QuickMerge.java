@@ -46,6 +46,7 @@ import org.jetbrains.idea.svn.SvnBranchConfigurationManager;
 import org.jetbrains.idea.svn.SvnUtil;
 import org.jetbrains.idea.svn.SvnVcs;
 import org.jetbrains.idea.svn.actions.ChangeListsMergerFactory;
+import org.jetbrains.idea.svn.commandLine.SvnBindException;
 import org.jetbrains.idea.svn.history.SvnChangeList;
 import org.jetbrains.idea.svn.history.SvnCommittedChangesProvider;
 import org.jetbrains.idea.svn.history.SvnRepositoryLocation;
@@ -60,6 +61,7 @@ import org.tmatesoft.svn.core.SVNLogEntry;
 import org.tmatesoft.svn.core.SVNLogEntryPath;
 import org.tmatesoft.svn.core.SVNURL;
 import org.tmatesoft.svn.core.internal.util.SVNPathUtil;
+import org.tmatesoft.svn.core.internal.util.SVNURLUtil;
 
 import java.io.File;
 import java.io.IOException;
@@ -115,7 +117,12 @@ public class QuickMerge {
 
     @Override
     public void run(ContinuationContext continuationContext) {
-      if (SVNPathUtil.isAncestor(mySourceUrl, myWcInfo.getRootUrl()) || SVNPathUtil.isAncestor(myWcInfo.getRootUrl(), mySourceUrl)) {
+      SVNURL url = parseUrl(continuationContext);
+      if (url == null) {
+        return;
+      }
+
+      if (SVNURLUtil.isAncestor(url, myWcInfo.getUrl()) || SVNURLUtil.isAncestor(myWcInfo.getUrl(), url)) {
         finishWithError(continuationContext, "Cannot merge from self", true);
         return;
       }
@@ -123,6 +130,20 @@ public class QuickMerge {
       if (! checkForSwitchedRoots()) {
         continuationContext.cancelEverything();
       }
+    }
+
+    @Nullable
+    private SVNURL parseUrl(ContinuationContext continuationContext) {
+      SVNURL url = null;
+
+      try {
+        url = SvnUtil.createUrl(mySourceUrl);
+      }
+      catch (SvnBindException e) {
+        finishWithError(continuationContext, e.getMessage(), true);
+      }
+
+      return url;
     }
   }
 
@@ -133,20 +154,14 @@ public class QuickMerge {
 
     @Override
     public void run(ContinuationContext context) {
-      try {
-        final List<TaskDescriptor> tasks = new LinkedList<TaskDescriptor>();
-        final boolean supportsMergeinfo = myWcInfo.getFormat().supportsMergeInfo() &&
-                                          SvnUtil.doesRepositorySupportMergeInfo(myVcs, SVNURL.parseURIEncoded(mySourceUrl));
-        if (! supportsMergeinfo) {
-          insertMergeAll(tasks);
-        } else {
-          tasks.add(new MergeAllOrSelectedChooser());
-        }
-        context.next(tasks);
+      final List<TaskDescriptor> tasks = new LinkedList<TaskDescriptor>();
+      final boolean supportsMergeinfo = myWcInfo.getFormat().supportsMergeInfo() && SvnUtil.checkRepositoryVersion15(myVcs, mySourceUrl);
+      if (! supportsMergeinfo) {
+        insertMergeAll(tasks);
+      } else {
+        tasks.add(new MergeAllOrSelectedChooser());
       }
-      catch (SVNException e) {
-        finishWithError(context, e.getMessage(), true);
-      }
+      context.next(tasks);
     }
   }
 

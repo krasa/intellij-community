@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,10 +36,7 @@ import com.intellij.openapi.util.*;
 import com.intellij.openapi.util.io.ByteSequence;
 import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.util.text.StringUtil;
-import com.intellij.openapi.vfs.CharsetToolkit;
-import com.intellij.openapi.vfs.VFileProperty;
-import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.openapi.vfs.VirtualFileSystem;
+import com.intellij.openapi.vfs.*;
 import com.intellij.openapi.vfs.newvfs.FileSystemInterface;
 import com.intellij.psi.SingleRootFileViewProvider;
 import com.intellij.testFramework.LightVirtualFile;
@@ -305,6 +302,11 @@ public class FileTypeManagerImpl extends FileTypeManagerEx implements NamedJDOME
   @Override
   @NotNull
   public FileType getFileTypeByFileName(@NotNull String fileName) {
+    return getFileTypeByFileName((CharSequence)fileName);
+  }
+
+  @NotNull
+  private FileType getFileTypeByFileName(@NotNull CharSequence fileName) {
     FileType type = myPatternsTable.findAssociatedFileType(fileName);
     return type == null ? UnknownFileType.INSTANCE : type;
   }
@@ -325,20 +327,24 @@ public class FileTypeManagerImpl extends FileTypeManagerEx implements NamedJDOME
     }
 
     //noinspection ForLoopReplaceableByForEach
-    for (int i = 0, size = mySpecialFileTypes.size(); i < size; i++) {
+    for (int i = 0; i < mySpecialFileTypes.size(); i++) {
       FileTypeIdentifiableByVirtualFile type = mySpecialFileTypes.get(i);
       if (type.isMyFileType(file)) {
         return type;
       }
     }
 
-    fileType = getFileTypeByFileName(file.getName());
+    fileType = getFileTypeByFileName(file.getNameSequence());
     if (fileType != UnknownFileType.INSTANCE) return fileType;
 
-    fileType = file.getUserData(DETECTED_FROM_CONTENT_FILE_TYPE_KEY);
+    fileType = cachedDetectedFromContent(file);
     if (fileType != null) return fileType;
 
     return UnknownFileType.INSTANCE;
+  }
+
+  private static FileType cachedDetectedFromContent(@NotNull VirtualFile file) {
+    return file.getUserData(DETECTED_FROM_CONTENT_FILE_TYPE_KEY);
   }
 
   @NotNull
@@ -347,12 +353,19 @@ public class FileTypeManagerImpl extends FileTypeManagerEx implements NamedJDOME
     if (file.isDirectory() || !file.isValid() || file.is(VFileProperty.SPECIAL)) {
       return UnknownFileType.INSTANCE;
     }
-    FileType fileType = file.getUserData(DETECTED_FROM_CONTENT_FILE_TYPE_KEY);
+    FileType fileType = cachedDetectedFromContent(file);
     if (fileType == null) {
       fileType = detectFromContent(file);
-      file.putUserData(DETECTED_FROM_CONTENT_FILE_TYPE_KEY, fileType);
+      // for empty file there is still hope its type will change
+      if (file.getLength() != 0) {
+        file.putUserData(DETECTED_FROM_CONTENT_FILE_TYPE_KEY, fileType);
+      }
     }
     return fileType;
+  }
+
+  public static boolean isFileTypeDetectedFromContent(@NotNull VirtualFile file) {
+    return cachedDetectedFromContent(file) != null;
   }
 
   @Override
@@ -1072,7 +1085,7 @@ public class FileTypeManagerImpl extends FileTypeManagerEx implements NamedJDOME
   }
 
   public static String getFileTypeComponentName() {
-    return PlatformUtils.isCommunity() ? "CommunityFileTypes" : "FileTypeManager";
+    return PlatformUtils.isIdeaCommunity() ? "CommunityFileTypes" : "FileTypeManager";
   }
 
   public FileTypeAssocTable getExtensionMap() {

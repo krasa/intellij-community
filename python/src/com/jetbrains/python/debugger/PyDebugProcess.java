@@ -34,7 +34,7 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.Pair;
-import com.intellij.remotesdk.RemoteProcessHandlerBase;
+import com.intellij.remote.RemoteProcessHandlerBase;
 import com.intellij.xdebugger.*;
 import com.intellij.xdebugger.breakpoints.XBreakpoint;
 import com.intellij.xdebugger.breakpoints.XBreakpointHandler;
@@ -77,6 +77,7 @@ public class PyDebugProcess extends XDebugProcess implements IPyDebugProcess, Pr
   private final List<PyThreadInfo> mySuspendedThreads = Collections.synchronizedList(Lists.<PyThreadInfo>newArrayList());
   private final Map<String, XValueChildrenList> myStackFrameCache = Maps.newHashMap();
   private final Map<String, PyDebugValue> myNewVariableValue = Maps.newHashMap();
+  private boolean myDownloadSources = false;
 
   private boolean myClosing = false;
 
@@ -423,8 +424,17 @@ public class PyDebugProcess extends XDebugProcess implements IPyDebugProcess, Pr
     cleanUp();
   }
 
+  public boolean isDownloadSources() {
+    return myDownloadSources;
+  }
+
+  public void setDownloadSources(boolean downloadSources) {
+    myDownloadSources = downloadSources;
+  }
+
   protected void cleanUp() {
     mySuspendedThreads.clear();
+    myDownloadSources = false;
   }
 
   @Override

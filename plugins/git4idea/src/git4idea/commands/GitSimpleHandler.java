@@ -94,7 +94,7 @@ public class GitSimpleHandler extends GitTextHandler {
     }
     else {
       LOG.debug(stderr.trim());
-      LOG.debug(stdout.trim());
+      OUTPUT_LOG.debug(stdout.trim());
     }
   }
 
@@ -235,10 +235,10 @@ public class GitSimpleHandler extends GitTextHandler {
     });
     runInCurrentThread(null);
     if (ex[0] != null) {
-      throw ex[0];
+      throw new VcsException(ex[0].getMessage() + " during executing " + printableCommandLine(), ex[0]);
     }
     if (result[0] == null) {
-      throw new VcsException("The git command returned null: " + myCommandLine.getCommandLineString());
+      throw new VcsException("The git command returned null: " + printableCommandLine());
     }
     return result[0];
   }

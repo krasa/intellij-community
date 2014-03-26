@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2012 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -543,12 +543,12 @@ public class FSRecords implements Forceable {
 
     private static class ContentHashesDescriptor implements KeyDescriptor<byte[]>, DifferentSerializableBytesImplyNonEqualityPolicy {
       @Override
-      public void save(DataOutput out, byte[] value) throws IOException {
+      public void save(@NotNull DataOutput out, byte[] value) throws IOException {
         out.write(value);
       }
 
       @Override
-      public byte[] read(DataInput in) throws IOException {
+      public byte[] read(@NotNull DataInput in) throws IOException {
         byte[] b = new byte[SIGNATURE_LENGTH];
         in.readFully(b);
         return b;
@@ -879,10 +879,10 @@ public class FSRecords implements Forceable {
   public static class NameId {
     public static final NameId[] EMPTY_ARRAY = new NameId[0];
     public final int id;
-    public final String name;
+    public final CharSequence name;
     public final int nameId;
 
-    public NameId(int id, int nameId, @NotNull String name) {
+    public NameId(int id, int nameId, @NotNull CharSequence name) {
       this.id = id;
       this.nameId = nameId;
       this.name = name;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2012 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,9 @@ import com.intellij.util.io.DataExternalizer;
 import com.intellij.util.io.DataInputOutputUtil;
 import gnu.trove.TIntHashSet;
 import gnu.trove.TIntProcedure;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.asm4.Type;
+import org.jetbrains.jps.builders.storage.BuildDataCorruptedException;
 
 import java.io.DataInput;
 import java.io.DataOutput;
@@ -82,7 +84,7 @@ class UsageRepr {
         myOwner = DataInputOutputUtil.readINT(in);
       }
       catch (IOException e) {
-        throw new RuntimeException(e);
+        throw new BuildDataCorruptedException(e);
       }
     }
 
@@ -93,7 +95,7 @@ class UsageRepr {
         DataInputOutputUtil.writeINT(out, myOwner);
       }
       catch (IOException e) {
-        throw new RuntimeException(e);
+        throw new BuildDataCorruptedException(e);
       }
     }
 
@@ -130,7 +132,7 @@ class UsageRepr {
         myType = TypeRepr.externalizer(context).read(in);
       }
       catch (IOException e) {
-        throw new RuntimeException(e);
+        throw new BuildDataCorruptedException(e);
       }
     }
 
@@ -221,7 +223,7 @@ class UsageRepr {
         myReturnType = externalizer.read(in);
       }
       catch (IOException e) {
-        throw new RuntimeException(e);
+        throw new BuildDataCorruptedException(e);
       }
     }
 
@@ -289,7 +291,7 @@ class UsageRepr {
         myArity = DataInputOutputUtil.readINT(in);
       }
       catch (IOException e) {
-        throw new RuntimeException(e);
+        throw new BuildDataCorruptedException(e);
       }
     }
 
@@ -300,7 +302,7 @@ class UsageRepr {
         DataInputOutputUtil.writeINT(out, myArity);
       }
       catch (IOException e) {
-        throw new RuntimeException(e);
+        throw new BuildDataCorruptedException(e);
       }
     }
 
@@ -353,7 +355,7 @@ class UsageRepr {
         myClassName = DataInputOutputUtil.readINT(in);
       }
       catch (IOException e) {
-        throw new RuntimeException(e);
+        throw new BuildDataCorruptedException(e);
       }
     }
 
@@ -364,7 +366,7 @@ class UsageRepr {
         DataInputOutputUtil.writeINT(out, myClassName);
       }
       catch (IOException e) {
-        throw new RuntimeException(e);
+        throw new BuildDataCorruptedException(e);
       }
     }
 
@@ -410,7 +412,7 @@ class UsageRepr {
         DataInputOutputUtil.writeINT(out, myClassName);
       }
       catch (IOException e) {
-        throw new RuntimeException(e);
+        throw new BuildDataCorruptedException(e);
       }
     }
   }
@@ -432,7 +434,7 @@ class UsageRepr {
         myClassName = DataInputOutputUtil.readINT(in);
       }
       catch (IOException e) {
-        throw new RuntimeException(e);
+        throw new BuildDataCorruptedException(e);
       }
     }
 
@@ -443,7 +445,7 @@ class UsageRepr {
         DataInputOutputUtil.writeINT(out, myClassName);
       }
       catch (IOException e) {
-        throw new RuntimeException(e);
+        throw new BuildDataCorruptedException(e);
       }
     }
 
@@ -486,7 +488,7 @@ class UsageRepr {
         DataInputOutputUtil.writeINT(out, myClassName);
       }
       catch (IOException e) {
-        throw new RuntimeException(e);
+        throw new BuildDataCorruptedException(e);
       }
     }
 
@@ -504,12 +506,12 @@ class UsageRepr {
   public static class AnnotationUsage extends Usage {
     public static final DataExternalizer<ElemType> elementTypeExternalizer = new DataExternalizer<ElemType>() {
       @Override
-      public void save(final DataOutput out, final ElemType value) throws IOException {
+      public void save(@NotNull final DataOutput out, final ElemType value) throws IOException {
         DataInputOutputUtil.writeINT(out, value.ordinal());
       }
 
       @Override
-      public ElemType read(final DataInput in) throws IOException {
+      public ElemType read(@NotNull final DataInput in) throws IOException {
         final int ordinal = DataInputOutputUtil.readINT(in);
         for (ElemType value : ElemType.values()) {
           if (value.ordinal() == ordinal) {
@@ -573,7 +575,7 @@ class UsageRepr {
         myUsedTargets = (EnumSet<ElemType>)RW.read(elementTypeExternalizer, EnumSet.noneOf(ElemType.class), in);
       }
       catch (IOException e) {
-        throw new RuntimeException(e);
+        throw new BuildDataCorruptedException(e);
       }
     }
 
@@ -586,7 +588,7 @@ class UsageRepr {
         RW.save(myUsedTargets, elementTypeExternalizer, out);
       }
       catch (IOException e) {
-        throw new RuntimeException(e);
+        throw new BuildDataCorruptedException(e);
       }
     }
 
@@ -698,12 +700,12 @@ class UsageRepr {
   public static DataExternalizer<Usage> externalizer(final DependencyContext context) {
     return new DataExternalizer<Usage>() {
       @Override
-      public void save(final DataOutput out, final Usage value) throws IOException {
+      public void save(@NotNull final DataOutput out, final Usage value) throws IOException {
         value.save(out);
       }
 
       @Override
-      public Usage read(DataInput in) throws IOException {
+      public Usage read(@NotNull DataInput in) throws IOException {
         final byte tag = in.readByte();
         switch (tag) {
           case CLASS_USAGE:

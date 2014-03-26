@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,6 @@ import com.intellij.psi.stubs.IStubElementType;
 import com.intellij.psi.util.CachedValueProvider;
 import com.intellij.psi.util.CachedValuesManager;
 import com.intellij.psi.util.PsiModificationTracker;
-import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.util.ObjectUtils;
 import com.intellij.util.containers.ContainerUtil;
 import org.jetbrains.annotations.NotNull;
@@ -66,6 +65,7 @@ public class GrImportStatementImpl extends GrStubElementBase<GrImportStatementSt
     return getParentByStub();
   }
 
+  @Override
   public void accept(GroovyElementVisitor visitor) {
     visitor.visitImportStatement(this);
   }
@@ -74,11 +74,12 @@ public class GrImportStatementImpl extends GrStubElementBase<GrImportStatementSt
     return "Import statement";
   }
 
+  @Override
   public boolean processDeclarations(@NotNull PsiScopeProcessor processor,
                                      @NotNull ResolveState state,
                                      @Nullable PsiElement lastParent,
                                      @NotNull PsiElement place) {
-    if (PsiTreeUtil.isAncestor(this, place, false)) {
+    if (isAncestor(place)) {
       return true;
     }
     if (isStatic() && lastParent instanceof GrImportStatement) return true;
@@ -93,7 +94,16 @@ public class GrImportStatementImpl extends GrStubElementBase<GrImportStatementSt
     return true;
   }
 
-  private boolean processDeclarationsForSingleElement(PsiScopeProcessor processor, ResolveState state) {
+  private boolean isAncestor(@Nullable PsiElement place) {
+    while (place instanceof GrCodeReferenceElement) {
+      PsiElement parent = place.getParent();
+      if (parent == this) return true;
+      place = parent;
+    }
+    return false;
+  }
+
+  private boolean processDeclarationsForSingleElement(PsiScopeProcessor processor, @NotNull ResolveState state) {
     String name = getImportedName();
     if (name == null) return true;
 
@@ -152,7 +162,7 @@ public class GrImportStatementImpl extends GrStubElementBase<GrImportStatementSt
   }
 
   private boolean processSingleStaticImport(PsiScopeProcessor processor,
-                                            ResolveState state,
+                                            @NotNull ResolveState state,
                                             String importedName,
                                             NameHint nameHint,
                                             GrCodeReferenceElement ref) {
@@ -253,6 +263,7 @@ public class GrImportStatementImpl extends GrStubElementBase<GrImportStatementSt
     return true;
   }
 
+  @Override
   public GrCodeReferenceElement getImportReference() {
     GrImportStatementStub stub = getStub();
     if (stub != null) {
@@ -267,6 +278,7 @@ public class GrImportStatementImpl extends GrStubElementBase<GrImportStatementSt
     return (GrCodeReferenceElement)findChildByType(GroovyElementTypes.REFERENCE_ELEMENT);
   }
 
+  @Override
   @Nullable
   public String getImportedName() {
     if (isOnDemand()) return null;
@@ -294,6 +306,7 @@ public class GrImportStatementImpl extends GrStubElementBase<GrImportStatementSt
     return ref == null ? null : ref.getReferenceName();
   }
 
+  @Override
   public boolean isStatic() {
     GrImportStatementStub stub = getStub();
     if (stub != null) {
@@ -303,6 +316,7 @@ public class GrImportStatementImpl extends GrStubElementBase<GrImportStatementSt
     return findChildByType(GroovyTokenTypes.kSTATIC) != null;
   }
 
+  @Override
   public boolean isAliasedImport() {
     GrImportStatementStub stub = getStub();
     if (stub != null) {
@@ -311,6 +325,7 @@ public class GrImportStatementImpl extends GrStubElementBase<GrImportStatementSt
     return getAliasNameElement() != null;
   }
 
+  @Override
   public boolean isOnDemand() {
     GrImportStatementStub stub = getStub();
     if (stub != null) {
@@ -319,6 +334,7 @@ public class GrImportStatementImpl extends GrStubElementBase<GrImportStatementSt
     return findChildByType(GroovyTokenTypes.mSTAR) != null;
   }
 
+  @Override
   @NotNull
   public GrModifierList getAnnotationList() {
     GrImportStatementStub stub = getStub();

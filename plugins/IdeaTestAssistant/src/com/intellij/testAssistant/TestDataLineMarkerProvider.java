@@ -17,19 +17,25 @@ package com.intellij.testAssistant;
 
 import com.intellij.codeHighlighting.Pass;
 import com.intellij.codeInsight.AnnotationUtil;
+import com.intellij.codeInsight.daemon.GutterIconNavigationHandler;
 import com.intellij.codeInsight.daemon.LineMarkerInfo;
 import com.intellij.codeInsight.daemon.LineMarkerProvider;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.markup.GutterIconRenderer;
+import com.intellij.openapi.fileEditor.OpenFileDescriptor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.roots.ProjectFileIndex;
 import com.intellij.openapi.roots.ProjectRootManager;
+import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
+import com.intellij.psi.util.PsiUtilCore;
 import com.intellij.util.PlatformIcons;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.awt.event.MouseEvent;
+import java.io.File;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -46,11 +52,31 @@ public class TestDataLineMarkerProvider implements LineMarkerProvider {
     if (ApplicationManager.getApplication().isUnitTestMode()) {
       return null;
     }
+    final VirtualFile file = PsiUtilCore.getVirtualFile(element);
+    if (file == null || !ProjectFileIndex.SERVICE.getInstance(element.getProject()).isInTestSourceContent(file)) {
+      return null;
+    }
     if (element instanceof PsiMethod) {
       final PsiMethod method = (PsiMethod)element;
       if (isTestMethod(method)) {
         return new LineMarkerInfo<PsiMethod>(
           method, method.getModifierList().getTextRange(), PlatformIcons.TEST_SOURCE_FOLDER, Pass.UPDATE_ALL, null, new TestDataNavigationHandler(),
+          GutterIconRenderer.Alignment.LEFT);
+      }
+    } else if (element instanceof PsiClass) {
+      final PsiClass psiClass = (PsiClass)element;
+      final String basePath = getTestDataBasePath(psiClass);
+      if (basePath != null) {
+        return new LineMarkerInfo<PsiClass>(
+          psiClass, psiClass.getModifierList().getTextRange(), PlatformIcons.TEST_SOURCE_FOLDER, Pass.UPDATE_ALL, null, new GutterIconNavigationHandler<PsiClass>() {
+          @Override
+          public void navigate(MouseEvent e, PsiClass elt) {
+            final VirtualFile baseDir = VfsUtil.findFileByIoFile(new File(basePath), true);
+            if (baseDir != null) {
+              new OpenFileDescriptor(psiClass.getProject(), baseDir).navigate(true);
+            }
+          }
+        }, 
           GutterIconRenderer.Alignment.LEFT);
       }
     }

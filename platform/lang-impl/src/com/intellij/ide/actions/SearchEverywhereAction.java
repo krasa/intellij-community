@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,11 @@
 package com.intellij.ide.actions;
 
 import com.intellij.codeInsight.navigation.NavigationUtil;
+import com.intellij.execution.Executor;
+import com.intellij.execution.ExecutorRegistry;
+import com.intellij.execution.actions.ChooseRunConfigurationPopup;
+import com.intellij.execution.actions.ExecutorProvider;
+import com.intellij.execution.executors.DefaultRunExecutor;
 import com.intellij.featureStatistics.FeatureUsageTracker;
 import com.intellij.icons.AllIcons;
 import com.intellij.ide.DataManager;
@@ -30,6 +35,8 @@ import com.intellij.ide.ui.search.OptionDescription;
 import com.intellij.ide.util.DefaultPsiElementCellRenderer;
 import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.ide.util.gotoByName.*;
+import com.intellij.lang.Language;
+import com.intellij.lang.LanguagePsiElementExternalizer;
 import com.intellij.navigation.ItemPresentation;
 import com.intellij.navigation.NavigationItem;
 import com.intellij.openapi.Disposable;
@@ -41,6 +48,7 @@ import com.intellij.openapi.application.AccessToken;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.editor.actions.TextComponentEditorAction;
+import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.OpenFileDescriptor;
 import com.intellij.openapi.fileEditor.impl.EditorHistoryManager;
 import com.intellij.openapi.keymap.KeymapManager;
@@ -52,18 +60,17 @@ import com.intellij.openapi.options.ex.IdeConfigurablesGroup;
 import com.intellij.openapi.options.ex.ProjectConfigurablesGroup;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.util.ProgressIndicatorBase;
-import com.intellij.openapi.project.DumbAware;
-import com.intellij.openapi.project.DumbAwareAction;
-import com.intellij.openapi.project.DumbServiceImpl;
-import com.intellij.openapi.project.Project;
+import com.intellij.openapi.project.*;
 import com.intellij.openapi.ui.popup.ComponentPopupBuilder;
 import com.intellij.openapi.ui.popup.JBPopup;
 import com.intellij.openapi.ui.popup.JBPopupFactory;
 import com.intellij.openapi.util.*;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.openapi.vfs.VirtualFilePathWrapper;
 import com.intellij.openapi.wm.IdeFocusManager;
+import com.intellij.openapi.wm.ToolWindowId;
 import com.intellij.openapi.wm.ToolWindowManager;
 import com.intellij.openapi.wm.WindowManager;
 import com.intellij.openapi.wm.impl.IdeFrameImpl;
@@ -109,10 +116,11 @@ import java.util.concurrent.atomic.AtomicLong;
  * @author Konstantin Bulenkov
  */
 public class SearchEverywhereAction extends AnAction implements CustomComponentAction, DumbAware{
-  public static final String SE_HISTORY_KEY = "SearchEverywhereHistory";
+  public static final String SE_HISTORY_KEY = "SearchEverywhereHistoryKey";
   public static final int SEARCH_FIELD_COLUMNS = 25;
   private static final int MAX_CLASSES = 6;
   private static final int MAX_FILES = 6;
+  private static final int MAX_RUN_CONFIGURATION = 6;
   private static final int MAX_TOOL_WINDOWS = 4;
   private static final int MAX_SYMBOLS = 6;
   private static final int MAX_SETTINGS = 5;
@@ -132,7 +140,6 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
   private String[] mySymbols;
   private Component myFocusComponent;
   private JBPopup myPopup;
-  private SearchListModel myListModel = new SearchListModel();
   private int myMoreClassesIndex = -1;
   private int myMoreFilesIndex = -1;
   private int myMoreActionsIndex = -1;
@@ -141,13 +148,14 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
   private TitleIndexes myTitleIndexes;
   private Map<String, String> myConfigurables = new HashMap<String, String>();
 
-  private Alarm myAlarm = new Alarm(Alarm.ThreadToUse.POOLED_THREAD, ApplicationManager.getApplication());
+  private Alarm myAlarm = new Alarm(Alarm.ThreadToUse.SWING_THREAD, ApplicationManager.getApplication());
   private Alarm myUpdateAlarm = new Alarm(ApplicationManager.getApplication());
   private JBList myList;
   private JCheckBox myNonProjectCheckBox;
   private AnActionEvent myActionEvent;
   private Component myContextComponent;
   private CalcThread myCalcThread;
+  private static AtomicBoolean ourShiftIsPressed = new AtomicBoolean(false);
   private static AtomicBoolean shift1Pressed = new AtomicBoolean(false);
   private static AtomicBoolean shift1Released = new AtomicBoolean(false);
   private static AtomicBoolean shift2Pressed = new AtomicBoolean(false);
@@ -156,6 +164,8 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
   private static AtomicLong ourLastTimePressed = new AtomicLong(0);
   private static AtomicBoolean showAll = new AtomicBoolean(false);
   private ArrayList<VirtualFile> myAlreadyAddedFiles = new ArrayList<VirtualFile>();
+  private ArrayList<AnAction> myAlreadyAddedActions = new ArrayList<AnAction>();
+  private volatile ActionCallback myCurrentWorker = ActionCallback.DONE;
   private int myHistoryIndex = 0;
 
   static {
@@ -167,6 +177,8 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
           final int keyCode = keyEvent.getKeyCode();
 
           if (keyCode == KeyEvent.VK_SHIFT) {
+            ourShiftIsPressed.set(event.getID() == KeyEvent.KEY_PRESSED);
+
             if (keyEvent.isControlDown() || keyEvent.isAltDown() || keyEvent.isMetaDown()) {
               resetState();
               return false;
@@ -257,6 +269,7 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
 
   private Editor myEditor;
   private PsiFile myFile;
+  private HistoryItem myHistoryItem;
 
   @Override
   public JComponent createCustomComponent(Presentation presentation) {
@@ -332,7 +345,7 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
 
   private void updateComponents() {
     myRenderer = new MyListRenderer();
-    myList = new JBList(myListModel) {
+    myList = new JBList() {
       @Override
       public Dimension getPreferredSize() {
         final Dimension size = super.getPreferredSize();
@@ -377,7 +390,7 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
     });
   }
 
-  private void initTooltip(JLabel label) {
+  private static void initTooltip(JLabel label) {
     final String shortcutText;
     shortcutText = getShortcut();
 
@@ -440,10 +453,10 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
             parent.repaint();
           }
         });
-        if (myPopup != null && myPopup.isVisible()) {
-          myPopup.cancel();
-          myPopup = null;
-        }
+        //if (myPopup != null && myPopup.isVisible()) {
+        //  myPopup.cancel();
+        //  myPopup = null;
+        //}
         rebuildList("");
       }
 
@@ -505,7 +518,6 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
   }
 
   private void clearModel() {
-    myListModel.clear();
     myMoreClassesIndex = -1;
     myMoreFilesIndex = -1;
     myMoreActionsIndex = -1;
@@ -518,7 +530,9 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
 
   private void doNavigate(int index) {
     final Project project = CommonDataKeys.PROJECT.getData(DataManager.getInstance().getDataContext(getField().getTextEditor()));
-
+    final Executor executor = ourShiftIsPressed.get()
+                              ? DefaultRunExecutor.getRunExecutorInstance()
+                              : ExecutorRegistry.getInstance().getExecutorById(ToolWindowId.DEBUG);
     assert project != null;
 
     if (isMoreItem(index)) {
@@ -539,6 +553,7 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
     }
     final String pattern = getField().getText();
     final Object value = myList.getSelectedValue();
+    saveHistory(project, pattern, value);
     IdeFocusManager focusManager = IdeFocusManager.findInstanceByComponent(getField().getTextEditor());
     if (myPopup != null && myPopup.isVisible()) {
       myPopup.cancel();
@@ -565,7 +580,7 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
           return;
         }
       }
-      else if (isActionValue(value) || isSetting(value)) {
+      else if (isActionValue(value) || isSetting(value) || isRunConfiguration(value)) {
         focusManager.requestDefaultFocus(true);
         final Component comp = myContextComponent;
         final AnActionEvent event = myActionEvent;
@@ -576,7 +591,12 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
             if (c == null) {
               c = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
             }
-            GotoActionAction.openOptionOrPerformAction(value, pattern, project, c, event);
+
+            if (isRunConfiguration(value)) {
+              ((ChooseRunConfigurationPopup.ItemWrapper)value).perform(project, executor, DataManager.getInstance().getDataContext(c));
+            } else {
+              GotoActionAction.openOptionOrPerformAction(value, pattern, project, c, event);
+            }
           }
         });
         return;
@@ -602,15 +622,22 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
   }
 
   private void rebuildList(final String pattern) {
-    if (myCalcThread != null) {
-      myCalcThread.cancel();
+    assert EventQueue.isDispatchThread() : "Must be EDT";
+    if (myCalcThread != null && !myCurrentWorker.isProcessed()) {
+      myCurrentWorker = myCalcThread.cancel();
     }
     final Project project = CommonDataKeys.PROJECT.getData(DataManager.getInstance().getDataContext(getField().getTextEditor()));
 
     assert project != null;
     myRenderer.myProject = project;
-    myCalcThread = new CalcThread(project, pattern);
-    myCalcThread.start();
+    myCurrentWorker.doWhenProcessed(new Runnable() {
+      @Override
+      public void run() {
+        myCalcThread = new CalcThread(project, pattern);
+        myPopupActualWidth = 0;
+        myCurrentWorker = myCalcThread.start();
+      }
+    });
   }
 
   @Override
@@ -626,6 +653,7 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
       rebuildList(myPopupField.getText());
       return;
     }
+    myCurrentWorker = ActionCallback.DONE;
     if (e != null) {
       myEditor = e.getData(CommonDataKeys.EDITOR);
       myFile = e.getData(CommonDataKeys.PSI_FILE);
@@ -637,7 +665,6 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
 
     updateComponents();
     myContextComponent = PlatformDataKeys.CONTEXT_COMPONENT.getData(e.getDataContext());
-    final Project project = e.getProject();
     Window wnd = myContextComponent != null ? SwingUtilities.windowForComponent(myContextComponent)
       : KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusedWindow();
     if (wnd == null && myContextComponent instanceof Window) {
@@ -649,6 +676,27 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
       Disposer.dispose(myPopupField);
     }
     myPopupField = new MySearchTextField();
+    myPopupField.getTextEditor().addKeyListener(new KeyAdapter() {
+      @Override
+      public void keyTyped(KeyEvent e) {
+        myHistoryIndex = 0;
+        myHistoryItem = null;
+      }
+
+      @Override
+      public void keyPressed(KeyEvent e) {
+        if (e.getKeyCode() == KeyEvent.VK_SHIFT) {
+          myList.repaint();
+        }
+      }
+
+      @Override
+      public void keyReleased(KeyEvent e) {
+        if (e.getKeyCode() == KeyEvent.VK_SHIFT) {
+          myList.repaint();
+        }
+      }
+    });
     initSearchField(myPopupField);
     myPopupField.setOpaque(false);
     final JTextField editor = myPopupField.getTextEditor();
@@ -680,25 +728,7 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
     myBalloon = builder
       .setCancelOnClickOutside(true)
       .setModalContext(false)
-      .setCancelCallback(new Computable<Boolean>() {
-        @Override
-        public Boolean compute() {
-          final String last = editor.getText().trim();
-          if (project == null || project.isDisposed() || !project.isInitialized()) {
-            return true;
-          }
-          final PropertiesComponent storage = PropertiesComponent.getInstance(project);
-          final String historyString = storage.getValue(SE_HISTORY_KEY);
-          List<String> history = StringUtil.isEmpty(historyString) ? new ArrayList<String>() : StringUtil.split(historyString, "\n");
-          history.remove(last);
-          history.add(0, last);
-          if (history.size() > MAX_SEARCH_EVERYWHERE_HISTORY) {
-            history = history.subList(0, MAX_SEARCH_EVERYWHERE_HISTORY);
-          }
-          storage.setValue(SE_HISTORY_KEY, StringUtil.join(history, "\n"));
-          return true;
-        }
-      })
+      .setRequestFocus(true)
       .createPopup();
     myBalloon.getContent().setBorder(new EmptyBorder(0,0,0,0));
     final Window window = WindowManager.getInstance().suggestParentWindow(e.getProject());
@@ -729,6 +759,56 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
     IdeFocusManager focusManager = IdeFocusManager.getInstance(e.getProject());
     focusManager.requestFocus(editor, true);
     FeatureUsageTracker.getInstance().triggerFeatureUsed(IdeActions.ACTION_SEARCH_EVERYWHERE);
+  }
+
+  private static void saveHistory(Project project, String text, Object value) {
+    if (project == null || project.isDisposed() || !project.isInitialized()) {
+      return;
+    }
+    HistoryType type = null;
+    String fqn = null;
+    if (isActionValue(value)) {
+      type = HistoryType.ACTION;
+      AnAction action = (AnAction)(value instanceof Map.Entry ? ((Map.Entry)value).getKey() : value);
+      fqn = ActionManager.getInstance().getId(action);
+    } else if (value instanceof VirtualFile) {
+      type = HistoryType.FILE;
+      fqn = ((VirtualFile)value).getUrl();
+    } else if (value instanceof ChooseRunConfigurationPopup.ItemWrapper) {
+      type = HistoryType.RUN_CONFIGURATION;
+      fqn = ((ChooseRunConfigurationPopup.ItemWrapper)value).getText();
+    } else if (value instanceof PsiElement) {
+      final PsiElement psiElement = (PsiElement)value;
+      final Language language = psiElement.getLanguage();
+      final String name = LanguagePsiElementExternalizer.INSTANCE.forLanguage(language).getQualifiedName(psiElement);
+      if (name != null) {
+        type = HistoryType.PSI;
+        fqn = language.getID() + "://" + name;
+      }
+    }
+
+    final PropertiesComponent storage = PropertiesComponent.getInstance(project);
+    final String[] values = storage.getValues(SE_HISTORY_KEY);
+    List<HistoryItem> history = new ArrayList<HistoryItem>();
+    if (values != null) {
+      for (String s : values) {
+        final String[] split = s.split("\t");
+        if (split.length != 3 || text.equals(split[0])) {
+          continue;
+        }
+        history.add(new HistoryItem(split[0], split[1], split[2]));
+      }
+    }
+    history.add(0, new HistoryItem(text, type == null ? null : type.name(), fqn));
+
+    if (history.size() > MAX_SEARCH_EVERYWHERE_HISTORY) {
+      history = history.subList(0, MAX_SEARCH_EVERYWHERE_HISTORY);
+    }
+    final String[] newValues = new String[history.size()];
+    for (int i = 0; i < newValues.length; i++) {
+      newValues[i] = history.get(i).toString();
+    }
+    storage.setValues(SE_HISTORY_KEY, newValues);
   }
 
   private void registerDataProvider(JPanel panel) {
@@ -780,20 +860,20 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
           doNavigate(index);
         }
       }
-    }.registerCustomShortcutSet(CustomShortcutSet.fromString("ENTER"), editor, balloon);
+    }.registerCustomShortcutSet(CustomShortcutSet.fromString("ENTER", "shift ENTER"), editor, balloon);
     new DumbAwareAction(){
       @Override
       public void actionPerformed(AnActionEvent e) {
         final PropertiesComponent storage = PropertiesComponent.getInstance(e.getProject());
-        final String historyString = storage.getValue(SE_HISTORY_KEY);
-        if (historyString != null) {
-          final List<String> history = StringUtil.split(historyString, "\n");
-          if (history.size() > myHistoryIndex) {
-            final String text = history.get(myHistoryIndex);
-            editor.setText(text);
-            editor.setCaretPosition(text.length());
-            editor.moveCaretPosition(0);
+        final String[] values = storage.getValues(SE_HISTORY_KEY);
+        if (values != null) {
+          if (values.length > myHistoryIndex) {
+            final List<String> data = StringUtil.split(values[myHistoryIndex], "\t");
+            myHistoryItem = new HistoryItem(data.get(0), data.get(1), data.get(2));
             myHistoryIndex++;
+            editor.setText(myHistoryItem.pattern);
+            editor.setCaretPosition(myHistoryItem.pattern.length());
+            editor.moveCaretPosition(0);
           }
         }
       }
@@ -885,7 +965,8 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
                  && myProject != null
                  && (((VirtualFile)value).isDirectory()
                      || (file = PsiManager.getInstance(myProject).findFile((VirtualFile)value)) != null)) {
-        cmp = new GotoFileCellRenderer(Math.min(800, list.getWidth())).getListCellRendererComponent(list, file == null ? value : file, index, isSelected, cellHasFocus);
+        cmp = new GotoFileCellRenderer(Math.min(800, list.getWidth()))
+          .getListCellRendererComponent(list, file == null ? value : file, index, isSelected, cellHasFocus);
       } else if (value instanceof PsiElement) {
         cmp = myPsiRenderer.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
       } else {
@@ -913,8 +994,8 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
       }
 
       Color bg = cmp.getBackground();
-      cmp.setBackground(UIUtil.getListBackground(isSelected));
       if (bg == null) {
+        cmp.setBackground(UIUtil.getListBackground(isSelected));
         bg = cmp.getBackground();
       }
       myMainPanel.setBorder(new CustomLineBorder(bg, 0, 0, 2, 0));
@@ -942,8 +1023,13 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
           String name = myClassModel.getElementName(value);
           assert name != null;
           append(name);
-        }
-        else if (isVirtualFile(value)) {
+        } else if (value instanceof ChooseRunConfigurationPopup.ItemWrapper) {
+          final ChooseRunConfigurationPopup.ItemWrapper wrapper = (ChooseRunConfigurationPopup.ItemWrapper)value;
+          append(wrapper.getText());
+          setIcon(wrapper.getIcon());
+          setLocationString(ourShiftIsPressed.get() ? "Run" : "Debug");
+          myLocationIcon = ourShiftIsPressed.get() ? AllIcons.Toolwindows.ToolWindowRun : AllIcons.Toolwindows.ToolWindowDebugger;
+        } else if (isVirtualFile(value)) {
           final VirtualFile file = (VirtualFile)value;
           if (file instanceof VirtualFilePathWrapper) {
             append(((VirtualFilePathWrapper)file).getPresentablePath());
@@ -1065,6 +1151,10 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
     return o instanceof OptionDescription;
   }
 
+  private static boolean isRunConfiguration(Object o) {
+    return o instanceof ChooseRunConfigurationPopup.ItemWrapper;
+  }
+
   private static boolean isVirtualFile(Object o) {
     return o instanceof VirtualFile;
   }
@@ -1078,6 +1168,8 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
     private final Project project;
     private final String pattern;
     private ProgressIndicator myProgressIndicator = new ProgressIndicatorBase();
+    private final ActionCallback myDone = new ActionCallback();
+    private SearchListModel myListModel = new SearchListModel();
 
     public CalcThread(Project project, String pattern) {
       this.project = project;
@@ -1087,28 +1179,45 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
     @Override
     public void run() {
       try {
-        myList.getEmptyText().setText("Searching...");
+        check();
+
         //noinspection SSBasedInspection
-        UIUtil.invokeLaterIfNeeded(new Runnable() {
+        SwingUtilities.invokeLater(new Runnable() {
           @Override
           public void run() {
+            //noinspection unchecked
+            myList.setModel(myListModel);
+            myList.getEmptyText().setText("Searching...");
             myTitleIndexes.clear();
             clearModel();
             myAlreadyAddedFiles.clear();
+            myAlreadyAddedActions.clear();
           }
         });
+
         if (pattern.trim().length() == 0) {
           buildModelFromRecentFiles();
           updatePopup();
           return;
         }
 
-        checkModelsUpToDate();
-        buildTopHit(pattern);
-        buildRecentFiles(pattern);
-        updatePopup();
-        buildToolWindows(pattern);
-        updatePopup();
+        checkModelsUpToDate();            check();
+        buildTopHit(pattern);             check();
+        buildRecentFiles(pattern);        check();
+        updatePopup();                    check();
+        buildToolWindows(pattern);        check();
+        updatePopup();                    check();
+
+        if (!DumbServiceImpl.getInstance(project).isDumb()) {
+          ApplicationManager.getApplication().runReadAction(new Runnable() {
+            public void run() {
+              buildRunConfigurations(pattern);
+            }
+          });
+
+          updatePopup();
+          check();
+        }
 
         if (!DumbServiceImpl.getInstance(project).isDumb()) {
           ApplicationManager.getApplication().runReadAction(new Runnable() {
@@ -1139,10 +1248,20 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
         updatePopup();
       }
       catch (Exception ignore) {
+        myDone.setRejected();
       }
       finally {
-        myList.getEmptyText().setText(StatusText.DEFAULT_EMPTY_TEXT);
+        if (!myProgressIndicator.isCanceled()) {
+          myList.getEmptyText().setText(StatusText.DEFAULT_EMPTY_TEXT);
+        }
+        if (!myDone.isProcessed()) {
+          myDone.setDone();
+        }
       }
+    }
+
+    protected void check() {
+      myProgressIndicator.checkCanceled();
     }
 
     private void buildToolWindows(String pattern) {
@@ -1152,17 +1271,17 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
       final HashSet<AnAction> toolWindows = new HashSet<AnAction>();
       List<MatchResult> matches = collectResults(pattern, myActions, myActionModel);
       for (MatchResult o : matches) {
-        myProgressIndicator.checkCanceled();
+        check();
         Object[] objects = myActionModel.getElementsByName(o.elementName, true, pattern);
         for (Object object : objects) {
-          myProgressIndicator.checkCanceled();
+          check();
           if (isToolWindowAction(object) && toolWindows.size() < MAX_TOOL_WINDOWS) {
             toolWindows.add((AnAction)((Map.Entry)object).getKey());
           }
         }
       }
 
-      myProgressIndicator.checkCanceled();
+      check();
 
       UIUtil.invokeLaterIfNeeded(new Runnable() {
         @Override
@@ -1189,10 +1308,10 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
       List<MatchResult> matches = collectResults(pattern, myActions, myActionModel);
 
       for (MatchResult o : matches) {
-        myProgressIndicator.checkCanceled();
+        check();
         Object[] objects = myActionModel.getElementsByName(o.elementName, true, pattern);
         for (Object object : objects) {
-          myProgressIndicator.checkCanceled();
+          check();
           if (isSetting(object) && settings.size() < MAX_SETTINGS) {
             if (matcher.matches(getSettingText((OptionDescription)object))) {
               settings.add(object);
@@ -1204,7 +1323,7 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
         }
       }
 
-      myProgressIndicator.checkCanceled();
+      check();
 
       UIUtil.invokeLaterIfNeeded(new Runnable() {
         @Override
@@ -1275,7 +1394,7 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
       }
 
 
-      myProgressIndicator.checkCanceled();
+      check();
 
       if (files.size() > 0) {
         UIUtil.invokeLaterIfNeeded(new Runnable() {
@@ -1314,7 +1433,7 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
         }
       }
 
-      myProgressIndicator.checkCanceled();
+      check();
 
       if (symbols.size() > 0) {
         UIUtil.invokeLaterIfNeeded(new Runnable() {
@@ -1332,6 +1451,59 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
       }
     }
 
+    @Nullable
+    private ChooseRunConfigurationPopup.ItemWrapper getRunConfigurationByName(String name) {
+      final ChooseRunConfigurationPopup.ItemWrapper[] wrappers =
+        ChooseRunConfigurationPopup.createSettingsList(project, new ExecutorProvider() {
+          @Override
+          public Executor getExecutor() {
+            return ExecutorRegistry.getInstance().getExecutorById(ToolWindowId.DEBUG);
+          }
+        }, false);
+
+      for (ChooseRunConfigurationPopup.ItemWrapper wrapper : wrappers) {
+        if (wrapper.getText().equals(name)) {
+          return wrapper;
+        }
+      }
+      return null;
+    }
+
+    private void buildRunConfigurations(String pattern) {
+      final List<Object> runConfigurations = new ArrayList<Object>();
+      MinusculeMatcher matcher = new MinusculeMatcher(pattern, NameUtil.MatchingCaseSensitivity.NONE);
+      final ChooseRunConfigurationPopup.ItemWrapper[] wrappers =
+        ChooseRunConfigurationPopup.createSettingsList(project, new ExecutorProvider() {
+          @Override
+          public Executor getExecutor() {
+            return ExecutorRegistry.getInstance().getExecutorById(ToolWindowId.DEBUG);
+          }
+        }, false);
+      check();
+      for (ChooseRunConfigurationPopup.ItemWrapper wrapper : wrappers) {
+        if (matcher.matches(wrapper.getText())) {
+          runConfigurations.add(wrapper);
+        }
+        check();
+      }
+
+      if (runConfigurations.size() > 0) {
+        UIUtil.invokeLaterIfNeeded(new Runnable() {
+          @Override
+          public void run() {
+            if (!myProgressIndicator.isCanceled()) {
+              myTitleIndexes.runConfigurations = myListModel.size();
+              for (Object runConfiguration : runConfigurations) {
+                myListModel.addElement(runConfiguration);
+              }
+              myMoreFilesIndex = runConfigurations.size() >= MAX_RUN_CONFIGURATION ? myListModel.size() - 1 : -1;
+            }
+          }
+        });
+      }
+
+    }
+
     private void buildClasses(String pattern, boolean includeLibraries) {
       if (pattern.indexOf('.') != -1) {
         //todo[kb] it's not a mistake. If we search for "*.png" or "index.xml" in SearchEverywhere
@@ -1347,13 +1519,14 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
       List<MatchResult> matches = collectResults(pattern, includeLibs ? myClassModel.getNames(true) : myClasses, myClassModel);
 //      FindSymbolParameters parameters = FindSymbolParameters.wrap(pattern, project, includeLibs);
       final List<Object> classes = new ArrayList<Object>();
+      check();
 
       for (MatchResult matchResult : matches) {
         if (clsCounter > maxCount) break;
 
         Object[] objects = myClassModel.getElementsByName(matchResult.elementName, includeLibs, pattern);
         for (Object object : objects) {
-          myProgressIndicator.checkCanceled();
+          check();
           if (!myListModel.contains(object)) {
             if (object instanceof PsiElement) {
               VirtualFile file = PsiUtilCore.getVirtualFile((PsiElement)object);
@@ -1374,7 +1547,7 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
         }
       }
 
-      myProgressIndicator.checkCanceled();
+      check();
 
       if (classes.size() > 0) {
         UIUtil.invokeLaterIfNeeded(new Runnable() {
@@ -1399,9 +1572,10 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
     private void buildRecentFiles(String pattern) {
       final MinusculeMatcher matcher = new MinusculeMatcher("*" + pattern, NameUtil.MatchingCaseSensitivity.NONE);
       final ArrayList<VirtualFile> files = new ArrayList<VirtualFile>();
+      final List<VirtualFile> selected = Arrays.asList(FileEditorManager.getInstance(project).getSelectedFiles());
       for (VirtualFile file : ArrayUtil.reverseArray(EditorHistoryManager.getInstance(project).getFiles())) {
         if (StringUtil.isEmptyOrSpaces(pattern) || matcher.matches(file.getName())) {
-          if (!files.contains(file)) {
+          if (!files.contains(file) && !selected.contains(file)) {
             files.add(file);
           }
         }
@@ -1427,10 +1601,77 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
 
     private void buildTopHit(String pattern) {
       final List<Object> elements = new ArrayList<Object>();
+      final HistoryItem history = myHistoryItem;
+      if (history != null) {
+        final HistoryType type = parseHistoryType(history.type);
+        if (type != null) {
+          switch (type){
+            case PSI:
+              if (!DumbService.isDumb(project)) {
+                ApplicationManager.getApplication().runReadAction(new Runnable() {
+                  public void run() {
+
+                    final int i = history.fqn.indexOf("://");
+                    if (i != -1) {
+                      final String langId = history.fqn.substring(0, i);
+                      final Language language = Language.findLanguageByID(langId);
+                      final String psiFqn = history.fqn.substring(i + 3);
+                      if (language != null) {
+                        final PsiElement psi =
+                          LanguagePsiElementExternalizer.INSTANCE.forLanguage(language).findByQualifiedName(project, psiFqn);
+                        if (psi != null) {
+                          elements.add(psi);
+                          final PsiFile psiFile = psi.getContainingFile();
+                          if (psiFile != null) {
+                            final VirtualFile file = psiFile.getVirtualFile();
+                            if (file != null) {
+                              myAlreadyAddedFiles.add(file);
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                });
+              }
+              break;
+            case FILE:
+              final VirtualFile file = VirtualFileManager.getInstance().findFileByUrl(history.fqn);
+              if (file != null) {
+                elements.add(file);
+              }
+              break;
+            case SETTING:
+              break;
+            case ACTION:
+              final AnAction action = ActionManager.getInstance().getAction(history.fqn);
+              if (action != null) {
+                elements.add(action);
+                myAlreadyAddedActions.add(action);
+              }
+              break;
+            case RUN_CONFIGURATION:
+              if (!DumbService.isDumb(project)) {
+                ApplicationManager.getApplication().runReadAction(new Runnable() {
+                  public void run() {
+                    final ChooseRunConfigurationPopup.ItemWrapper runConfiguration = getRunConfigurationByName(history.fqn);
+                    if (runConfiguration != null) {
+                      elements.add(runConfiguration);
+                    }
+                  }
+                });
+              }
+              break;
+          }
+        }
+      }
       final Consumer<Object> consumer = new Consumer<Object>() {
         @Override
         public void consume(Object o) {
           if (isSetting(o) || isVirtualFile(o) || isActionValue(o) || o instanceof PsiElement) {
+            if (o instanceof AnAction && myAlreadyAddedActions.contains(o)) {
+              return;
+            }
             elements.add(o);
           }
         }
@@ -1443,7 +1684,7 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
       }
 
       for (SearchTopHitProvider provider : SearchTopHitProvider.EP_NAME.getExtensions()) {
-        myProgressIndicator.checkCanceled();
+        check();
         provider.consumeTopHits(pattern, consumer);
       }
       if (elements.size() > 0) {
@@ -1491,11 +1732,10 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
 
     @SuppressWarnings("SSBasedInspection")
     private void updatePopup() {
-      myProgressIndicator.checkCanceled();
+      check();
       SwingUtilities.invokeLater(new Runnable() {
         @Override
         public void run() {
-          myProgressIndicator.checkCanceled();
           myListModel.update();
           myList.revalidate();
           myList.repaint();
@@ -1544,6 +1784,8 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
                 myCalcThread = null;
                 myPopup = null;
                 myHistoryIndex = 0;
+                myPopupActualWidth = 0;
+                myCurrentWorker = ActionCallback.DONE;
                 showAll.set(false);
                 myNonProjectCheckBox.setSelected(false);
                 ActionToolbarImpl.updateAllToolbarsImmediately();
@@ -1605,7 +1847,7 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
       MatchResult result;
 
       for (String name : names) {
-        myProgressIndicator.checkCanceled();
+        check();
         result = null;
         if (model instanceof CustomMatcherModel) {
           try {
@@ -1635,12 +1877,14 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
       return results;
     }
 
-    public void cancel() {
+    public ActionCallback cancel() {
       myProgressIndicator.cancel();
+      return myDone;
     }
 
-    public void start() {
+    public ActionCallback start() {
       ApplicationManager.getApplication().executeOnPooledThread(this);
+      return myDone;
     }
   }
 
@@ -1650,6 +1894,7 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
     }
     final Container parent = getField().getParent();
     final Dimension size = myList.getParent().getParent().getPreferredSize();
+    size.width = myPopupActualWidth;
     if (size.width < parent.getWidth()) {
       size.width = parent.getWidth();
     }
@@ -1740,6 +1985,7 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
   static class TitleIndexes {
     int topHit;
     int recentFiles;
+    int runConfigurations;
     int classes;
     int files;
     int actions;
@@ -1752,6 +1998,7 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
     final String gotoActionTitle;
     final String gotoSettingsTitle;
     final String gotoRecentFilesTitle;
+    final String gotoRunConfigurationsTitle;
     final String gotoSymbolTitle;
     static final String toolWindowsTitle = "Tool Windows";
 
@@ -1767,12 +2014,18 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
       String gotoRecentFiles = KeymapUtil.getFirstKeyboardShortcutText(ActionManager.getInstance().getAction("RecentFiles"));
       gotoRecentFilesTitle = StringUtil.isEmpty(gotoRecentFiles) ? "Recent Files" : "Recent Files (" + gotoRecentFiles + ")";
       String gotoSymbol = KeymapUtil.getFirstKeyboardShortcutText(ActionManager.getInstance().getAction("GotoSymbol"));
-      gotoSymbolTitle = StringUtil.isEmpty(gotoClass) ? "Symbols" : "Symbols (" + gotoSymbol + ")";
+      gotoSymbolTitle = StringUtil.isEmpty(gotoSymbol) ? "Symbols" : "Symbols (" + gotoSymbol + ")";
+      String gotoRunConfiguration = KeymapUtil.getFirstKeyboardShortcutText(ActionManager.getInstance().getAction("ChooseDebugConfiguration"));
+      if (StringUtil.isEmpty(gotoRunConfiguration)) {
+        gotoRunConfiguration = KeymapUtil.getFirstKeyboardShortcutText(ActionManager.getInstance().getAction("ChooseRunConfiguration"));
+      }
+      gotoRunConfigurationsTitle = StringUtil.isEmpty(gotoRunConfiguration) ? "Run Configurations" : "Run Configurations (" + gotoRunConfiguration + ")";
     }
 
     String getTitle(int index) {
       if (index == topHit) return index == 0 ? "Top Hit" : "Top Hits";
       if (index == recentFiles) return gotoRecentFilesTitle;
+      if (index == runConfigurations) return gotoRunConfigurationsTitle;
       if (index == classes) return gotoClassTitle;
       if (index == files) return gotoFileTitle;
       if (index == toolWindows) return toolWindowsTitle;
@@ -1783,7 +2036,7 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
     }
 
     int next(int index) {
-      int[] all = new int[]{topHit, recentFiles, classes, files, actions, settings, toolWindows, symbols};
+      int[] all = new int[]{topHit, recentFiles, runConfigurations, classes, files, actions, settings, toolWindows, symbols};
       Arrays.sort(all);
       for (int next : all) {
         if (next > index) return next;
@@ -1792,7 +2045,7 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
     }
 
     int prev(int index) {
-      int[] all = new int[]{topHit, recentFiles, classes, files, actions, settings, toolWindows, symbols};
+      int[] all = new int[]{topHit, recentFiles, runConfigurations, classes, files, actions, settings, toolWindows, symbols};
       Arrays.sort(all);
       for (int i = all.length-1; i >= 0; i--) {
         if (all[i] != -1 && all[i] < index) return all[i];
@@ -1803,6 +2056,7 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
 
     public void clear() {
       topHit = -1;
+      runConfigurations = -1;
       recentFiles = -1;
       classes = -1;
       files = -1;
@@ -1872,4 +2126,46 @@ public class SearchEverywhereAction extends AnAction implements CustomComponentA
     return result;
   }
 
+  private enum HistoryType {PSI, FILE, SETTING, ACTION, RUN_CONFIGURATION}
+
+  @Nullable
+  private static HistoryType parseHistoryType(@Nullable String name) {
+    try {
+      return HistoryType.valueOf(name);
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  private static class HistoryItem {
+    final String pattern, type, fqn;
+
+    private HistoryItem(String pattern, String type, String fqn) {
+      this.pattern = pattern;
+      this.type = type;
+      this.fqn = fqn;
+    }
+
+    public String toString() {
+      return pattern + "\t" + type + "\t" + fqn;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+
+      HistoryItem item = (HistoryItem)o;
+
+      if (!pattern.equals(item.pattern)) return false;
+
+      return true;
+    }
+
+    @Override
+    public int hashCode() {
+      return pattern.hashCode();
+    }
+  }
 }
+

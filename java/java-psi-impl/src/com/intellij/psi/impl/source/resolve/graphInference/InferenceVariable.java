@@ -15,7 +15,8 @@
  */
 package com.intellij.psi.impl.source.resolve.graphInference;
 
-import com.intellij.psi.*;
+import com.intellij.psi.PsiType;
+import com.intellij.psi.PsiTypeParameter;
 
 import java.util.*;
 
@@ -27,6 +28,7 @@ public class InferenceVariable {
     return myParameter;
   }
 
+  private boolean myThrownBound = false;
   private final Map<InferenceBound, List<PsiType>> myBounds = new HashMap<InferenceBound, List<PsiType>>();
   private final PsiTypeParameter myParameter;
 
@@ -41,10 +43,6 @@ public class InferenceVariable {
   public void setInstantiation(PsiType instantiation) {
     myInstantiation = instantiation;
   }
-  
-  public void ignoreInstantiation() {
-    myInstantiation = PsiType.NULL;
-  }
 
   public boolean addBound(PsiType classType, InferenceBound inferenceBound) {
     List<PsiType> list = myBounds.get(inferenceBound);
@@ -53,7 +51,7 @@ public class InferenceVariable {
       myBounds.put(inferenceBound, list);
     }
     final int idx = list.indexOf(classType);
-    if (idx < 0 || inferenceBound == InferenceBound.EQ && classType instanceof PsiCapturedWildcardType && list.get(idx) != classType) {
+    if (idx < 0) {
       list.add(classType);
       return true;
     }
@@ -72,6 +70,57 @@ public class InferenceVariable {
         session.collectDependencies(bound, dependencies);
       }
     }
+
+    next:
+    for (InferenceVariable variable : session.getInferenceVariables()) {
+      if (!dependencies.contains(variable) && variable != this) {
+        nextBound:
+        for (InferenceBound inferenceBound : InferenceBound.values()) {
+          final List<PsiType> bounds = getBounds(inferenceBound); //todo
+          for (PsiType bound : bounds) {
+            if (session.isProperType(bound)) {
+              continue nextBound;
+            }
+          }
+          for (PsiType bound : bounds) {
+            Set<InferenceVariable> deps = new HashSet<InferenceVariable>();
+            session.collectDependencies(bound, deps);
+            if (deps.contains(this)) {
+              dependencies.add(variable);
+              continue next;
+            }
+          }
+        }
+      }
+    }
+
+    if (!session.hasCapture(this)) {
+      return dependencies;
+    }
+
+    for (Iterator<InferenceVariable> iterator = dependencies.iterator(); iterator.hasNext(); ) {
+      if (!session.hasCapture(iterator.next())) {
+        iterator.remove();
+      }
+    }
+    session.collectCaptureDependencies(this, dependencies);
     return dependencies;
+  }
+
+  public boolean isThrownBound() {
+    return myThrownBound;
+  }
+
+  public void setThrownBound() {
+    myThrownBound = true;
+  }
+
+  public void replaceBounds(InferenceBound boundType, LinkedHashSet<PsiType> bounds) {
+    
+  }
+
+  @Override
+  public String toString() {
+    return myParameter.toString();
   }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -129,12 +129,11 @@ public class ClosureParameterEnhancer extends AbstractClosureParameterEnhancer {
     if (!(parent instanceof GrMethodCall)) {
       return null;
     }
+
     String methodName = findMethodName((GrMethodCall)parent);
 
     GrExpression expression = ((GrMethodCall)parent).getInvokedExpression();
     if (!(expression instanceof GrReferenceExpression)) return null;
-//    final PsiElement resolved = ((GrReferenceExpression)expression).resolve();
-//    if (!(resolved instanceof GrGdkMethod)) return null;
 
     GrExpression qualifier = ((GrReferenceExpression)expression).getQualifierExpression();
     if (qualifier == null) return null;
@@ -254,7 +253,6 @@ public class ClosureParameterEnhancer extends AbstractClosureParameterEnhancer {
     }
     return null;
   }
-
 
   @Nullable
   private static PsiType getEntryForMap(@Nullable PsiType map, @NotNull final Project project, @NotNull final GlobalSearchScope scope) {

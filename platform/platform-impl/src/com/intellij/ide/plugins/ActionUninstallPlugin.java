@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -72,6 +72,10 @@ public class ActionUninstallPlugin extends AnAction implements DumbAware {
   }
 
   public void actionPerformed(AnActionEvent e) {
+    uninstall(host, pluginTable);
+  }
+
+  public static void uninstall(PluginManagerMain host, PluginTable pluginTable) {
     String message;
     IdeaPluginDescriptor[] selection = pluginTable.getSelectedObjects();
 
@@ -96,11 +100,11 @@ public class ActionUninstallPlugin extends AnAction implements DumbAware {
         actualDelete = (Messages.showYesNoDialog(host.getMainPanel(), message, promptTitle, Messages.getQuestionIcon()) == Messages.YES);
       }
 
-      if (actualDelete) uninstallPlugin(pluginDescriptor);
+      if (actualDelete) uninstallPlugin(pluginDescriptor, host, pluginTable);
     }
   }
 
-  private void uninstallPlugin(IdeaPluginDescriptorImpl descriptor) {
+  private static void uninstallPlugin(IdeaPluginDescriptorImpl descriptor, PluginManagerMain host, PluginTable pluginTable) {
     PluginId pluginId = descriptor.getPluginId();
     descriptor.setDeleted(true);
 

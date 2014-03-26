@@ -237,6 +237,7 @@ public class ExternalSystemUtil {
       }
 
       private void processOrphanModules() {
+        if(project.isDisposed()) return;
         if(ExternalSystemDebugEnvironment.DEBUG_ORPHAN_MODULES_PROCESSING) {
           LOG.info(String.format(
             "Checking for orphan modules. External paths returned by external system: '%s'", myExternalModulePaths
@@ -290,8 +291,8 @@ public class ExternalSystemUtil {
     Set<String> toRefresh = ContainerUtilRt.newHashSet();
     for (ExternalProjectSettings setting : projectsSettings) {
       Long oldModificationStamp = modificationStamps.get(setting.getExternalProjectPath());
-      long currentModificationStamp = getTimeStamp(setting.getExternalProjectPath(), externalSystemId);
-      if (force || currentModificationStamp < 0 || oldModificationStamp == null || oldModificationStamp < currentModificationStamp) {
+      long currentModificationStamp = getTimeStamp(setting, externalSystemId);
+      if (force || oldModificationStamp == null || oldModificationStamp < currentModificationStamp) {
         toRefresh.add(setting.getExternalProjectPath());
       }
     }
@@ -304,21 +305,17 @@ public class ExternalSystemUtil {
     }
   }
 
-  private static long getTimeStamp(@NotNull String path, @NotNull ProjectSystemId externalSystemId) {
-    VirtualFile vFile = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(new File(path));
-    if (vFile == null) {
-      return -1;
-    }
+  private static long getTimeStamp(@NotNull ExternalProjectSettings externalProjectSettings, @NotNull ProjectSystemId externalSystemId) {
+    long timeStamp = 0;
     for (ExternalSystemConfigLocator locator : ExternalSystemConfigLocator.EP_NAME.getExtensions()) {
       if (!externalSystemId.equals(locator.getTargetExternalSystemId())) {
         continue;
       }
-      VirtualFile adjusted = locator.adjust(vFile);
-      if (adjusted != null) {
-        vFile = adjusted;
+      for (VirtualFile virtualFile : locator.findAll(externalProjectSettings)) {
+        timeStamp += virtualFile.getTimeStamp();
       }
     }
-    return vFile.getTimeStamp();
+    return timeStamp;
   }
 
   /**
@@ -469,15 +466,12 @@ public class ExternalSystemUtil {
           = new ExternalSystemResolveProjectTask(externalSystemId, project, externalProjectPath, isPreviewMode);
 
         task.execute(indicator, ExternalSystemTaskNotificationListener.EP_NAME.getExtensions());
+        if(project.isDisposed()) return;
+
         final Throwable error = task.getError();
         if (error == null) {
           ExternalSystemManager<?, ?, ?, ?, ?> manager = ExternalSystemApiUtil.getManager(externalSystemId);
           assert manager != null;
-          long stamp = getTimeStamp(externalProjectPath, externalSystemId);
-          if (stamp > 0) {
-            if(project.isDisposed()) return;
-            manager.getLocalSettingsProvider().fun(project).getExternalConfigModificationStamps().put(externalProjectPath, stamp);
-          }
           DataNode<ProjectData> externalProject = task.getExternalProject();
 
           if(externalProject != null) {
@@ -491,6 +485,11 @@ public class ExternalSystemUtil {
             ExternalProjectSettings linkedProjectSettings = manager.getSettingsProvider().fun(project).getLinkedProjectSettings(projectPath);
             if (linkedProjectSettings != null) {
               linkedProjectSettings.setModules(externalModulePaths);
+
+              long stamp = getTimeStamp(linkedProjectSettings, externalSystemId);
+              if (stamp > 0) {
+                manager.getLocalSettingsProvider().fun(project).getExternalConfigModificationStamps().put(externalProjectPath, stamp);
+              }
             }
           }
 
@@ -504,8 +503,7 @@ public class ExternalSystemUtil {
         String message = ExternalSystemApiUtil.buildErrorMessage(error);
         if (StringUtil.isEmpty(message)) {
           message = String.format(
-            "Can't resolve %s project at '%s'. Reason: %s",
-            externalSystemId.getReadableName(), externalProjectPath, message
+            "Can't resolve %s project at '%s'. Reason: %s", externalSystemId.getReadableName(), externalProjectPath, message
           );
         }
 

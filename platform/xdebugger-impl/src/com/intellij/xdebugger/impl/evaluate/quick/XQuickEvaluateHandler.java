@@ -26,7 +26,6 @@ import com.intellij.psi.PsiDocumentManager;
 import com.intellij.xdebugger.XDebugSession;
 import com.intellij.xdebugger.XDebuggerManager;
 import com.intellij.xdebugger.evaluation.XDebuggerEvaluator;
-import com.intellij.xdebugger.frame.XStackFrame;
 import com.intellij.xdebugger.impl.evaluate.quick.common.AbstractValueHint;
 import com.intellij.xdebugger.impl.evaluate.quick.common.QuickEvaluateHandler;
 import com.intellij.xdebugger.impl.evaluate.quick.common.ValueHintType;
@@ -44,22 +43,20 @@ public class XQuickEvaluateHandler extends QuickEvaluateHandler {
   @Override
   public boolean isEnabled(@NotNull final Project project) {
     XDebugSession session = XDebuggerManager.getInstance(project).getCurrentSession();
-    if (session == null || !session.isSuspended()) {
-      return false;
-    }
-    XStackFrame stackFrame = session.getCurrentStackFrame();
-    return stackFrame != null && stackFrame.getEvaluator() != null;
+    return session != null && session.getDebugProcess().getEvaluator() != null;
   }
 
   @Override
   public AbstractValueHint createValueHint(@NotNull final Project project, @NotNull final Editor editor, @NotNull final Point point, final ValueHintType type) {
     final XDebugSession session = XDebuggerManager.getInstance(project).getCurrentSession();
-    if (session == null) return null;
+    if (session == null) {
+      return null;
+    }
 
-    XStackFrame stackFrame = session.getCurrentStackFrame();
-    if (stackFrame == null) return null;
-    final XDebuggerEvaluator evaluator = stackFrame.getEvaluator();
-    if (evaluator == null) return null;
+    final XDebuggerEvaluator evaluator = session.getDebugProcess().getEvaluator();
+    if (evaluator == null) {
+      return null;
+    }
 
     return PsiDocumentManager.getInstance(project).commitAndRunReadAction(new Computable<XValueHint>() {
       @Override
@@ -105,12 +102,9 @@ public class XQuickEvaluateHandler extends QuickEvaluateHandler {
   public int getValueLookupDelay(final Project project) {
     XDebugSession session = XDebuggerManager.getInstance(project).getCurrentSession();
     if (session != null) {
-      XStackFrame stackFrame = session.getCurrentStackFrame();
-      if (stackFrame != null) {
-        XDebuggerEvaluator evaluator = stackFrame.getEvaluator();
-        if (evaluator != null) {
-          return evaluator.getValuePopupDelay();
-        }
+      XDebuggerEvaluator evaluator = session.getDebugProcess().getEvaluator();
+      if (evaluator != null) {
+        return evaluator.getValuePopupDelay();
       }
     }
     return 700;

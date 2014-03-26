@@ -930,7 +930,7 @@ public class MavenProjectsTree {
         updateCrc(crc, getFilterExclusions(mavenProject).hashCode());
         updateCrc(crc, mavenProject.getProperties().hashCode());
 
-        for (String each : mavenProject.getFilters()) {
+        for (String each : mavenProject.getFilterPropertiesFiles()) {
           File file = new File(each);
           updateCrc(crc, file.lastModified());
         }
@@ -1206,7 +1206,7 @@ public class MavenProjectsTree {
                       @NotNull ResolveContext context,
                       @NotNull MavenProgressIndicator process) throws MavenProcessCanceledException {
     MavenEmbedderWrapper embedder = embeddersManager.getEmbedder(MavenEmbeddersManager.FOR_DEPENDENCIES_RESOLVE);
-    embedder.customizeForResolve(getWorkspaceMap(), console, process);
+    embedder.customizeForResolve(getWorkspaceMap(), console, process, generalSettings.isAlwaysUpdateSnapshots());
 
     try {
       process.checkCanceled();
@@ -1321,7 +1321,7 @@ public class MavenProjectsTree {
                                   @NotNull MavenProgressIndicator process,
                                   @NotNull EmbedderTask task) throws MavenProcessCanceledException {
     MavenEmbedderWrapper embedder = embeddersManager.getEmbedder(embedderKind);
-    embedder.customizeForResolve(getWorkspaceMap(), console, process);
+    embedder.customizeForResolve(getWorkspaceMap(), console, process, false);
     embedder.clearCachesFor(mavenProject.getMavenId());
     try {
       task.run(embedder);

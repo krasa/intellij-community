@@ -73,18 +73,18 @@ public class PyArgumentEqualDefaultInspection extends PyInspection {
       if (list == null) {
         return;
       }
-      Callable func = node.resolveCalleeFunction(resolveWithoutImplicits());
+      Callable func = node.resolveCalleeFunction(getResolveContext());
       if (func != null && hasSpecialCasedDefaults(func, node)) {
         return;
       }
-      CallArgumentsMapping result = list.analyzeCall(resolveWithoutImplicits());
+      CallArgumentsMapping result = list.analyzeCall(getResolveContext());
       checkArguments(result, node.getArguments());
     }
 
     private static boolean hasSpecialCasedDefaults(Callable callable, PsiElement anchor) {
       final String name = callable.getName();
       final PyBuiltinCache cache = PyBuiltinCache.getInstance(anchor);
-      if ("getattr".equals(name) && cache.hasInBuiltins(callable)) {
+      if ("getattr".equals(name) && cache.isBuiltin(callable)) {
         return true;
       }
       else if ("get".equals(name) || "pop".equals(name)) {
@@ -131,16 +131,20 @@ public class PyArgumentEqualDefaultInspection extends PyInspection {
         if (key.getText().equals(defaultValue.getText()))
           return true;
       }
+      if (key instanceof PyBinaryExpression && defaultValue instanceof PyBinaryExpression) {
+        if (key.getText().equals(defaultValue.getText()))
+          return true;
+      }
       else if (key instanceof PyStringLiteralExpression && defaultValue instanceof PyStringLiteralExpression) {
         if (((PyStringLiteralExpression)key).getStringValue().equals(((PyStringLiteralExpression)defaultValue).getStringValue()))
           return true;
       }
       else {
         PsiReference keyRef = key instanceof PyReferenceExpression 
-                              ? ((PyReferenceExpression) key).getReference(resolveWithoutImplicits())
+                              ? ((PyReferenceExpression) key).getReference(getResolveContext())
                               : key.getReference();
         PsiReference defRef = defaultValue instanceof PyReferenceExpression
-                              ? ((PyReferenceExpression) defaultValue).getReference(resolveWithoutImplicits())
+                              ? ((PyReferenceExpression) defaultValue).getReference(getResolveContext())
                               : defaultValue.getReference();
         if (keyRef != null && defRef != null) {
           PsiElement keyResolve = keyRef.resolve();

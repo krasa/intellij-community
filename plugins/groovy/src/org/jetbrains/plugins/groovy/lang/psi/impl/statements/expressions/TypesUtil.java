@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,7 +47,7 @@ import org.jetbrains.plugins.groovy.lang.psi.api.signatures.GrClosureSignature;
 import org.jetbrains.plugins.groovy.lang.psi.api.signatures.GrSignature;
 import org.jetbrains.plugins.groovy.lang.psi.api.statements.expressions.GrExpression;
 import org.jetbrains.plugins.groovy.lang.psi.impl.*;
-import org.jetbrains.plugins.groovy.lang.psi.impl.signatures.GrClosureSignatureImpl;
+import org.jetbrains.plugins.groovy.lang.psi.impl.signatures.GrImmediateClosureSignatureImpl;
 import org.jetbrains.plugins.groovy.lang.psi.typeEnhancers.GrTypeConverter;
 import org.jetbrains.plugins.groovy.lang.psi.util.GroovyCommonClassNames;
 import org.jetbrains.plugins.groovy.lang.resolve.ResolveUtil;
@@ -508,7 +508,7 @@ public class TypesUtil {
       if (components1.length == 0) return genNewListBy(type2, manager);
       if (components2.length == 0) return genNewListBy(type1, manager);
 
-      PsiType[] components3 = new PsiType[Math.min(components1.length, components2.length)];
+      PsiType[] components3 = PsiType.createArray(Math.min(components1.length, components2.length));
       for (int i = 0; i < components3.length; i++) {
         PsiType c1 = components1[i];
         PsiType c2 = components2[i];
@@ -545,8 +545,8 @@ public class TypesUtil {
 
       if (signature1 instanceof GrClosureSignature && signature2 instanceof GrClosureSignature) {
         if (((GrClosureSignature)signature1).getParameterCount() == ((GrClosureSignature)signature2).getParameterCount()) {
-          final GrClosureSignature signature = GrClosureSignatureImpl.getLeastUpperBound(((GrClosureSignature)signature1),
-                                                                                         ((GrClosureSignature)signature2), manager);
+          final GrClosureSignature signature = GrImmediateClosureSignatureImpl.getLeastUpperBound(((GrClosureSignature)signature1),
+                                                                                                  ((GrClosureSignature)signature2), manager);
           if (signature != null) {
             GlobalSearchScope scope = clType1.getResolveScope().intersectWith(clType2.getResolveScope());
             final LanguageLevel languageLevel = ComparatorUtil.max(clType1.getLanguageLevel(), clType2.getLanguageLevel());
@@ -849,7 +849,7 @@ public class TypesUtil {
       public PsiType fun(GrAnnotationMemberValue value) {
         return inferAnnotationMemberValueType(value);
       }
-    }, new PsiType[initializers.length]);
+    }, PsiType.createArray(initializers.length));
     return new GrTupleType(types, JavaPsiFacade.getInstance(value.getProject()), value.getResolveScope());
   }
 

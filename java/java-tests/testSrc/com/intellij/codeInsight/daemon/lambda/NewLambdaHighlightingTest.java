@@ -95,6 +95,89 @@ public class NewLambdaHighlightingTest extends LightDaemonAnalyzerTestCase {
     doTest();
   }
 
+  public void testRecursiveCalls() throws Exception {
+    doTest();
+  }
+
+  public void testGroundTargetTypeForImplicitLambdas() throws Exception {
+    doTest();
+  }
+
+  public void testAdditionalConstraintsReduceOrder() throws Exception {
+    doTest();
+  }
+
+  public void testAdditionalConstraintSubstitution() throws Exception {
+    doTest();
+  }
+  public void testFunctionalInterfacesCalculation() throws Exception {
+    doTest();
+  }
+
+  public void testMissedSiteSubstitutorDuringDeepAdditionalConstraintsGathering() throws Exception {
+    doTest();
+  }
+
+  public void testIDEA120992() throws Exception {
+    doTest();
+  }
+
+  public void testTargetTypeConflictResolverShouldNotTryToEvaluateCurrentArgumentType() throws Exception {
+    doTest();
+  }
+
+  public void testIDEA119535() throws Exception {
+    doTest();
+  }
+
+  public void testIDEA119003() throws Exception {
+    doTest();
+  }
+
+  public void testIDEA117124() throws Exception {
+    doTest();
+  }
+
+  public void testWildcardParameterization() throws Exception {
+    doTest();
+  }
+
+  public void testDiamondInLambdaReturn() throws Exception {
+    doTest();
+  }
+
+  public void testIDEA118965() throws Exception {
+    doTest();
+  }
+
+  public void testIDEA121315() throws Exception {
+    doTest();
+  }
+
+  public void testIDEA118965comment() throws Exception {
+    doTest();
+  }
+
+  public void testIDEA122074() throws Exception {
+    doTest();
+  }
+
+  public void testIDEA122084() throws Exception {
+    doTest();
+  }
+
+  public void testAdditionalConstraintDependsOnNonMentionedVars() throws Exception {
+    doTest();
+  }
+
+  public void testIDEA122616() throws Exception {
+    doTest();
+  }
+
+  public void testIDEA122700() throws Exception {
+    doTest();
+  }
+
   private void doTest() {
     doTest(false);
   }

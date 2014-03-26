@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,6 +45,7 @@ import javax.swing.text.DefaultEditorKit;
 import javax.swing.text.JTextComponent;
 import javax.swing.text.html.HTMLEditorKit;
 import javax.swing.text.html.StyleSheet;
+import javax.swing.undo.UndoManager;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.font.FontRenderContext;
@@ -69,6 +70,8 @@ import java.util.regex.Pattern;
  */
 @SuppressWarnings("StaticMethodOnlyUsedInOneClass")
 public class UIUtil {
+
+  @NonNls public static final String BORDER_LINE = "<hr size=1 noshade>";
 
   private static final AtomicNotNullLazyValue<Boolean> X_RENDER_ACTIVE = new AtomicNotNullLazyValue<Boolean>() {
     @NotNull
@@ -222,6 +225,13 @@ public class UIUtil {
   }
 
   public static boolean isRetina() {
+    if (GraphicsEnvironment.isHeadless()) return false;
+
+    //Temporary workaround for HiDPI on Windows/Linux
+    if ("true".equalsIgnoreCase(System.getProperty("is.hidpi"))) {
+      return true;
+    }
+
     synchronized (ourRetina) {
       if (ourRetina.isNull()) {
         ourRetina.set(false); // in case HiDPIScaledImage.drawIntoImage is not called for some reason
@@ -232,21 +242,21 @@ public class UIUtil {
             return ourRetina.get();
           }
         } else if (SystemInfo.isJavaVersionAtLeast("1.7.0_40") && SystemInfo.isOracleJvm) {
+          try {
             GraphicsEnvironment env = GraphicsEnvironment.getLocalGraphicsEnvironment();
             final GraphicsDevice device = env.getDefaultScreenDevice();
-            try {
-              Field field = device.getClass().getDeclaredField("scale");
-              if (field != null) {
-                field.setAccessible(true);
-                Object scale = field.get(device);
-                if (scale instanceof Integer && ((Integer)scale).intValue() == 2) {
-                  ourRetina.set(true);
-                  return true;
-                }
+            Field field = device.getClass().getDeclaredField("scale");
+            if (field != null) {
+              field.setAccessible(true);
+              Object scale = field.get(device);
+              if (scale instanceof Integer && ((Integer)scale).intValue() == 2) {
+                ourRetina.set(true);
+                return true;
               }
             }
-            catch (Exception ignore) {
-            }
+          }
+          catch (AWTError ignore) {}
+          catch (Exception ignore) {}
         }
         ourRetina.set(false);
       }
@@ -349,6 +359,11 @@ public class UIUtil {
 
   public static void setEnabled(Component component, boolean enabled, boolean recursively) {
     component.setEnabled(enabled);
+    if (component instanceof JComboBox && isUnderAquaLookAndFeel()) {
+      // On Mac JComboBox instances have children: com.apple.laf.AquaComboBoxButton and javax.swing.CellRendererPane.
+      // Disabling these children results in ugly UI: WEB-10733
+      return;
+    }
     if (component instanceof JLabel) {
       Color color = enabled ? getLabelForeground() : getLabelDisabledForeground();
       if (color != null) {
@@ -426,18 +441,22 @@ public class UIUtil {
     return ArrayUtil.toStringArray(lines);
   }
 
-  public static void setActionNameAndMnemonic(String text, Action action) {
-    int mnemoPos = text.indexOf('&');
-    if (mnemoPos >= 0 && mnemoPos < text.length() - 2) {
-      String mnemoChar = text.substring(mnemoPos + 1, mnemoPos + 2).trim();
-      if (mnemoChar.length() == 1) {
-        action.putValue(Action.MNEMONIC_KEY, Integer.valueOf((int)mnemoChar.charAt(0)));
-      }
-    }
+  public static void setActionNameAndMnemonic(@NotNull String text, @NotNull Action action) {
+    assignMnemonic(text, action);
 
     text = text.replaceAll("&", "");
     action.putValue(Action.NAME, text);
   }
+  public static void assignMnemonic(@NotNull String text, @NotNull Action action) {
+    int mnemoPos = text.indexOf('&');
+    if (mnemoPos >= 0 && mnemoPos < text.length() - 2) {
+      String mnemoChar = text.substring(mnemoPos + 1, mnemoPos + 2).trim();
+      if (mnemoChar.length() == 1) {
+        action.putValue(Action.MNEMONIC_KEY, Integer.valueOf(mnemoChar.charAt(0)));
+      }
+    }
+  }
+
 
   public static Font getLabelFont(@NotNull FontSize size) {
     return getFont(size, null);
@@ -1566,6 +1585,7 @@ public class UIUtil {
     g.setComposite(X_RENDER_ACTIVE.getValue() ? AlphaComposite.SrcOver : AlphaComposite.Src);
   }
 
+  /** @see #pump() */
   @TestOnly
   public static void dispatchAllInvocationEvents() {
     assert SwingUtilities.isEventDispatchThread() : Thread.currentThread();
@@ -1585,6 +1605,7 @@ public class UIUtil {
     }
   }
 
+  /** @see #dispatchAllInvocationEvents() */
   @TestOnly
   public static void pump() {
     assert !SwingUtilities.isEventDispatchThread();
@@ -1718,14 +1739,14 @@ public class UIUtil {
   public static String getCssFontDeclaration(final Font font, @Nullable Color fgColor, @Nullable Color linkColor, @Nullable String liImg) {
     URL resource = liImg != null ? SystemInfo.class.getResource(liImg) : null;
 
-    @NonNls String fontFamilyAndSize = "font-family:" + font.getFamily() + "; font-size:" + font.getSize() + ";";
+    @NonNls String fontFamilyAndSize = "font-family:'" + font.getFamily() + "'; font-size:" + font.getSize() + "pt;";
     @NonNls @Language("HTML")
-    String body = "body, div, td, p {" + fontFamilyAndSize + " " + (fgColor != null ? "color:" + ColorUtil.toHex(fgColor) : "") + "}";
+    String body = "body, div, td, p {" + fontFamilyAndSize + " " + (fgColor != null ? "color:#" + ColorUtil.toHex(fgColor)+";" : "") + "}\n";
     if (resource != null) {
-      body += "ul {list-style-image: " + resource.toExternalForm() + "}";
+      body += "ul {list-style-image:url('" + resource.toExternalForm() + "');}\n";
     }
-    @NonNls String link = linkColor != null ? "a {" + fontFamilyAndSize + " color:" + ColorUtil.toHex(linkColor) + "}" : "";
-    return "<style> " + body + " " + link + "</style>";
+    @NonNls String link = linkColor != null ? "a {" + fontFamilyAndSize + " color:#"+ColorUtil.toHex(linkColor) + ";}\n" : "";
+    return "<style>\n" + body + link + "</style>";
   }
 
   public static boolean isWinLafOnVista() {
@@ -2227,6 +2248,24 @@ public class UIUtil {
     return SystemInfo.isMac && isUnderAquaLookAndFeel() ? 28 : height;
   }
 
+
+  /**
+   * The main difference from javax.swing.SwingUtilities#isDescendingFrom(Component, Component) is that this method
+   * uses getInvoker() instead of getParent() when it meets JPopupMenu
+   * @param child child component
+   * @param parent parent component
+   * @return true if parent if a top parent of child, false otherwise
+   *
+   * @see javax.swing.SwingUtilities#isDescendingFrom(java.awt.Component, java.awt.Component)
+   */
+  public static boolean isDescendingFrom(@Nullable Component child, @NotNull Component parent) {
+    while (child != null && child != parent) {
+      child =  child instanceof JPopupMenu  ? ((JPopupMenu)child).getInvoker()
+                                            : child.getParent();
+    }
+    return child == parent;
+  }
+
   @Nullable
   public static <T> T getParentOfType(Class<? extends T> cls, Component c) {
     Component eachParent = c;
@@ -2657,7 +2696,7 @@ public class UIUtil {
     }
   }
 
-  private static final Color DECORATED_ROW_BG_COLOR = new JBColor(new Color(242, 245, 249), new Color(79, 83, 84));
+  private static final Color DECORATED_ROW_BG_COLOR = new JBColor(new Color(242, 245, 249), new Color(65, 69, 71));
 
   public static Color getDecoratedRowColor() {
     return DECORATED_ROW_BG_COLOR;
@@ -2707,5 +2746,63 @@ public class UIUtil {
       catch (InvocationTargetException e) { LOG.debug(e); }
       catch (IllegalAccessException e) { LOG.debug(e); }
     }
+  }
+
+  //May have no usages but it's useful in runtime (Debugger "watches", some logging etc.)
+  public static String getDebugText(Component c) {
+    StringBuilder builder  = new StringBuilder();
+    getAllTextsRecursivelyImpl(c, builder);
+    return builder.toString();
+  }
+
+  private static void getAllTextsRecursivelyImpl(Component component, StringBuilder builder) {
+    String candidate = "";
+    int limit = builder.length() > 60 ? 20 : 40;
+    if (component instanceof JLabel) candidate = ((JLabel)component).getText();
+    if (component instanceof JTextComponent) candidate = ((JTextComponent)component).getText();
+    if (component instanceof AbstractButton) candidate = ((AbstractButton)component).getText();
+    if (StringUtil.isNotEmpty(candidate)) {
+      builder.append(candidate.length() > limit ? (candidate.substring(0, limit - 3) + "...") : candidate).append('|');
+    }
+    if (component instanceof Container) {
+      Component[] components = ((Container)component).getComponents();
+      for (Component child : components) {
+        getAllTextsRecursivelyImpl(child, builder);
+      }
+    }
+  }
+
+  public static boolean isAncestor(@NotNull Component ancestor, @Nullable Component descendant) {
+    while (descendant != null) {
+      if (descendant == ancestor) {
+        return true;
+      }
+      descendant = descendant.getParent();
+    }
+    return false;
+  }
+
+  public static void addUndoRedoActions(JTextComponent textComponent) {
+    final UndoManager undoManager = new UndoManager();
+    textComponent.getDocument().addUndoableEditListener(undoManager);
+    textComponent.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_Z, SystemInfo.isMac? InputEvent.META_MASK : InputEvent.CTRL_MASK), "undoKeystroke");
+    textComponent.getActionMap().put("undoKeystroke", new AbstractAction() {
+      @Override
+      public void actionPerformed(ActionEvent e) {
+        if (undoManager.canUndo()) {
+          undoManager.undo();
+        }
+      }
+    });
+    textComponent.getInputMap().put(
+      KeyStroke.getKeyStroke(KeyEvent.VK_Z, (SystemInfo.isMac? InputEvent.META_MASK : InputEvent.CTRL_MASK) | InputEvent.SHIFT_MASK), "redoKeystroke");
+    textComponent.getActionMap().put("redoKeystroke", new AbstractAction() {
+      @Override
+      public void actionPerformed(ActionEvent e) {
+         if (undoManager.canRedo()) {
+           undoManager.redo();
+         }
+      }
+    });
   }
 }

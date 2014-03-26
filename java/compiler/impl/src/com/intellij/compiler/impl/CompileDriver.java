@@ -488,7 +488,11 @@ public class CompileDriver {
     final Collection<String> paths = CompileScopeUtil.fetchFiles(compileContext);
     List<TargetTypeBuildScope> scopes = new ArrayList<TargetTypeBuildScope>();
     final boolean forceBuild = !compileContext.isMake();
-    if (!compileContext.isRebuild() && !CompileScopeUtil.allProjectModulesAffected(compileContext)) {
+    List<TargetTypeBuildScope> explicitScopes = CompileScopeUtil.getBaseScopeForExternalBuild(scope);
+    if (explicitScopes != null) {
+      scopes.addAll(explicitScopes);
+    }
+    else if (!compileContext.isRebuild() && !CompileScopeUtil.allProjectModulesAffected(compileContext)) {
       CompileScopeUtil.addScopesForModules(Arrays.asList(scope.getAffectedModules()), scopes, forceBuild);
     }
     else {
@@ -910,7 +914,7 @@ public class CompileDriver {
       if (!outputs.isEmpty()) {
         final ProgressIndicator indicator = compileContext.getProgressIndicator();
         indicator.setText("Synchronizing output directories...");
-        lfs.refreshIoFiles(outputs, _status == ExitStatus.CANCELLED, false, null);
+        CompilerUtil.refreshOutputDirectories(outputs, _status == ExitStatus.CANCELLED);
         indicator.setText("");
       }
       if (compileContext.isAnnotationProcessorsEnabled() && !myProject.isDisposed()) {

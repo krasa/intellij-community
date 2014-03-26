@@ -101,6 +101,38 @@ public class JavaRearranger implements Rearranger<JavaElementArrangementEntry>, 
     GROUPING_RULES.put(DEPENDENT_METHODS, ContainerUtilRt.newArrayList(BREADTH_FIRST, DEPTH_FIRST));
   }
 
+  private static final StdArrangementSettings DEFAULT_SETTINGS;
+
+  static {
+    List<ArrangementGroupingRule> groupingRules = ContainerUtilRt.newArrayList(new ArrangementGroupingRule(GETTERS_AND_SETTERS));
+    List<StdArrangementMatchRule> matchRules = ContainerUtilRt.newArrayList();
+    ArrangementSettingsToken[] visibility = {PUBLIC, PROTECTED, PACKAGE_PRIVATE, PRIVATE};
+    for (ArrangementSettingsToken modifier : visibility) {
+      and(matchRules, FIELD, STATIC, FINAL, modifier);
+    }
+    for (ArrangementSettingsToken modifier : visibility) {
+      and(matchRules, FIELD, STATIC, modifier);
+    }
+    for (ArrangementSettingsToken modifier : visibility) {
+      and(matchRules, FIELD, FINAL, modifier);
+    }
+    for (ArrangementSettingsToken modifier : visibility) {
+      and(matchRules, FIELD, modifier);
+    }
+    and(matchRules, FIELD);
+    and(matchRules, CONSTRUCTOR);
+    and(matchRules, METHOD, STATIC);
+    and(matchRules, METHOD);
+    and(matchRules, ENUM);
+    and(matchRules, INTERFACE);
+    and(matchRules, CLASS, STATIC);
+    and(matchRules, CLASS);
+
+    DEFAULT_SETTINGS = new StdRulePriorityAwareSettings(groupingRules, matchRules);
+  }
+
+  private static final DefaultArrangementSettingsSerializer SETTINGS_SERIALIZER = new DefaultArrangementSettingsSerializer(DEFAULT_SETTINGS);
+
   @NotNull
   private static Set<ArrangementSettingsToken> concat(@NotNull Set<ArrangementSettingsToken> base, ArrangementSettingsToken... modifiers) {
     Set<ArrangementSettingsToken> result = ContainerUtilRt.newHashSet(base);
@@ -148,12 +180,14 @@ public class JavaRearranger implements Rearranger<JavaElementArrangementEntry>, 
   private static void setupBreadthFirstDependency(@NotNull ArrangementEntryDependencyInfo info) {
     Deque<ArrangementEntryDependencyInfo> toProcess = new ArrayDeque<ArrangementEntryDependencyInfo>();
     toProcess.add(info);
+    JavaElementArrangementEntry prev = info.getAnchorEntry();
     while (!toProcess.isEmpty()) {
       ArrangementEntryDependencyInfo current = toProcess.removeFirst();
       for (ArrangementEntryDependencyInfo dependencyInfo : current.getDependentEntriesInfos()) {
         JavaElementArrangementEntry dependencyMethod = dependencyInfo.getAnchorEntry();
         if (dependencyMethod.getDependencies() == null) {
-          dependencyMethod.addDependency(current.getAnchorEntry());
+          dependencyMethod.addDependency(prev);
+          prev = dependencyMethod;
         }
         toProcess.addLast(dependencyInfo);
       }
@@ -279,32 +313,14 @@ public class JavaRearranger implements Rearranger<JavaElementArrangementEntry>, 
 
   @NotNull
   @Override
-  public StdArrangementSettings getDefaultSettings() {
-    List<ArrangementGroupingRule> groupingRules = ContainerUtilRt.newArrayList(new ArrangementGroupingRule(GETTERS_AND_SETTERS));
-    List<StdArrangementMatchRule> matchRules = ContainerUtilRt.newArrayList();
-    ArrangementSettingsToken[] visibility = {PUBLIC, PROTECTED, PACKAGE_PRIVATE, PRIVATE};
-    for (ArrangementSettingsToken modifier : visibility) {
-      and(matchRules, FIELD, STATIC, FINAL, modifier);
-    }
-    for (ArrangementSettingsToken modifier : visibility) {
-      and(matchRules, FIELD, STATIC, modifier);
-    }
-    for (ArrangementSettingsToken modifier : visibility) {
-      and(matchRules, FIELD, FINAL, modifier);
-    }
-    for (ArrangementSettingsToken modifier : visibility) {
-      and(matchRules, FIELD, modifier);
-    }
-    and(matchRules, FIELD);
-    and(matchRules, CONSTRUCTOR);
-    and(matchRules, METHOD, STATIC);
-    and(matchRules, METHOD);
-    and(matchRules, ENUM);
-    and(matchRules, INTERFACE);
-    and(matchRules, CLASS, STATIC);
-    and(matchRules, CLASS);
+  public ArrangementSettingsSerializer getSerializer() {
+    return SETTINGS_SERIALIZER;
+  }
 
-    return new StdRulePriorityAwareSettings(groupingRules, matchRules);
+  @NotNull
+  @Override
+  public StdArrangementSettings getDefaultSettings() {
+    return DEFAULT_SETTINGS;
   }
 
   @Nullable

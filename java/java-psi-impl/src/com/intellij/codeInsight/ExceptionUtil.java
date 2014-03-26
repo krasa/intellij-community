@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -421,8 +421,12 @@ public class ExceptionUtil {
             @Override
             public Pair<PsiMethod, PsiSubstitutor> fun(CandidateInfo info) {
               PsiElement element = info.getElement();
-              return element instanceof PsiMethod && MethodSignatureUtil.areSignaturesEqual(method, (PsiMethod)element)
-                     ? Pair.create((PsiMethod)element, info.getSubstitutor()) : null;
+              if (element instanceof PsiMethod &&
+                  MethodSignatureUtil.areSignaturesEqual(method, (PsiMethod)element) &&
+                  !MethodSignatureUtil.isSuperMethod((PsiMethod)element, method)) {
+                return Pair.create((PsiMethod)element, info.getSubstitutor());
+              }
+              return null;
             }
           });
           if (candidates.size() > 1) {
@@ -456,8 +460,10 @@ public class ExceptionUtil {
           found = true;
           break;
         } else if (classType.isAssignableFrom(psiClassType)) {
-          replacement.add(psiClassType);
-          iterator.remove();
+          if (isUncheckedException(classType) == isUncheckedException(psiClassType)) {
+            replacement.add(psiClassType);
+            iterator.remove();
+          }
           found = true;
           break;
         }
@@ -481,15 +487,17 @@ public class ExceptionUtil {
   }
 
   @NotNull
-  public static List<PsiClassType> getCloserExceptions(@NotNull final PsiResourceVariable resource) {
-    final PsiMethod method = PsiUtil.getResourceCloserMethod(resource);
-    return method != null ? getExceptionsByMethod(method, PsiSubstitutor.EMPTY) : Collections.<PsiClassType>emptyList();
+  public static List<PsiClassType> getCloserExceptions(@NotNull PsiResourceVariable resource) {
+    PsiMethod method = PsiUtil.getResourceCloserMethod(resource);
+    PsiSubstitutor substitutor = PsiUtil.resolveGenericsClassInType(resource.getType()).getSubstitutor();
+    return method != null ? getExceptionsByMethod(method, substitutor) : Collections.<PsiClassType>emptyList();
   }
 
   @NotNull
-  public static List<PsiClassType> getUnhandledCloserExceptions(@NotNull final PsiResourceVariable resource, @Nullable final PsiElement topElement) {
-    final PsiMethod method = PsiUtil.getResourceCloserMethod(resource);
-    return method != null ? getUnhandledExceptions(method, resource, topElement, PsiSubstitutor.EMPTY) : Collections.<PsiClassType>emptyList();
+  public static List<PsiClassType> getUnhandledCloserExceptions(@NotNull PsiResourceVariable resource, @Nullable PsiElement topElement) {
+    PsiMethod method = PsiUtil.getResourceCloserMethod(resource);
+    PsiSubstitutor substitutor = PsiUtil.resolveGenericsClassInType(resource.getType()).getSubstitutor();
+    return method != null ? getUnhandledExceptions(method, resource, topElement, substitutor) : Collections.<PsiClassType>emptyList();
   }
 
   @NotNull

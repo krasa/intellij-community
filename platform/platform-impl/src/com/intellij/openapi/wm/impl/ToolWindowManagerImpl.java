@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -57,6 +57,8 @@ import com.intellij.ui.switcher.QuickAccessSettings;
 import com.intellij.ui.switcher.SwitchManager;
 import com.intellij.util.Alarm;
 import com.intellij.util.ArrayUtil;
+import com.intellij.util.EventDispatcher;
+import com.intellij.util.IJSwingUtilities;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.containers.HashMap;
 import com.intellij.util.ui.PositionTracker;
@@ -68,7 +70,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
-import javax.swing.event.EventListenerList;
 import javax.swing.event.HyperlinkEvent;
 import javax.swing.event.HyperlinkListener;
 import java.awt.*;
@@ -88,7 +89,7 @@ public final class ToolWindowManagerImpl extends ToolWindowManagerEx implements 
 
   private final Project myProject;
   private final WindowManagerEx myWindowManager;
-  private final EventListenerList myListenerList;
+  private final EventDispatcher<ToolWindowManagerListener> myDispatcher = EventDispatcher.create(ToolWindowManagerListener.class);
   private final DesktopLayout myLayout;
   private final Map<String, InternalDecorator> myId2InternalDecorator;
   private final Map<String, FloatingDecorator> myId2FloatingDecorator;
@@ -162,7 +163,6 @@ public final class ToolWindowManagerImpl extends ToolWindowManagerEx implements 
     myWindowManager = windowManagerEx;
     myFileEditorManager = fem;
     myLafManager = lafManager;
-    myListenerList = new EventListenerList();
 
     if (!project.isDefault()) {
       actionManager.addAnActionListener(new AnActionListener() {
@@ -383,17 +383,17 @@ public final class ToolWindowManagerImpl extends ToolWindowManagerEx implements 
 
   @Override
   public void projectOpened() {
-    final MyUIManagerPropertyChangeListener myUIManagerPropertyChangeListener = new MyUIManagerPropertyChangeListener();
-    final MyLafManagerListener myLafManagerListener = new MyLafManagerListener();
+    final MyUIManagerPropertyChangeListener uiManagerPropertyListener = new MyUIManagerPropertyChangeListener();
+    final MyLafManagerListener lafManagerListener = new MyLafManagerListener();
 
-    UIManager.addPropertyChangeListener(myUIManagerPropertyChangeListener);
-    myLafManager.addLafManagerListener(myLafManagerListener);
+    UIManager.addPropertyChangeListener(uiManagerPropertyListener);
+    myLafManager.addLafManagerListener(lafManagerListener);
 
     Disposer.register(myProject, new Disposable() {
       @Override
       public void dispose() {
-        UIManager.removePropertyChangeListener(myUIManagerPropertyChangeListener);
-        myLafManager.removeLafManagerListener(myLafManagerListener);
+        UIManager.removePropertyChangeListener(uiManagerPropertyListener);
+        myLafManager.removeLafManagerListener(lafManagerListener);
       }
     });
     myFrame = myWindowManager.allocateFrame(myProject);
@@ -569,20 +569,20 @@ public final class ToolWindowManagerImpl extends ToolWindowManagerEx implements 
   }
 
   @Override
-  public void addToolWindowManagerListener(@NotNull final ToolWindowManagerListener l) {
-    myListenerList.add(ToolWindowManagerListener.class, l);
+  public void addToolWindowManagerListener(@NotNull ToolWindowManagerListener l) {
+    myDispatcher.addListener(l);
   }
 
   @Override
-  public void removeToolWindowManagerListener(@NotNull final ToolWindowManagerListener l) {
-    myListenerList.remove(ToolWindowManagerListener.class, l);
+  public void removeToolWindowManagerListener(@NotNull ToolWindowManagerListener l) {
+    myDispatcher.removeListener(l);
   }
 
   /**
    * This is helper method. It delegated its functionality to the WindowManager.
    * Before delegating it fires state changed.
    */
-  public void execute(final ArrayList<FinalizableCommand> commandList) {
+  public void execute(@NotNull List<FinalizableCommand> commandList) {
     for (FinalizableCommand each : commandList) {
       if (each.willChangeState()) {
         fireStateChanged();
@@ -647,7 +647,7 @@ public final class ToolWindowManagerImpl extends ToolWindowManagerEx implements 
   }
 
   private void activateEditorComponentImpl(EditorsSplitters splitters,
-                                           final ArrayList<FinalizableCommand> commandList,
+                                           List<FinalizableCommand> commandList,
                                            final boolean forced) {
     final String active = getActiveToolWindowId();
     // Now we have to request focus into most recent focused editor
@@ -725,7 +725,7 @@ public final class ToolWindowManagerImpl extends ToolWindowManagerEx implements 
    */
   private void showAndActivate(final String id,
                                final boolean dirtyMode,
-                               final ArrayList<FinalizableCommand> commandsList,
+                               List<FinalizableCommand> commandsList,
                                boolean autoFocusContents,
                                boolean forcedFocusRequest) {
     if (!getToolWindow(id).isAvailable()) {
@@ -767,7 +767,7 @@ public final class ToolWindowManagerImpl extends ToolWindowManagerEx implements 
   }
 
   private void activateToolWindowImpl(final String id,
-                                      final ArrayList<FinalizableCommand> commandList,
+                                      List<FinalizableCommand> commandList,
                                       boolean forced,
                                       boolean autoFocusContents) {
     if (!FocusManagerImpl.getInstance().isUnforcedRequestAllowed() && !forced) return;
@@ -1182,7 +1182,7 @@ public final class ToolWindowManagerImpl extends ToolWindowManagerEx implements 
 
     final StripeButton button = new StripeButton(decorator, myToolWindowsPane);
     myId2StripeButton.put(id, button);
-    final ArrayList<FinalizableCommand> commandsList = new ArrayList<FinalizableCommand>();
+    List<FinalizableCommand> commandsList = new ArrayList<FinalizableCommand>();
     appendAddButtonCmd(button, info, commandsList);
 
     if (canWorkInDumbMode) {
@@ -1352,7 +1352,7 @@ public final class ToolWindowManagerImpl extends ToolWindowManagerEx implements 
 
   @Override
   public void invokeLater(final Runnable runnable) {
-    final ArrayList<FinalizableCommand> commandList = new ArrayList<FinalizableCommand>();
+    List<FinalizableCommand> commandList = new ArrayList<FinalizableCommand>();
     commandList.add(new InvokeLaterCmd(runnable, myWindowManager.getCommandProcessor()));
     execute(commandList);
   }
@@ -1661,17 +1661,11 @@ public final class ToolWindowManagerImpl extends ToolWindowManagerEx implements 
   }
 
   private void fireToolWindowRegistered(final String id) {
-    final ToolWindowManagerListener[] listeners = myListenerList.getListeners(ToolWindowManagerListener.class);
-    for (ToolWindowManagerListener listener : listeners) {
-      listener.toolWindowRegistered(id);
-    }
+    myDispatcher.getMulticaster().toolWindowRegistered(id);
   }
 
   private void fireStateChanged() {
-    final ToolWindowManagerListener[] listeners = myListenerList.getListeners(ToolWindowManagerListener.class);
-    for (ToolWindowManagerListener listener : listeners) {
-      listener.stateChanged();
-    }
+    myDispatcher.getMulticaster().stateChanged();
   }
 
   boolean isToolWindowActive(final String id) {
@@ -1796,7 +1790,7 @@ public final class ToolWindowManagerImpl extends ToolWindowManagerEx implements 
   }
 
   private ActionCallback appendRequestFocusInEditorComponentCmd(EditorsSplitters splitters,
-                                                                final ArrayList<FinalizableCommand> commandList,
+                                                                List<FinalizableCommand> commandList,
                                                                 boolean forced) {
     if (myProject.isDisposed()) return new ActionCallback.Done();
     final CommandProcessor commandProcessor = myWindowManager.getCommandProcessor();
@@ -1806,7 +1800,7 @@ public final class ToolWindowManagerImpl extends ToolWindowManagerEx implements 
     return command.getDoneCallback();
   }
 
-  private void appendRequestFocusInToolWindowCmd(final String id, final ArrayList<FinalizableCommand> commandList, boolean forced) {
+  private void appendRequestFocusInToolWindowCmd(final String id, List<FinalizableCommand> commandList, boolean forced) {
     final ToolWindowImpl toolWindow = (ToolWindowImpl)getToolWindow(id);
     final FocusWatcher focusWatcher = myId2FocusWatcher.get(id);
     commandList
@@ -2254,11 +2248,11 @@ public final class ToolWindowManagerImpl extends ToolWindowManagerEx implements 
   private void updateComponentTreeUI() {
     ApplicationManager.getApplication().assertIsDispatchThread();
     final WindowInfoImpl[] infos = myLayout.getInfos();
-    for (final WindowInfoImpl info : infos) {
-      if (info.isVisible()) { // skip visible tool windows (optimization)
-        continue;
-      }
-      SwingUtilities.updateComponentTreeUI(getInternalDecorator(info.getId()));
+    for (WindowInfoImpl info : infos) {
+      // the main goal is to update hidden TW components because they are not in the hierarchy
+      // and will not be updated automatically but unfortunately the visibility of a TW may change
+      // during the same actionPerformed() so we can't optimize and have to process all of them
+      IJSwingUtilities.updateComponentTreeUI(getInternalDecorator(info.getId()));
     }
   }
 

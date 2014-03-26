@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ public class GradleConfigurationsNonCodeMembersContributor extends NonCodeMember
                                      PsiClass aClass,
                                      PsiScopeProcessor processor,
                                      PsiElement place,
-                                     ResolveState state) {
+                                     @NotNull ResolveState state) {
     if (place == null || aClass == null) {
       return;
     }
@@ -67,17 +67,16 @@ public class GradleConfigurationsNonCodeMembersContributor extends NonCodeMember
     GrMethodCall call = PsiTreeUtil.getParentOfType(place, GrMethodCall.class);
     if (call == null) {
       // TODO replace with groovy implicit method
-      GrReferenceExpressionImpl expression = (GrReferenceExpressionImpl)place;
-      String expr = expression.getCanonicalText();
-      GrImplicitVariableImpl myPsi = new GrImplicitVariableImpl(place.getManager(), expr, GRADLE_API_CONFIGURATION, place);
-      processor.execute(myPsi, state);
-      setNavigation(myPsi, dependencyHandlerClass, METHOD_GET_BY_NAME, 1);
+      if(place instanceof GrReferenceExpressionImpl) {
+        GrReferenceExpressionImpl expression = (GrReferenceExpressionImpl)place;
+        String expr = expression.getCanonicalText();
+        GrImplicitVariableImpl myPsi = new GrImplicitVariableImpl(place.getManager(), expr, GRADLE_API_CONFIGURATION, place);
+        processor.execute(myPsi, state);
+        setNavigation(myPsi, dependencyHandlerClass, METHOD_GET_BY_NAME, 1);
+      }
       return;
     }
     GrArgumentList args = call.getArgumentList();
-    if (args == null) {
-      return;
-    }
     int argsCount = GradleResolverUtil.getGrMethodArumentsCount(args);
 
     argsCount++; // Configuration name is delivered as an argument.

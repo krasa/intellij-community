@@ -30,6 +30,7 @@ import com.intellij.openapi.util.io.FileUtil;
 import com.intellij.openapi.vfs.VfsUtilCore;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.plugins.gradle.service.GradleBuildClasspathManager;
 import org.jetbrains.plugins.gradle.service.project.wizard.GradleProjectImportBuilder;
 import org.jetbrains.plugins.gradle.service.project.wizard.GradleProjectImportProvider;
 import org.jetbrains.plugins.gradle.settings.GradleSettings;
@@ -52,7 +53,12 @@ public class GradleStartupActivity implements StartupActivity {
 
   @Override
   public void runActivity(@NotNull Project project) {
+    configureBuildClasspath(project);
     showNotificationForUnlinkedGradleProject(project);
+  }
+
+  private static void configureBuildClasspath(@NotNull final Project project) {
+    GradleBuildClasspathManager.getInstance(project).reload();
   }
 
   private static void showNotificationForUnlinkedGradleProject(@NotNull final Project project) {
@@ -74,13 +80,14 @@ public class GradleStartupActivity implements StartupActivity {
     if (files != null && files.length != 0) {
       String message = String.format("%s<br>\n%s",
                                      GradleBundle.message("gradle.notifications.unlinked.project.found.msg", IMPORT_EVENT_DESCRIPTION),
-                                     GradleBundle.message("gradle.notifications.do.not.show", DO_NOT_SHOW_EVENT_DESCRIPTION));
+                                     GradleBundle.message("gradle.notifications.do.not.show"));
 
       GradleNotification.getInstance(project).showBalloon(
         GradleBundle.message("gradle.notifications.unlinked.project.found.title"),
         message, NotificationType.INFORMATION, new NotificationListener.Adapter() {
           @Override
           protected void hyperlinkActivated(@NotNull Notification notification, @NotNull HyperlinkEvent e) {
+            notification.expire();
             if (IMPORT_EVENT_DESCRIPTION.equals(e.getDescription())) {
               final ProjectDataManager projectDataManager = ServiceManager.getService(ProjectDataManager.class);
               GradleProjectImportBuilder gradleProjectImportBuilder = new GradleProjectImportBuilder(projectDataManager);

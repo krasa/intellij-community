@@ -18,11 +18,13 @@ package com.intellij.refactoring.copy;
 import com.intellij.CommonBundle;
 import com.intellij.ide.CopyPasteDelegator;
 import com.intellij.ide.util.EditorHelper;
+import com.intellij.ide.util.PlatformPackageUtil;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.command.CommandProcessor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.util.ThrowableComputable;
+import com.intellij.openapi.vfs.VfsUtil;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.encoding.EncodingRegistry;
 import com.intellij.openapi.wm.ToolWindowManager;
@@ -71,10 +73,16 @@ public class CopyFilesOrDirectoriesHandler extends CopyHandlerDelegateBase {
       if (defaultTargetDirectory == null) return;
     }
 
+    if (defaultTargetDirectory == null) {
+      VirtualFile root = project.getBaseDir();
+      if (root == null) root = VfsUtil.getUserHomeDir();
+      if (root != null) defaultTargetDirectory = PsiManager.getInstance(project).findDirectory(root);
+    }
+
     copyAsFiles(elements, defaultTargetDirectory, project);
   }
 
-  public static void copyAsFiles(PsiElement[] elements, PsiDirectory defaultTargetDirectory, Project project) {
+  public static void copyAsFiles(PsiElement[] elements, @Nullable PsiDirectory defaultTargetDirectory, Project project) {
     PsiDirectory targetDirectory = null;
     String newName = null;
     boolean openInEditor = true;
@@ -119,11 +127,11 @@ public class CopyFilesOrDirectoriesHandler extends CopyHandlerDelegateBase {
     PsiDirectory targetDirectory;
     if (element instanceof PsiDirectory) {
       targetDirectory = ((PsiDirectory)element).getParentDirectory();
-      assert targetDirectory != null : element;
     }
     else  {
-      targetDirectory = ((PsiFile)element).getContainingDirectory();
+      targetDirectory = PlatformPackageUtil.getDirectory(element);
     }
+    assert targetDirectory != null : element;
 
     PsiElement[] elements = {element};
     CopyFilesOrDirectoriesDialog dialog = new CopyFilesOrDirectoriesDialog(elements, null, element.getProject(), true);
@@ -146,7 +154,7 @@ public class CopyFilesOrDirectoriesHandler extends CopyHandlerDelegateBase {
         directory = directory.getParentDirectory();
       }
       else if (element instanceof PsiFile) {
-        directory = ((PsiFile)element).getContainingDirectory();
+        directory = PlatformPackageUtil.getDirectory(element);
       }
       else {
         throw new IllegalArgumentException("unexpected element " + element);
@@ -302,7 +310,8 @@ public class CopyFilesOrDirectoriesHandler extends CopyHandlerDelegateBase {
     }
   }
 
-  public static boolean checkFileExist(PsiDirectory targetDirectory, int[] choice, PsiFile file, String name, String title) {
+  public static boolean checkFileExist(@Nullable PsiDirectory targetDirectory, int[] choice, PsiFile file, String name, String title) {
+    if (targetDirectory == null) return false;
     final PsiFile existing = targetDirectory.findFile(name);
     if (existing != null && !existing.equals(file)) {
       int selection;

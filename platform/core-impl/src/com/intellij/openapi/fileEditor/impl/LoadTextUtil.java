@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,7 +40,6 @@ import java.nio.charset.Charset;
 import java.nio.charset.UnsupportedCharsetException;
 
 public final class LoadTextUtil {
-  private static final Key<String> DETECTED_LINE_SEPARATOR_KEY = Key.create("DETECTED_LINE_SEPARATOR_KEY");
   @Nls private static final String AUTO_DETECTED_FROM_BOM = "auto-detected from BOM";
 
   private LoadTextUtil() {
@@ -215,7 +214,7 @@ public final class LoadTextUtil {
     }
     String newText = StringUtil.convertLineSeparators(currentText.toString(), newSeparator);
 
-    file.putUserData(DETECTED_LINE_SEPARATOR_KEY, newSeparator);
+    file.setDetectedLineSeparator(newSeparator);
     write(project, file, requestor, newText, -1);
   }
 
@@ -330,25 +329,23 @@ public final class LoadTextUtil {
     return charset;
   }
 
+  /**
+   * @deprecated use {@link #charsetFromContentOrNull(com.intellij.openapi.project.Project, com.intellij.openapi.vfs.VirtualFile, CharSequence)}
+   */
   @Nullable("returns null if cannot determine from content")
   public static Charset charsetFromContentOrNull(@Nullable Project project, @NotNull VirtualFile virtualFile, @NotNull String text) {
-    FileType fileType = virtualFile.getFileType();
-    if (fileType instanceof LanguageFileType) {
-      return ((LanguageFileType)fileType).extractCharsetFromFileContent(project, virtualFile, text);
-    }
-    return null;
+    return CharsetUtil.extractCharsetFromFileContent(project, virtualFile, virtualFile.getFileType(), text);
+  }
+
+  @Nullable("returns null if cannot determine from content")
+  public static Charset charsetFromContentOrNull(@Nullable Project project, @NotNull VirtualFile virtualFile, @NotNull CharSequence text) {
+    return CharsetUtil.extractCharsetFromFileContent(project, virtualFile, virtualFile.getFileType(), text);
   }
 
   @NotNull
   public static CharSequence loadText(@NotNull VirtualFile file) {
     if (file instanceof LightVirtualFile) {
-      CharSequence content = ((LightVirtualFile)file).getContent();
-      if (StringUtil.indexOf(content, '\r') == -1) return content;
-
-      CharBuffer buffer = CharBuffer.allocate(content.length());
-      buffer.append(content);
-      buffer.rewind();
-      return convertLineSeparators(buffer).first;
+      return ((LightVirtualFile)file).getContent();
     }
 
     if (file.isDirectory()) {
@@ -393,7 +390,7 @@ public final class LoadTextUtil {
 
     Pair<CharSequence, String> result = convertBytes(bytes, charset, offset);
     if (saveDetectedSeparators) {
-      virtualFile.putUserData(DETECTED_LINE_SEPARATOR_KEY, result.getSecond());
+      virtualFile.setDetectedLineSeparator(result.getSecond());
     }
     return result.getFirst();
   }
@@ -421,7 +418,7 @@ public final class LoadTextUtil {
   }
 
   static String getDetectedLineSeparator(@NotNull VirtualFile file) {
-    return file.getUserData(DETECTED_LINE_SEPARATOR_KEY);
+    return file.getDetectedLineSeparator();
   }
 
   @NotNull

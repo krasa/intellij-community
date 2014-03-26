@@ -19,13 +19,10 @@ import com.intellij.psi.*;
 import com.intellij.psi.impl.source.resolve.graphInference.FunctionalInterfaceParameterizationUtil;
 import com.intellij.psi.impl.source.resolve.graphInference.InferenceSession;
 import com.intellij.psi.impl.source.resolve.graphInference.InferenceVariable;
-import com.intellij.psi.impl.source.resolve.graphInference.PsiPolyExpressionUtil;
 import com.intellij.psi.util.PsiUtil;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 
 /**
  * User: anna
@@ -50,10 +47,10 @@ public abstract class InputOutputConstraintFormula implements ConstraintFormula 
       if (inferenceVariable != null) {
         return Collections.singleton(inferenceVariable);
       }
-      if (LambdaHighlightingUtil.checkInterfaceFunctional(type) == null) {
+      if (LambdaUtil.isFunctionalType(type)) {
         final PsiType functionType =
           psiExpression instanceof PsiLambdaExpression
-          ? FunctionalInterfaceParameterizationUtil.getFunctionalType(type, (PsiLambdaExpression)psiExpression)
+          ? FunctionalInterfaceParameterizationUtil.getGroundTargetType(type, (PsiLambdaExpression)psiExpression)
           : type;
         final PsiClassType.ClassResolveResult resolveResult = PsiUtil.resolveGenericsClassInType(functionType);
         final PsiMethod interfaceMethod = LambdaUtil.getFunctionalInterfaceMethod(resolveResult);
@@ -111,5 +108,11 @@ public abstract class InputOutputConstraintFormula implements ConstraintFormula 
   @Override
   public void apply(PsiSubstitutor substitutor) {
     setT(substitutor.substitute(getT()));
+    Map<PsiElement, PsiType> map = LambdaUtil.ourFunctionTypes.get();
+    if (map == null) {
+      map = new HashMap<PsiElement, PsiType>();
+      LambdaUtil.ourFunctionTypes.set(map);
+    }
+    map.put(getExpression(), getT());
   }
 }

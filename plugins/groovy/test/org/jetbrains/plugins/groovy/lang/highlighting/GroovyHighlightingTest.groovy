@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1426,8 +1426,8 @@ def bar
 ''')
   }
 
- void testFinalFieldRewrite() {
-   testHighlighting('''\
+  void testFinalFieldRewrite() {
+    testHighlighting('''\
 class A {
   final foo = 1
 
@@ -1442,7 +1442,7 @@ class A {
 
 new A().foo = 2 //no error
 ''')
- }
+  }
 
   void testStaticFinalFieldRewrite() {
     testHighlighting('''\
@@ -1472,15 +1472,15 @@ A.foo = 3 //no error
 
   void testSOEIfExtendsItself() {
     testHighlighting('''\
-<error descr="Cyclic inheritance involving 'A'"><error descr="Method 'invokeMethod' is not implemented">class A extends A </error></error>{
+<error descr="Cyclic inheritance involving 'A'"><error descr="Method 'invokeMethod' is not implemented">class A extends A</error></error> {
   def foo
 }
 
-<error descr="Cyclic inheritance involving 'B'"><error descr="Method 'invokeMethod' is not implemented">class B extends C </error></error>{
+<error descr="Cyclic inheritance involving 'B'"><error descr="Method 'invokeMethod' is not implemented">class B extends C</error></error> {
   def foo
 }
 
-<error descr="Cyclic inheritance involving 'C'"><error descr="Method 'invokeMethod' is not implemented">class C extends B </error></error>{
+<error descr="Cyclic inheritance involving 'C'"><error descr="Method 'invokeMethod' is not implemented">class C extends B</error></error> {
 }
 ''')
   }
@@ -1643,7 +1643,7 @@ public abstract class Base {
 }
 ''')
     testHighlighting('''\
-<error>class Foo extends p.Base </error>{
+<error>class Foo extends p.Base</error> {
 }
 ''')
   }
@@ -1789,4 +1789,33 @@ public class Bar3 { }
 ''')
   }
 
+  void testImportStaticFix() {
+    myFixture.configureByText('a.groovy', '''
+class A {
+  static void foo(String s){}
+}
+
+foo(<caret>)
+''')
+
+    myFixture.getAvailableIntention("Static Import Method 'A.foo'")
+  }
+
+  void testInaccessibleWithCompileStatic() {
+    addCompileStatic()
+    testHighlighting('''
+import groovy.transform.CompileStatic
+
+@CompileStatic
+class PrivateTest {
+    void doTest() {
+        Target.<error descr="Access to 'callMe' exceeds its access rights">callMe</error>()
+    }
+}
+
+class Target {
+    private static void callMe() {}
+}
+''')
+  }
 }

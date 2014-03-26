@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 package org.jetbrains.plugins.groovy.debugger.fragments;
 
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
 import com.intellij.psi.impl.PsiManagerEx;
 import com.intellij.psi.impl.file.impl.FileManager;
@@ -59,19 +60,22 @@ public class GroovyCodeFragment extends GroovyFileImpl implements JavaCodeFragme
     this(project, new LightVirtualFile("Dummy.groovy", GroovyFileType.GROOVY_FILE_TYPE, text));
   }
 
-  public GroovyCodeFragment(Project project, LightVirtualFile virtualFile) {
+  public GroovyCodeFragment(Project project, VirtualFile virtualFile) {
     super(new SingleRootFileViewProvider(PsiManager.getInstance(project), virtualFile, true));
     ((SingleRootFileViewProvider)getViewProvider()).forceCachedPsi(this);
   }
 
+  @Override
   public void setThisType(PsiType thisType) {
     myThisType = thisType;
   }
 
+  @Override
   public PsiType getSuperType() {
     return mySuperType;
   }
 
+  @Override
   public void setSuperType(PsiType superType) {
     mySuperType = superType;
   }
@@ -93,6 +97,7 @@ public class GroovyCodeFragment extends GroovyFileImpl implements JavaCodeFragme
   /**
    * @return list of imports in format "qname[:imported_name](,qname[:imported_name])*"
    */
+  @Override
   public String importsToString() {
     if (myPseudoImports.isEmpty()) return "";
 
@@ -121,6 +126,7 @@ public class GroovyCodeFragment extends GroovyFileImpl implements JavaCodeFragme
     return buffer.toString();
   }
 
+  @Override
   public void addImportsFromString(String imports) {
     for (String anImport : imports.split(",")) {
       int colon = anImport.indexOf(':');
@@ -136,48 +142,58 @@ public class GroovyCodeFragment extends GroovyFileImpl implements JavaCodeFragme
     }
   }
 
+  @Override
   public void setVisibilityChecker(JavaCodeFragment.VisibilityChecker checker) {
   }
 
+  @Override
   public VisibilityChecker getVisibilityChecker() {
     return VisibilityChecker.EVERYTHING_VISIBLE;
   }
 
+  @Override
   public void setExceptionHandler(ExceptionHandler checker) {
     myExceptionChecker = checker;
   }
 
+  @Override
   public ExceptionHandler getExceptionHandler() {
     return myExceptionChecker;
   }
 
+  @Override
   public void setIntentionActionsFilter(@NotNull IntentionActionsFilter filter) {
     myFilter = filter;
   }
 
+  @Override
   public IntentionActionsFilter getIntentionActionsFilter() {
     return myFilter;
   }
 
+  @Override
   public void forceResolveScope(GlobalSearchScope scope) {
     myResolveScope = scope;
   }
 
+  @Override
   public GlobalSearchScope getForcedResolveScope() {
     return myResolveScope;
   }
 
+  @Override
   public boolean importClass(PsiClass aClass) {
     return false;
   }
 
+  @Override
   public PsiType getThisType() {
     return myThisType;
   }
 
   @Override
   protected boolean processImports(PsiScopeProcessor processor,
-                                   ResolveState state,
+                                   @NotNull ResolveState state,
                                    PsiElement lastParent,
                                    PsiElement place,
                                    GrImportStatement[] importStatements,
@@ -208,7 +224,7 @@ public class GroovyCodeFragment extends GroovyFileImpl implements JavaCodeFragme
   }
 
   protected boolean processPseudoImports(PsiScopeProcessor processor,
-                                         ResolveState state,
+                                         @NotNull ResolveState state,
                                          PsiElement lastParent,
                                          PsiElement place,
                                          boolean onDemand) {
@@ -234,7 +250,7 @@ public class GroovyCodeFragment extends GroovyFileImpl implements JavaCodeFragme
     return true;
   }
 
-  private boolean processSingleImports(PsiScopeProcessor processor, ResolveState state, PsiElement lastParent, PsiElement place) {
+  private boolean processSingleImports(PsiScopeProcessor processor, @NotNull ResolveState state, PsiElement lastParent, PsiElement place) {
     NameHint nameHint = processor.getHint(NameHint.KEY);
     String name = nameHint != null ? nameHint.getName(state) : null;
 

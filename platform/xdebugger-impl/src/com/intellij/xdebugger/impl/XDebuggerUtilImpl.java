@@ -19,6 +19,7 @@ import com.intellij.openapi.actionSystem.CommonDataKeys;
 import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.application.Result;
 import com.intellij.openapi.application.WriteAction;
+import com.intellij.openapi.editor.Caret;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
@@ -75,11 +76,14 @@ public class XDebuggerUtilImpl extends XDebuggerUtil {
 
   @Override
   public void toggleLineBreakpoint(@NotNull final Project project, @NotNull final VirtualFile file, final int line, boolean temporary) {
+    XLineBreakpointType<?> typeWinner = null;
     for (XLineBreakpointType<?> type : getLineBreakpointTypes()) {
-      if (type.canPutAt(file, line, project)) {
-        toggleLineBreakpoint(project, type, file, line, temporary);
-        return;
+      if (type.canPutAt(file, line, project) && (typeWinner == null || type.getPriority() > typeWinner.getPriority())) {
+        typeWinner = type;
       }
+    }
+    if (typeWinner != null) {
+      toggleLineBreakpoint(project, typeWinner, file, line, temporary);
     }
   }
 
@@ -99,9 +103,17 @@ public class XDebuggerUtilImpl extends XDebuggerUtil {
                                                                      @NotNull final VirtualFile file,
                                                                      final int line,
                                                                      final boolean temporary) {
-    new WriteAction() {
+    toggleAndReturnLineBreakpoint(project, type, file, line, temporary);
+  }
+
+  public static <P extends XBreakpointProperties> XLineBreakpoint toggleAndReturnLineBreakpoint(@NotNull final Project project,
+                                                                                                @NotNull final XLineBreakpointType<P> type,
+                                                                                                @NotNull final VirtualFile file,
+                                                                                                final int line,
+                                                                                                final boolean temporary) {
+    return new WriteAction<XLineBreakpoint>() {
       @Override
-      protected void run(@NotNull final Result result) {
+      protected void run(@NotNull final Result<XLineBreakpoint> result) {
         XBreakpointManager breakpointManager = XDebuggerManager.getInstance(project).getBreakpointManager();
         XLineBreakpoint<P> breakpoint = breakpointManager.findBreakpointAtLine(type, file, line);
         if (breakpoint != null) {
@@ -109,10 +121,10 @@ public class XDebuggerUtilImpl extends XDebuggerUtil {
         }
         else {
           P properties = type.createBreakpointProperties(file, line);
-          breakpointManager.addLineBreakpoint(type, file.getUrl(), line, properties, temporary);
+          result.setResult(breakpointManager.addLineBreakpoint(type, file.getUrl(), line, properties, temporary));
         }
       }
-    }.execute();
+    }.execute().getResultObject();
   }
 
   @Override
@@ -176,6 +188,27 @@ public class XDebuggerUtilImpl extends XDebuggerUtil {
     return XSourcePositionImpl.create(file, line);
   }
 
+  @NotNull
+  public static Collection<XSourcePosition> getAllCaretsPositions(@NotNull Project project, DataContext context) {
+    Editor editor = getEditor(project, context);
+    if (editor == null) {
+      return Collections.emptyList();
+    }
+
+    final Document document = editor.getDocument();
+    VirtualFile file = FileDocumentManager.getInstance().getFile(document);
+    Collection<XSourcePosition> res = new ArrayList<XSourcePosition>();
+    List<Caret> carets = editor.getCaretModel().getAllCarets();
+    for (Caret caret : carets) {
+      int line = caret.getLogicalPosition().line;
+      XSourcePositionImpl position = XSourcePositionImpl.create(file, line);
+      if (position != null) {
+        res.add(position);
+      }
+    }
+    return res;
+  }
+
   @Nullable
   private static Editor getEditor(@NotNull Project project, DataContext context) {
     Editor editor = CommonDataKeys.EDITOR.getData(context);
@@ -222,34 +255,34 @@ public class XDebuggerUtilImpl extends XDebuggerUtil {
   @Override
   public void iterateLine(@NotNull Project project, @NotNull Document document, int line, @NotNull Processor<PsiElement> processor) {
     PsiFile file = PsiDocumentManager.getInstance(project).getPsiFile(document);
-    if (file == null) return;
+    if (file == null) {
+      return;
+    }
 
     int lineStart;
     int lineEnd;
-
     try {
       lineStart = document.getLineStartOffset(line);
       lineEnd = document.getLineEndOffset(line);
     }
-    catch (IndexOutOfBoundsException e) {
+    catch (IndexOutOfBoundsException ignored) {
       return;
     }
 
     PsiElement element;
-
-    int off = lineStart;
-    while (off < lineEnd) {
-      element = file.findElementAt(off);
+    int offset = lineStart;
+    while (offset < lineEnd) {
+      element = file.findElementAt(offset);
       if (element != null) {
         if (!processor.process(element)) {
           return;
         }
         else {
-          off = element.getTextRange().getEndOffset();
+          offset = element.getTextRange().getEndOffset();
         }
       }
       else {
-        off++;
+        offset++;
       }
     }
   }
@@ -262,9 +295,13 @@ public class XDebuggerUtilImpl extends XDebuggerUtil {
   @Override
   @Nullable
   public PsiElement findContextElement(@NotNull VirtualFile virtualFile, int offset, @NotNull Project project, boolean checkXml) {
+    if (!virtualFile.isValid()) {
+      return null;
+    }
+
     Document document = FileDocumentManager.getInstance().getDocument(virtualFile);
-    PsiFile file = PsiManager.getInstance(project).findFile(virtualFile);
-    if (file == null || document == null) {
+    PsiFile file = document == null ? null : PsiManager.getInstance(project).findFile(virtualFile);
+    if (file == null) {
       return null;
     }
 

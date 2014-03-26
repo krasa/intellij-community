@@ -73,10 +73,6 @@ public class GradleTaskManager extends AbstractExternalSystemTaskManager<GradleE
                            @Nullable final String debuggerSetup,
                            @NotNull final ExternalSystemTaskNotificationListener listener) throws ExternalSystemException {
 
-    if (settings != null) {
-      myHelper.ensureInstalledWrapper(id, projectPath, settings, listener);
-    }
-
     // TODO add support for external process mode
     if (ExternalSystemApiUtil.isInProcessMode(GradleConstants.SYSTEM_ID)) {
       for (GradleTaskManagerExtension gradleTaskManagerExtension : GradleTaskManagerExtension.EP_NAME.getExtensions()) {
@@ -86,11 +82,13 @@ public class GradleTaskManager extends AbstractExternalSystemTaskManager<GradleE
         }
       }
     }
+    if(!scriptParameters.contains("--tests") && taskNames.contains("test")) {
+      ContainerUtil.addAll(scriptParameters, "--tests", "*");
+    }
 
     Function<ProjectConnection, Void> f = new Function<ProjectConnection, Void>() {
       @Override
       public Void fun(ProjectConnection connection) {
-        BuildLauncher launcher = myHelper.getBuildLauncher(id, connection, settings, listener, vmOptions);
         if (!StringUtil.isEmpty(debuggerSetup)) {
           try {
             final File tempFile = FileUtil.createTempFile("init", ".gradle");
@@ -103,17 +101,14 @@ public class GradleTaskManager extends AbstractExternalSystemTaskManager<GradleE
             };
             FileUtil.writeToFile(tempFile, StringUtil.join(lines, SystemProperties.getLineSeparator()));
 
-            scriptParameters.add("--init-script");
-            scriptParameters.add(tempFile.getAbsolutePath());
+            ContainerUtil.addAll(scriptParameters, GradleConstants.INIT_SCRIPT_CMD_OPTION, tempFile.getAbsolutePath());
           }
           catch (IOException e) {
             throw new ExternalSystemException(e);
           }
         }
 
-        if (!scriptParameters.isEmpty()) {
-          launcher.withArguments(ArrayUtil.toStringArray(scriptParameters));
-        }
+        BuildLauncher launcher = myHelper.getBuildLauncher(id, connection, settings, listener, vmOptions, scriptParameters);
         launcher.forTasks(ArrayUtil.toStringArray(taskNames));
         launcher.run();
         return null;
@@ -126,8 +121,11 @@ public class GradleTaskManager extends AbstractExternalSystemTaskManager<GradleE
   public boolean cancelTask(@NotNull ExternalSystemTaskId id, @NotNull ExternalSystemTaskNotificationListener listener)
     throws ExternalSystemException {
 
-    for (GradleTaskManagerExtension gradleTaskManagerExtension : GradleTaskManagerExtension.EP_NAME.getExtensions()) {
-      if (gradleTaskManagerExtension.cancelTask(id, listener)) return true;
+    // extension points are available only in IDE process
+    if (ExternalSystemApiUtil.isInProcessMode(GradleConstants.SYSTEM_ID)) {
+      for (GradleTaskManagerExtension gradleTaskManagerExtension : GradleTaskManagerExtension.EP_NAME.getExtensions()) {
+        if (gradleTaskManagerExtension.cancelTask(id, listener)) return true;
+      }
     }
 
     // TODO replace with cancellation gradle API invocation when it will be ready, see http://issues.gradle.org/browse/GRADLE-1539

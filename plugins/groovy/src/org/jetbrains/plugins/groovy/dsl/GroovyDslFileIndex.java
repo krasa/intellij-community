@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,13 +28,12 @@ import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.roots.ProjectFileIndex;
 import com.intellij.openapi.roots.ProjectRootManager;
 import com.intellij.openapi.util.Key;
+import com.intellij.openapi.util.ModificationTracker;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.Trinity;
 import com.intellij.openapi.util.io.FileUtil;
-import com.intellij.openapi.vfs.VirtualFile;
-import com.intellij.openapi.vfs.VirtualFileAdapter;
-import com.intellij.openapi.vfs.VirtualFileEvent;
-import com.intellij.openapi.vfs.VirtualFileManager;
+import com.intellij.openapi.util.text.StringUtil;
+import com.intellij.openapi.vfs.*;
 import com.intellij.openapi.vfs.newvfs.FileAttribute;
 import com.intellij.psi.*;
 import com.intellij.psi.impl.PsiModificationTrackerImpl;
@@ -110,7 +109,7 @@ public class GroovyDslFileIndex extends ScalarIndexExtension<String> {
     VirtualFileManager.getInstance().addVirtualFileListener(new VirtualFileAdapter() {
 
       @Override
-      public void contentsChanged(VirtualFileEvent event) {
+      public void contentsChanged(@NotNull VirtualFileEvent event) {
         if (event.getFileName().endsWith(".gdsl")) {
           disableFile(event.getFile(), MODIFIED);
         }
@@ -131,11 +130,13 @@ public class GroovyDslFileIndex extends ScalarIndexExtension<String> {
     return myDataIndexer;
   }
 
+  @NotNull
   @Override
   public KeyDescriptor<String> getKeyDescriptor() {
     return myKeyDescriptor;
   }
 
+  @NotNull
   @Override
   public FileBasedIndex.InputFilter getInputFilter() {
     return new MyInputFilter();
@@ -306,7 +307,7 @@ public class GroovyDslFileIndex extends ScalarIndexExtension<String> {
 
     final DelegatingScopeProcessor nameChecker = new DelegatingScopeProcessor(processor) {
       @Override
-      public boolean execute(@NotNull PsiElement element, ResolveState state) {
+      public boolean execute(@NotNull PsiElement element, @NotNull ResolveState state) {
         if (element instanceof PsiMethod && ((PsiMethod)element).isConstructor()) {
           return processor.execute(element, state);
         }
@@ -432,12 +433,13 @@ public class GroovyDslFileIndex extends ScalarIndexExtension<String> {
   }
 
   private static final Key<CachedValue<List<GroovyDslScript>>> SCRIPTS_CACHE = Key.create("GdslScriptCache");
+
   private static List<GroovyDslScript> getDslScripts(final Project project) {
     return CachedValuesManager.getManager(project).getCachedValue(project, SCRIPTS_CACHE, new CachedValueProvider<List<GroovyDslScript>>() {
       @Override
       public Result<List<GroovyDslScript>> compute() {
         if (ourGdslStopped) {
-          return Result.create(Collections.<GroovyDslScript>emptyList(), Collections.emptyList());
+          return Result.create(Collections.<GroovyDslScript>emptyList(), ModificationTracker.NEVER_CHANGED);
         }
 
         int count = 0;
@@ -445,9 +447,6 @@ public class GroovyDslFileIndex extends ScalarIndexExtension<String> {
         List<GroovyDslScript> result = new ArrayList<GroovyDslScript>();
 
         List<Pair<File, GroovyDslExecutor>> standardScripts = getStandardScripts();
-        if (ourGdslStopped) {
-          return Result.create(Collections.<GroovyDslScript>emptyList(), Collections.emptyList());
-        }
         assert standardScripts != null;
         for (Pair<File, GroovyDslExecutor> pair : standardScripts) {
           result.add(new GroovyDslScript(project, null, pair.second, pair.first.getPath()));
@@ -457,7 +456,8 @@ public class GroovyDslFileIndex extends ScalarIndexExtension<String> {
           new LinkedBlockingQueue<Pair<VirtualFile, GroovyDslExecutor>>();
 
         final ProjectFileIndex fileIndex = ProjectRootManager.getInstance(project).getFileIndex();
-        for (VirtualFile vfile : FileBasedIndex.getInstance().getContainingFiles(NAME, OUR_KEY, GlobalSearchScope.allScope(project))) {
+        final GlobalSearchScope scope = GlobalSearchScope.allScope(project);
+        for (VirtualFile vfile : FileBasedIndex.getInstance().getContainingFiles(NAME, OUR_KEY, scope)) {
           if (!vfile.isValid()) {
             continue;
           }
@@ -515,7 +515,7 @@ public class GroovyDslFileIndex extends ScalarIndexExtension<String> {
 
     @Override
     public boolean acceptInput(final VirtualFile file) {
-      return "gdsl".equals(file.getExtension());
+      return StringUtil.endsWith(file.getNameSequence(), ".gdsl");
     }
   }
 

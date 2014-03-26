@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -227,6 +227,7 @@ public class DarculaLaf extends BasicLookAndFeel {
       //"ENTER", "selectNextRowCell",
       "shift ENTER", "selectPreviousRowCell",
       "ctrl A", "selectAll",
+      "meta A", "selectAll",
       //"ESCAPE", "cancel",
       "F2", "startEditing"
     }));
@@ -272,6 +273,10 @@ public class DarculaLaf extends BasicLookAndFeel {
   }
 
   protected Object parseValue(String key, @NotNull String value) {
+    if ("null".equals(value)) {
+      return null;
+    }
+
     if (key.endsWith("Insets")) {
       final List<String> numbers = StringUtil.split(value, ",");
       return new InsetsUIResource(Integer.parseInt(numbers.get(0)),

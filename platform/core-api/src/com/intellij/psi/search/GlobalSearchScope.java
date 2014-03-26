@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
  */
 package com.intellij.psi.search;
 
-import com.intellij.openapi.components.ServiceManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.fileTypes.FileType;
 import com.intellij.openapi.module.Module;
@@ -40,7 +39,7 @@ public abstract class GlobalSearchScope extends SearchScope implements ProjectAw
   private static final Logger LOG = Logger.getInstance("#com.intellij.psi.search.GlobalSearchScope");
   @Nullable private final Project myProject;
 
-  protected GlobalSearchScope(Project project) {
+  protected GlobalSearchScope(@Nullable Project project) {
     myProject = project;
   }
 
@@ -50,6 +49,7 @@ public abstract class GlobalSearchScope extends SearchScope implements ProjectAw
 
   public abstract boolean contains(@NotNull VirtualFile file);
 
+  @Nullable
   @Override
   public Project getProject() {
     return myProject;
@@ -347,7 +347,7 @@ public abstract class GlobalSearchScope extends SearchScope implements ProjectAw
     public boolean isSearchInLibraries() {
       return myScope1.isSearchInLibraries() && myScope2.isSearchInLibraries();
     }
-    
+
     @Override
     public boolean isSearchOutsideRootModel() {
       return myScope1.isSearchOutsideRootModel() && myScope2.isSearchOutsideRootModel();
@@ -574,8 +574,8 @@ public abstract class GlobalSearchScope extends SearchScope implements ProjectAw
     private FileScope(@NotNull Project project, final VirtualFile virtualFile) {
       super(project);
       myVirtualFile = virtualFile;
-      FileIndexFacade fileIndex = ServiceManager.getService(project, FileIndexFacade.class);
-      myModule = myVirtualFile != null ? fileIndex.getModuleForFile(myVirtualFile) : null;
+      myModule = virtualFile != null && !project.isDefault() ?
+                 FileIndexFacade.getInstance(project).getModuleForFile(virtualFile) : null;
     }
 
     @Override

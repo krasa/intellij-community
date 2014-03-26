@@ -60,7 +60,11 @@
       <module fileurl="file://$PROJECT_DIR$/plugins/github/github.iml" filepath="$PROJECT_DIR$/plugins/github/github.iml" group="plugins" />
       <module fileurl="file://$PROJECT_DIR$/plugins/google-app-engine/google-app-engine.iml" filepath="$PROJECT_DIR$/plugins/google-app-engine/google-app-engine.iml" group="plugins/GAE" />
       <module fileurl="file://$PROJECT_DIR$/plugins/google-app-engine/jps-plugin/google-app-engine-jps-plugin.iml" filepath="$PROJECT_DIR$/plugins/google-app-engine/jps-plugin/google-app-engine-jps-plugin.iml" group="plugins/GAE" />
-      <module fileurl="file://$PROJECT_DIR$/plugins/gradle/gradle.iml" filepath="$PROJECT_DIR$/plugins/gradle/gradle.iml" group="plugins" />
+      <module fileurl="file://$PROJECT_DIR$/plugins/gradle/gradle.iml" filepath="$PROJECT_DIR$/plugins/gradle/gradle.iml" group="community/plugins/gradle" />
+      <module fileurl="file://$PROJECT_DIR$/plugins/gradle/tooling-extension/gradle-tooling-extension.iml" filepath="$PROJECT_DIR$/plugins/gradle/tooling-extension/gradle-tooling-extension.iml" group="community/plugins/gradle" />
+      <module fileurl="file://$PROJECT_DIR$/plugins/gradle/tooling-extension-v1.11/gradle-tooling-extension-v1.11.iml" filepath="$PROJECT_DIR$/plugins/gradle/tooling-extension-v1.11/gradle-tooling-extension-v1.11.iml" group="community/plugins/gradle" />
+      <module fileurl="file://$PROJECT_DIR$/plugins/gradle/tooling-extension-v1.12/gradle-tooling-extension-v1.12.iml" filepath="$PROJECT_DIR$/plugins/gradle/tooling-extension-v1.12/gradle-tooling-extension-v1.12.iml" group="community/plugins/gradle" />
+      <module fileurl="file://$PROJECT_DIR$/plugins/gradle/tooling-extension-v1.9/gradle-tooling-extension-v1.9.iml" filepath="$PROJECT_DIR$/plugins/gradle/tooling-extension-v1.9/gradle-tooling-extension-v1.9.iml" group="community/plugins/gradle" />
       <module fileurl="file://$PROJECT_DIR$/plugins/groovy/jps-plugin/groovy-jps-plugin.iml" filepath="$PROJECT_DIR$/plugins/groovy/jps-plugin/groovy-jps-plugin.iml" group="plugins/Groovy" />
       <module fileurl="file://$PROJECT_DIR$/plugins/groovy/rt-constants/groovy-rt-constants.iml" filepath="$PROJECT_DIR$/plugins/groovy/rt-constants/groovy-rt-constants.iml" group="plugins/Groovy" />
       <module fileurl="file://$PROJECT_DIR$/plugins/groovy/rt/groovy_rt.iml" filepath="$PROJECT_DIR$/plugins/groovy/rt/groovy_rt.iml" group="plugins/Groovy" />
@@ -81,6 +85,7 @@
       <module fileurl="file://$PROJECT_DIR$/java/java-psi-api/java-psi-api.iml" filepath="$PROJECT_DIR$/java/java-psi-api/java-psi-api.iml" group="java" />
       <module fileurl="file://$PROJECT_DIR$/java/java-psi-impl/java-psi-impl.iml" filepath="$PROJECT_DIR$/java/java-psi-impl/java-psi-impl.iml" group="java" />
       <module fileurl="file://$PROJECT_DIR$/java/java-runtime/java-runtime.iml" filepath="$PROJECT_DIR$/java/java-runtime/java-runtime.iml" group="java" />
+      <module fileurl="file://$PROJECT_DIR$/java/java-structure-view/java-structure-view.iml" filepath="$PROJECT_DIR$/java/java-structure-view/java-structure-view.iml" group="java" />
       <module fileurl="file://$PROJECT_DIR$/java/java-tests/java-tests.iml" filepath="$PROJECT_DIR$/java/java-tests/java-tests.iml" group="java" />
       <module fileurl="file://$PROJECT_DIR$/plugins/javaFX/javaFX.iml" filepath="$PROJECT_DIR$/plugins/javaFX/javaFX.iml" group="plugins/JavaFX" />
       <module fileurl="file://$PROJECT_DIR$/plugins/javaFX/javaFX-CE/javaFX-CE.iml" filepath="$PROJECT_DIR$/plugins/javaFX/javaFX-CE/javaFX-CE.iml" group="plugins/JavaFX" />
@@ -88,11 +93,15 @@
       <module fileurl="file://$PROJECT_DIR$/java/compiler/javac2/javac2.iml" filepath="$PROJECT_DIR$/java/compiler/javac2/javac2.iml" group="java/compiler" />
       <module fileurl="file://$PROJECT_DIR$/plugins/cvs/javacvs-src/javacvs-src.iml" filepath="$PROJECT_DIR$/plugins/cvs/javacvs-src/javacvs-src.iml" group="plugins/VCS/cvs" />
       <module fileurl="file://$PROJECT_DIR$/plugins/groovy/jetgroovy.iml" filepath="$PROJECT_DIR$/plugins/groovy/jetgroovy.iml" group="plugins/Groovy" />
+      <module fileurl="file://$PROJECT_DIR$/plugins/tasks/tasks-core/jira/jira.iml" filepath="$PROJECT_DIR$/plugins/tasks/tasks-core/jira/jira.iml" group="plugins/tasks" />
       <module fileurl="file://$PROJECT_DIR$/jps/jps-builders/jps-builders.iml" filepath="$PROJECT_DIR$/jps/jps-builders/jps-builders.iml" group="jps" />
       <module fileurl="file://$PROJECT_DIR$/jps/jps-launcher/jps-launcher.iml" filepath="$PROJECT_DIR$/jps/jps-launcher/jps-launcher.iml" group="java" />
       <module fileurl="file://$PROJECT_DIR$/jps/model-api/jps-model-api.iml" filepath="$PROJECT_DIR$/jps/model-api/jps-model-api.iml" group="jps" />
       <module fileurl="file://$PROJECT_DIR$/jps/model-impl/jps-model-impl.iml" filepath="$PROJECT_DIR$/jps/model-impl/jps-model-impl.iml" group="jps" />
+      <module fileurl="file://$PROJECT_DIR$/jps/plugin-system/jps-plugin-system.iml" filepath="$PROJECT_DIR$/jps/plugin-system/jps-plugin-system.iml" group="jps"/>
       <module fileurl="file://$PROJECT_DIR$/jps/model-serialization/jps-model-serialization.iml" filepath="$PROJECT_DIR$/jps/model-serialization/jps-model-serialization.iml" group="jps" />
+      <module fileurl="file://$PROJECT_DIR$/jps/model-impl/jps-model-tests.iml" filepath="$PROJECT_DIR$/jps/model-impl/jps-model-tests.iml" />
+      <module fileurl="file://$PROJECT_DIR$/jps/model-serialization/jps-serialization-tests.iml" filepath="$PROJECT_DIR$/jps/model-serialization/jps-serialization-tests.iml" group="jps" />
       <module fileurl="file://$PROJECT_DIR$/jps/standalone-builder/jps-standalone-builder.iml" filepath="$PROJECT_DIR$/jps/standalone-builder/jps-standalone-builder.iml" group="jps" />
       <module fileurl="file://$PROJECT_DIR$/java/jsp-base-openapi/jsp-base-openapi.iml" filepath="$PROJECT_DIR$/java/jsp-base-openapi/jsp-base-openapi.iml" group="java" />
       <module fileurl="file://$PROJECT_DIR$/java/jsp-openapi/jsp-openapi.iml" filepath="$PROJECT_DIR$/java/jsp-openapi/jsp-openapi.iml" group="java" />
@@ -124,6 +133,8 @@
       <module fileurl="file://$PROJECT_DIR$/platform/projectModel-api/projectModel-api.iml" filepath="$PROJECT_DIR$/platform/projectModel-api/projectModel-api.iml" group="platform" />
       <module fileurl="file://$PROJECT_DIR$/platform/projectModel-impl/projectModel-impl.iml" filepath="$PROJECT_DIR$/platform/projectModel-impl/projectModel-impl.iml" group="platform" />
       <module fileurl="file://$PROJECT_DIR$/plugins/properties/properties.iml" filepath="$PROJECT_DIR$/plugins/properties/properties.iml" group="plugins" />
+      <module fileurl="file://$PROJECT_DIR$/plugins/properties/properties-psi-api/properties-psi-api.iml" filepath="$PROJECT_DIR$/plugins/properties/properties-psi-api/properties-psi-api.iml" group="plugins" />
+      <module fileurl="file://$PROJECT_DIR$/plugins/properties/properties-psi-impl/properties-psi-impl.iml" filepath="$PROJECT_DIR$/plugins/properties/properties-psi-impl/properties-psi-impl.iml" group="plugins" />
       <module fileurl="file://$PROJECT_DIR$/python/python-community.iml" filepath="$PROJECT_DIR$/python/python-community.iml" group="python" />
       <module fileurl="file://$PROJECT_DIR$/python/build/python-community-build.iml" filepath="$PROJECT_DIR$/python/build/python-community-build.iml" group="python" />
       <module fileurl="file://$PROJECT_DIR$/python/pluginSrc/python-community-plugin.iml" filepath="$PROJECT_DIR$/python/pluginSrc/python-community-plugin.iml" group="python" />
@@ -148,6 +159,8 @@
       <module fileurl="file://$PROJECT_DIR$/platform/smRunner/smRunner.iml" filepath="$PROJECT_DIR$/platform/smRunner/smRunner.iml" group="platform" />
       <module fileurl="file://$PROJECT_DIR$/plugins/cvs/smartcvs-src/smartcvs-src.iml" filepath="$PROJECT_DIR$/plugins/cvs/smartcvs-src/smartcvs-src.iml" group="plugins/VCS/cvs" />
       <module fileurl="file://$PROJECT_DIR$/spellchecker/spellchecker.iml" filepath="$PROJECT_DIR$/spellchecker/spellchecker.iml" group="plugins" />
+      <module fileurl="file://$PROJECT_DIR$/platform/structure-view-api/structure-view-api.iml" filepath="$PROJECT_DIR$/platform/structure-view-api/structure-view-api.iml" group="platform" />
+      <module fileurl="file://$PROJECT_DIR$/platform/structure-view-impl/structure-view-impl.iml" filepath="$PROJECT_DIR$/platform/structure-view-impl/structure-view-impl.iml" group="platform" />
       <module fileurl="file://$PROJECT_DIR$/plugins/svn4idea/svn4idea.iml" filepath="$PROJECT_DIR$/plugins/svn4idea/svn4idea.iml" group="plugins/VCS" />
       <module fileurl="file://$PROJECT_DIR$/plugins/svn4idea/svn4idea-tests.iml" filepath="$PROJECT_DIR$/plugins/svn4idea/svn4idea-tests.iml" group="plugins/VCS" />
       <module fileurl="file://$PROJECT_DIR$/plugins/tasks/tasks-api/tasks-api.iml" filepath="$PROJECT_DIR$/plugins/tasks/tasks-api/tasks-api.iml" group="plugins/tasks" />
@@ -180,6 +193,8 @@
       <module fileurl="file://$PROJECT_DIR$/xml/openapi/xml-openapi.iml" filepath="$PROJECT_DIR$/xml/openapi/xml-openapi.iml" group="xml" />
       <module fileurl="file://$PROJECT_DIR$/xml/xml-psi-api/xml-psi-api.iml" filepath="$PROJECT_DIR$/xml/xml-psi-api/xml-psi-api.iml" group="xml" />
       <module fileurl="file://$PROJECT_DIR$/xml/xml-psi-impl/xml-psi-impl.iml" filepath="$PROJECT_DIR$/xml/xml-psi-impl/xml-psi-impl.iml" group="xml" />
+      <module fileurl="file://$PROJECT_DIR$/xml/xml-structure-view-api/xml-structure-view-api.iml" filepath="$PROJECT_DIR$/xml/xml-structure-view-api/xml-structure-view-api.iml" group="xml" />
+      <module fileurl="file://$PROJECT_DIR$/xml/xml-structure-view-impl/xml-structure-view-impl.iml" filepath="$PROJECT_DIR$/xml/xml-structure-view-impl/xml-structure-view-impl.iml" group="xml" />
       <module fileurl="file://$PROJECT_DIR$/xml/tests/xml-tests.iml" filepath="$PROJECT_DIR$/xml/tests/xml-tests.iml" group="xml" />
       <module fileurl="file://$PROJECT_DIR$/plugins/xpath/xpath.iml" filepath="$PROJECT_DIR$/plugins/xpath/xpath.iml" group="plugins" />
       <module fileurl="file://$PROJECT_DIR$/plugins/xslt-debugger/xslt-debugger.iml" filepath="$PROJECT_DIR$/plugins/xslt-debugger/xslt-debugger.iml" group="plugins" />

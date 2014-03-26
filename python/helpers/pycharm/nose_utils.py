@@ -1,8 +1,12 @@
-from tcmessages import TeamcityServiceMessages
-import sys, traceback, datetime
+import sys
+import traceback
+import datetime
 import unittest
+
+from tcmessages import TeamcityServiceMessages
 from tcunittest import strclass
 from tcunittest import TeamcityTestResult
+
 
 try:
   from nose.util import isclass # backwards compat
@@ -59,7 +63,10 @@ class TeamcityPlugin(ErrorClassPlugin, TextTestResult, TeamcityTestResult):
   def formatErr(self, err):
     exctype, value, tb = err
     if isinstance(value, str):
-      value = exctype(value)
+      try:
+        value = exctype(value)
+      except TypeError:
+        pass
     return ''.join(traceback.format_exception(exctype, value, tb))
 
   def is_gen(self, test):
@@ -109,7 +116,7 @@ class TeamcityPlugin(ErrorClassPlugin, TextTestResult, TeamcityTestResult):
       suite = strclass(test.__class__)
       suite_location = "python_nosetestid://" + suite
       try:
-        from nose_helper.util import func_lineno
+        from nose.util import func_lineno
 
         if hasattr(test.test, "descriptor") and test.test.descriptor:
           suite_location = "file://" + self.test_address(

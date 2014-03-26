@@ -25,6 +25,8 @@ import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.fileEditor.OpenFileDescriptor;
 import com.intellij.openapi.ide.CopyPasteManager;
+import com.intellij.openapi.project.DumbAware;
+import com.intellij.openapi.project.DumbAwareAction;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.text.StringUtil;
@@ -42,6 +44,7 @@ import com.intellij.util.EditSourceOnDoubleClickHandler;
 import com.intellij.util.Function;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.ui.MutableErrorTreeView;
+import com.intellij.util.ui.StatusText;
 import com.intellij.util.ui.UIUtil;
 import com.intellij.util.ui.tree.TreeUtil;
 import org.jetbrains.annotations.NotNull;
@@ -208,6 +211,10 @@ public class NewErrorTreeViewPanel extends JPanel implements DataProvider, Occur
   public boolean isCopyVisible(@NotNull DataContext dataContext) {
     return true;
   }
+  
+  @NotNull public StatusText getEmptyText() {
+    return myTree.getEmptyText();
+  } 
 
   @Override
   public Object getData(String dataId) {
@@ -588,7 +595,7 @@ public class NewErrorTreeViewPanel extends JPanel implements DataProvider, Occur
     return myOccurrenceNavigatorSupport.getPreviousOccurenceActionName();
   }
 
-  private class RerunAction extends AnAction {
+  private class RerunAction extends DumbAwareAction {
     private final Runnable myRerunAction;
     private final AnAction myCloseAction;
 
@@ -611,7 +618,7 @@ public class NewErrorTreeViewPanel extends JPanel implements DataProvider, Occur
     }
   }
 
-  private class StopAction extends AnAction {
+  private class StopAction extends DumbAwareAction {
     public StopAction() {
       super(IdeBundle.message("action.stop"), null, AllIcons.Actions.Suspend);
     }
@@ -637,7 +644,7 @@ public class NewErrorTreeViewPanel extends JPanel implements DataProvider, Occur
     return true;
   }
 
-  private class HideWarningsAction extends ToggleAction {
+  private class HideWarningsAction extends ToggleAction implements DumbAware {
     public HideWarningsAction() {
       super(IdeBundle.message("action.hide.warnings"), null, AllIcons.General.HideWarnings);
     }

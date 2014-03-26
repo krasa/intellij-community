@@ -30,10 +30,11 @@ import java.util.Collection;
  */
 public class HgRepositoryFiles {
 
-  public static final String BRANCHHEADS = "cache/branchheads";  // can be branchheads or branchheads-served after approx 2.5,
-  // so check for starting branchheads
+  public static final String BRANCHHEADS = "cache/branch";//branchheads <2.5; branchheads-served >= 2.5 and <2.9; branch2-served >=2.9
+  // so check for starting branch
   public static final String BRANCHEADSDIR = "cache";
   public static final String MERGE = "merge";
+  public static final String REBASE = "rebase"; //rebasestate
   public static final String BRANCH = "branch";
   public static final String BOOKMARKS = "bookmarks";
   public static final String LOCAL_TAGS = "localtags";
@@ -45,6 +46,7 @@ public class HgRepositoryFiles {
   @NotNull private final String myBranchHeadsPath;
   @NotNull private final String myBranchHeadsDirPath;
   @NotNull private final String myMergePath;
+  @NotNull private final String myRebasePath;
   @NotNull private final String myBranchPath;
   @NotNull private final String myBookmarksPath;
   @NotNull private final String myTagsPath;
@@ -62,6 +64,7 @@ public class HgRepositoryFiles {
     myBranchHeadsDirPath = hgDir.getPath() + slash(BRANCHEADSDIR);
     myBranchPath = hgDir.getPath() + slash(BRANCH);
     myMergePath = hgDir.getPath() + slash(MERGE);
+    myRebasePath = hgDir.getPath() + slash(REBASE);
     myBookmarksPath = hgDir.getPath() + slash(BOOKMARKS);
     myTagsPath = hgDir.getParent().getPath() + slash(TAGS);
     myLocalTagsPath = hgDir.getPath() + slash(LOCAL_TAGS);
@@ -97,6 +100,10 @@ public class HgRepositoryFiles {
 
   public boolean isMergeFile(String filePath) {
     return filePath.startsWith(myMergePath);
+  }
+
+  public boolean isRebaseFile(String filePath) {
+    return filePath.startsWith(myRebasePath);
   }
 
   public boolean isBookmarksFile(String filePath) {

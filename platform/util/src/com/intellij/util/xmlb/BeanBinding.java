@@ -50,7 +50,7 @@ class BeanBinding implements Binding {
   @NonNls private static final String CLASS_PROPERTY = "class";
   private final Accessor myAccessor;
 
-  public BeanBinding(Class<?> beanClass, final Accessor accessor) {
+  public BeanBinding(Class<?> beanClass, @Nullable Accessor accessor) {
     myAccessor = accessor;
     assert !beanClass.isArray() : "Bean is an array: " + beanClass;
     assert !beanClass.isPrimitive() : "Bean is primitive type: " + beanClass;
@@ -169,18 +169,7 @@ class BeanBinding implements Binding {
   }
 
   private Object instantiateBean() {
-    Object result;
-
-    try {
-      result = myBeanClass.newInstance();
-    }
-    catch (InstantiationException e) {
-      throw new XmlSerializationException(e);
-    }
-    catch (IllegalAccessException e) {
-      throw new XmlSerializationException(e);
-    }
-    return result;
+    return XmlSerializerImpl.newInstance(myBeanClass);
   }
 
   @Override
@@ -194,9 +183,19 @@ class BeanBinding implements Binding {
   }
 
   private static String getTagName(Class<?> aClass) {
+    for (Class<?> c = aClass; c != null; c = c.getSuperclass()) {
+      String name = getTagNameFromAnnotation(c);
+      if (name != null) {
+        return name;
+      }
+    }
+    return aClass.getSimpleName();
+  }
+
+  private static String getTagNameFromAnnotation(Class<?> aClass) {
     Tag tag = aClass.getAnnotation(Tag.class);
     if (tag != null && !tag.value().isEmpty()) return tag.value();
-    return aClass.getSimpleName();
+    return null;
   }
 
   @NotNull

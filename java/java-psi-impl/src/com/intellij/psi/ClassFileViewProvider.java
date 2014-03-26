@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,8 +31,8 @@ public class ClassFileViewProvider extends SingleRootFileViewProvider {
     super(manager, file);
   }
 
-  public ClassFileViewProvider(@NotNull final PsiManager manager, @NotNull final VirtualFile virtualFile, final boolean physical) {
-    super(manager, virtualFile, physical);
+  public ClassFileViewProvider(@NotNull final PsiManager manager, @NotNull final VirtualFile virtualFile, final boolean eventSystemEnabled) {
+    super(manager, virtualFile, eventSystemEnabled);
   }
 
   @Override
@@ -45,7 +45,7 @@ public class ClassFileViewProvider extends SingleRootFileViewProvider {
     // skip inners & anonymous
     if (isInnerClass(vFile)) return null;
 
-    return new ClsFileImpl(PsiManager.getInstance(project), this);
+    return new ClsFileImpl(this);
   }
 
   public static boolean isInnerClass(VirtualFile vFile) {

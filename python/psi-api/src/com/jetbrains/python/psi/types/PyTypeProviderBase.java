@@ -80,7 +80,7 @@ public class PyTypeProviderBase implements PyTypeProvider {
   };
 
   @Override
-  public PyType getReferenceExpressionType(PyReferenceExpression referenceExpression, TypeEvalContext context) {
+  public PyType getReferenceExpressionType(@NotNull PyReferenceExpression referenceExpression, @NotNull TypeEvalContext context) {
     return null;
   }
 
@@ -94,8 +94,14 @@ public class PyTypeProviderBase implements PyTypeProvider {
     return null;
   }
 
+  @Nullable
   @Override
-  public PyType getReturnType(@NotNull PyFunction function, @Nullable PyQualifiedExpression callSite, @NotNull TypeEvalContext context) {
+  public PyType getReturnType(@NotNull Callable callable, @NotNull TypeEvalContext context) {
+    return null;
+  }
+
+  @Override
+  public PyType getCallType(@NotNull PyFunction function, @Nullable PyQualifiedExpression callSite, @NotNull TypeEvalContext context) {
     ReturnTypeDescriptor descriptor;
     synchronized (myMethodToReturnTypeMap) {
       descriptor = myMethodToReturnTypeMap.get(function.getName());
@@ -103,11 +109,6 @@ public class PyTypeProviderBase implements PyTypeProvider {
     if (descriptor != null) {
       return descriptor.get(function, callSite, context);
     }
-    return null;
-  }
-
-  @Override
-  public PyType getIterationType(@NotNull PyClass iterable) {
     return null;
   }
 
