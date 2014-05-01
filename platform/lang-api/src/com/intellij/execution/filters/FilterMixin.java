@@ -28,7 +28,7 @@ import org.jetbrains.annotations.Nullable;
  */
 public interface FilterMixin {
   boolean shouldRunHeavy();
-  void applyHeavyFilter(Document copiedFragment, int startOffset, int startLineNumber, Consumer<AdditionalHighlight> consumer);
+  void applyHeavyFilter(Document copiedFragment, int startOffset, Consumer<AdditionalHighlight> consumer);
 
   String getUpdateMessage();
 

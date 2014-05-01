@@ -93,10 +93,7 @@ public class VcsContentAnnotationExceptionFilter implements Filter, FilterMixin 
   }
 
   @Override
-  public void applyHeavyFilter(final Document copiedFragment,
-                               int startOffset,
-                               int startLineNumber,
-                               Consumer<AdditionalHighlight> consumer) {
+  public void applyHeavyFilter(final Document copiedFragment, int startOffset, Consumer<AdditionalHighlight> consumer) {
     VcsContentAnnotation vcsContentAnnotation = VcsContentAnnotationImpl.getInstance(myProject);
     final LocalChangesCorrector localChangesCorrector = new LocalChangesCorrector(myProject);
     Trinity<PsiClass, PsiFile, String> previousLineResult = null;

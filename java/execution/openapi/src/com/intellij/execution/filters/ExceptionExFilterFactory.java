@@ -62,10 +62,7 @@ public class ExceptionExFilterFactory implements ExceptionFilterFactory {
     }
 
     @Override
-    public void applyHeavyFilter(final Document copiedFragment,
-                                 final int startOffset,
-                                 int startLineNumber,
-                                 final Consumer<AdditionalHighlight> consumer) {
+    public void applyHeavyFilter(final Document copiedFragment, final int startOffset, final Consumer<AdditionalHighlight> consumer) {
       Map<String, Trinity<TextRange, TextRange, TextRange>> visited = new THashMap<String, Trinity<TextRange, TextRange, TextRange>>();
       final Trinity<TextRange, TextRange, TextRange> emptyInfo = Trinity.create(null, null, null);
 

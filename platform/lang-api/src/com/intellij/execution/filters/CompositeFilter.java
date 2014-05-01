@@ -105,7 +105,7 @@ public class CompositeFilter implements Filter, FilterMixin {
   }
 
   @Override
-  public void applyHeavyFilter(Document copiedFragment, int startOffset, int startLineNumber, Consumer<AdditionalHighlight> consumer) {
+  public void applyHeavyFilter(Document copiedFragment, int startOffset, Consumer<AdditionalHighlight> consumer) {
     final boolean dumb = myDumbService.isDumb();
     List<Filter> filters = myFilters;
     int count = filters.size();
@@ -114,7 +114,7 @@ public class CompositeFilter implements Filter, FilterMixin {
       Filter filter = filters.get(i);
       if (! (filter instanceof FilterMixin) || !((FilterMixin)filter).shouldRunHeavy()) continue;
       if (!dumb || DumbService.isDumbAware(filter)) {
-        ((FilterMixin) filter).applyHeavyFilter(copiedFragment, startOffset, startLineNumber, consumer);
+        ((FilterMixin) filter).applyHeavyFilter(copiedFragment, startOffset, consumer);
       }
     }
   }

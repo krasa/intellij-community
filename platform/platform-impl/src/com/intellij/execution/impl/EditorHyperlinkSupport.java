@@ -30,16 +30,12 @@ import com.intellij.openapi.editor.event.EditorMouseEvent;
 import com.intellij.openapi.editor.ex.EditorEx;
 import com.intellij.openapi.editor.ex.MarkupModelEx;
 import com.intellij.openapi.editor.ex.util.EditorUtil;
-import com.intellij.openapi.editor.markup.HighlighterLayer;
-import com.intellij.openapi.editor.markup.HighlighterTargetArea;
-import com.intellij.openapi.editor.markup.RangeHighlighter;
-import com.intellij.openapi.editor.markup.TextAttributes;
+import com.intellij.openapi.editor.markup.*;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Key;
 import com.intellij.pom.NavigatableAdapter;
 import com.intellij.ui.awt.RelativePoint;
 import com.intellij.util.Consumer;
-import com.intellij.util.SmartList;
 import com.intellij.util.ui.UIUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -68,12 +64,10 @@ public class EditorHyperlinkSupport {
   @NotNull private final Project myProject;
   private final SortedMap<RangeHighlighter, HyperlinkInfo> myHighlighterToMessageInfoMap = new TreeMap<RangeHighlighter, HyperlinkInfo>(START_OFFSET_COMPARATOR);
   private int myLastIndex = NO_INDEX;
-  private final List<RangeHighlighter> myHighlighters;
 
   public EditorHyperlinkSupport(@NotNull final Editor editor, @NotNull final Project project) {
     myEditor = editor;
     myProject = project;
-    myHighlighters = new SmartList<RangeHighlighter>();
 
     editor.addEditorMouseListener(new EditorMouseAdapter() {
       @Override
@@ -155,16 +149,6 @@ public class EditorHyperlinkSupport {
         myEditor.getMarkupModel().removeHighlighter(found);
         return;
       }
-      final Iterator<RangeHighlighter> iterator = myHighlighters.iterator();
-      while (iterator.hasNext()) {
-        final RangeHighlighter highlighter = iterator.next();
-        if (highlighter.getStartOffset() == highlight.getStart() && highlighter.getEndOffset() == highlight.getEnd()) {
-          iterator.remove();
-          final TextAttributes textAttributes = highlight.getTextAttributes(highlighter.getTextAttributes());
-          addHighlighter(highlight.getStart(), highlight.getEnd(), textAttributes);
-          return;
-        }
-      }
       final TextAttributes textAttributes = highlight.getTextAttributes(null);
       addHighlighter(highlight.getStart(), highlight.getEnd(), textAttributes);
     }
@@ -172,7 +156,6 @@ public class EditorHyperlinkSupport {
 
   public void clearHyperlinks() {
     myHighlighterToMessageInfoMap.clear();
-    myHighlighters.clear();
     myLastIndex = NO_INDEX;
   }
 
@@ -263,12 +246,13 @@ public class EditorHyperlinkSupport {
     return getHyperlinkInfoByLineAndCol(pos.line, pos.column);
   }
 
-  public void highlightHyperlinks(final Filter customFilter, final Filter predefinedMessageFilter, final int line1, final int endLine) {
+  public void highlightHyperlinks(final Filter customFilter, final Filter predefinedMessageFilter, final int startOffset) {
     final Document document = myEditor.getDocument();
 
-    final int startLine = Math.max(0, line1);
-
-    for (int line = startLine; line <= endLine; line++) {
+    final int startLine = document.getLineNumber(startOffset);
+    final int lineCount = document.getLineCount()-1;
+    
+    for (int line = startLine; line <= lineCount; line++) {
       int endOffset = document.getLineEndOffset(line);
       if (endOffset < document.getTextLength()) {
         endOffset++; // add '\n'
@@ -297,7 +281,6 @@ public class EditorHyperlinkSupport {
                                                                                        HIGHLIGHT_LAYER,
                                                                                        highlightAttributes,
                                                                                        HighlighterTargetArea.EXACT_RANGE);
-    myHighlighters.add(highlighter);
   }
 
   private static TextAttributes getHyperlinkAttributes() {

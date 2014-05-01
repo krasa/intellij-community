@@ -171,7 +171,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     });
     myFolding.clear();
 
-    updateFoldings(0, myEditor.getDocument().getLineCount() - 1, true);
+    updateFoldings(0, true);
   }
 
   static class TokenInfo {
@@ -304,7 +304,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
       @Override
       public void run() {
         clearHyperlinkAndFoldings();
-        highlightHyperlinksAndFoldings(0, myEditor.getDocument().getLineCount() - 1);
+        highlightHyperlinksAndFoldings(0);
         ConsoleViewImpl.this.remove(processAllOutputLinkLabel);
         myInSpareTimeUpdate=false;
       }
@@ -678,14 +678,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
       cancelHeavyAlarm();
     }
     final Document document = myEditor.getDocument();
-    final int oldLineCount = document.getLineCount();
     final boolean isAtEndOfDocument = myEditor.getCaretModel().getOffset() == document.getTextLength();
-    //TODO if the buffer is filled and then the output slows down, this thing stills is true -> have to clear the buffer to enable filters again
-    boolean cycleUsed = myBuffer.isUseCyclicBuffer() && document.getTextLength() + text.length() > myBuffer.getCyclicBufferSize();
-    if (cycleUsed) {
-      //TODO why to call this? 
-      //clearHyperlinkAndFoldings();
-    }
 
     CommandProcessor.getInstance().executeCommand(myProject, new Runnable() {
       @Override
@@ -734,8 +727,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
       }
     }
     myPsiDisposedCheck.performCheck();
-    final int newLineCount = document.getLineCount();
-    if (cycleUsed || myInSpareTimeUpdate) {
+    if (text.length()*10> myBuffer.getCyclicBufferSize()  || myInSpareTimeUpdate) {
       if (!myInSpareTimeUpdate) {
         myInSpareTimeUpdate = true;
         final EditorNotificationPanel comp = new EditorNotificationPanel().text("Too much output to process").icon(AllIcons.General.ExclMark);
@@ -749,8 +741,9 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
         });
       }
     }
-    else if (oldLineCount < newLineCount) {
-      highlightHyperlinksAndFoldings(oldLineCount - 1, newLineCount - 1);
+    else  {
+      //TODO can this be executed multiple times for one line? because it was not executed before...
+      highlightHyperlinksAndFoldings(myEditor.getDocument().getTextLength() - text.length());
     }
 
     if (isAtEndOfDocument) {
@@ -958,7 +951,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     menu.getComponent().show(mouseEvent.getComponent(), mouseEvent.getX(), mouseEvent.getY());
   }
 
-  private void highlightHyperlinksAndFoldings(final int line1, final int endLine) {
+  private void highlightHyperlinksAndFoldings(final int startOffset) {
     boolean canHighlightHyperlinks = !myCustomFilter.isEmpty() || !myPredefinedMessageFilter.isEmpty();
 
     if (!canHighlightHyperlinks && myUpdateFoldingsEnabled) {
@@ -967,23 +960,21 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     ApplicationManager.getApplication().assertIsDispatchThread();
     PsiDocumentManager.getInstance(myProject).commitAllDocuments();
     if (canHighlightHyperlinks) {
-      myHyperlinks.highlightHyperlinks(myCustomFilter, myPredefinedMessageFilter, line1, endLine);
+      myHyperlinks.highlightHyperlinks(myCustomFilter, myPredefinedMessageFilter, startOffset);
     }
 
     if (myAllowHeavyFilters && myPredefinedMessageFilter.isAnyHeavy() && myPredefinedMessageFilter.shouldRunHeavy()) {
-      runHeavyFilters(line1, endLine);
+      runHeavyFilters(startOffset);
     }
     if (myUpdateFoldingsEnabled) {
-      updateFoldings(line1, endLine, true);
+      updateFoldings(startOffset, true);
     }
   }
 
-  private void runHeavyFilters(int line1, int endLine) {
-    final int startLine = Math.max(0, line1);
+  private void runHeavyFilters(final int startOffset) {
 
     final Document document = myEditor.getDocument();
-    final int startOffset = document.getLineStartOffset(startLine);
-    String text = document.getText(new TextRange(startOffset, document.getLineEndOffset(endLine)));
+    String text = document.getText(new TextRange(startOffset, document.getLineEndOffset(document.getLineCount()-1)));
     final Document documentCopy = new DocumentImpl(text,true);
     documentCopy.setReadOnly(true);
 
@@ -995,7 +986,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
       public void run() {
         if (! myPredefinedMessageFilter.shouldRunHeavy()) return;
         try {
-          myPredefinedMessageFilter.applyHeavyFilter(documentCopy, startOffset, startLine, new Consumer<FilterMixin.AdditionalHighlight>() {
+          myPredefinedMessageFilter.applyHeavyFilter(documentCopy, startOffset, new Consumer<FilterMixin.AdditionalHighlight>() {
             @Override
             public void consume(final FilterMixin.AdditionalHighlight additionalHighlight) {
               if (myFlushAlarm.isDisposed()) return;
@@ -1023,12 +1014,13 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     }, 0);
   }
 
-  private void updateFoldings(final int line1, final int endLine, boolean immediately) {
+  private void updateFoldings(final int startOffset, boolean immediately) {
     final Document document = myEditor.getDocument();
     final CharSequence chars = document.getCharsSequence();
-    final int startLine = Math.max(0, line1);
+    final int startLine = myEditor.getDocument().getLineNumber(startOffset);
     final List<FoldRegion> toAdd = new ArrayList<FoldRegion>();
-    for (int line = startLine; line <= endLine; line++) {
+    final int lineCount = myEditor.getDocument().getLineCount()-1;
+    for (int line = startLine; line <= lineCount; line++) {
       addFolding(document, chars, line, toAdd);
     }
     if (!toAdd.isEmpty()) {
