@@ -678,14 +678,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
       cancelHeavyAlarm();
     }
     final Document document = myEditor.getDocument();
-    final int oldLineCount = document.getLineCount();
     final boolean isAtEndOfDocument = myEditor.getCaretModel().getOffset() == document.getTextLength();
-    //TODO if the buffer is filled and then the output slows down, this thing stills is true -> have to clear the buffer to enable filters again
-    boolean cycleUsed = myBuffer.isUseCyclicBuffer() && document.getTextLength() + text.length() > myBuffer.getCyclicBufferSize();
-    if (cycleUsed) {
-      //TODO why to call this? 
-      //clearHyperlinkAndFoldings();
-    }
 
     CommandProcessor.getInstance().executeCommand(myProject, new Runnable() {
       @Override
@@ -734,8 +727,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
       }
     }
     myPsiDisposedCheck.performCheck();
-    final int newLineCount = document.getLineCount();
-    if (cycleUsed || myInSpareTimeUpdate) {
+    if (text.length() > myBuffer.getCyclicBufferSize()/10  || myInSpareTimeUpdate) {
       if (!myInSpareTimeUpdate) {
         myInSpareTimeUpdate = true;
         final EditorNotificationPanel comp = new EditorNotificationPanel().text("Too much output to process").icon(AllIcons.General.ExclMark);
@@ -749,8 +741,10 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
         });
       }
     }
-    else if (oldLineCount < newLineCount) {
-      highlightHyperlinksAndFoldings(oldLineCount - 1, newLineCount - 1);
+    else  {
+      //TODO can this be executed multiple times for one line? because it was not executed before...
+      final int lineNumber = document.getLineNumber(myEditor.getDocument().getTextLength() - text.length());
+      highlightHyperlinksAndFoldings(lineNumber, document.getLineCount() - 1);
     }
 
     if (isAtEndOfDocument) {
