@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2012 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,19 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.intellij.execution.filters;
 
-import com.intellij.openapi.extensions.ExtensionPointName;
-import com.intellij.openapi.project.Project;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+/**
+ * The actual order can be interpreted as prioritization, lowest values are executed first
+ *
+ * @author Vojtech Krasa
+ */
+public interface OrderableFilter {
+  int DEFAULT_FILTER_ORDER = 0;
+  int DEFAULT_EXTENSION_FILTER_ORDER = 1000;
 
-public interface ConsoleInputFilterProvider {
-  ExtensionPointName<ConsoleInputFilterProvider> INPUT_FILTER_PROVIDERS =
-    ExtensionPointName.create("com.intellij.consoleInputFilterProvider");
+  int getOrder();
 
-  @Deprecated
-  @Nullable
-  InputFilter[] getDefaultFilters(@NotNull Project project);
 }

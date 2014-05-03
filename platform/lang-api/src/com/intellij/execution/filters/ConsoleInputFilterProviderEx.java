@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2012 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,16 +16,12 @@
 
 package com.intellij.execution.filters;
 
-import com.intellij.openapi.extensions.ExtensionPointName;
+import com.intellij.execution.ui.ConsoleView;
 import com.intellij.openapi.project.Project;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-public interface ConsoleInputFilterProvider {
-  ExtensionPointName<ConsoleInputFilterProvider> INPUT_FILTER_PROVIDERS =
-    ExtensionPointName.create("com.intellij.consoleInputFilterProvider");
-
-  @Deprecated
+public interface ConsoleInputFilterProviderEx extends ConsoleInputFilterProvider {
   @Nullable
-  InputFilter[] getDefaultFilters(@NotNull Project project);
+  InputFilter[] getDefaultFilters(@NotNull Project project, @NotNull ConsoleView consoleView);
 }

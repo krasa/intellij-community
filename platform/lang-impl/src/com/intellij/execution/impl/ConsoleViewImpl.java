@@ -247,8 +247,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
 
   private final Set<MyFlushRunnable> myCurrentRequests = new HashSet<MyFlushRunnable>();
 
-  protected final CompositeFilter myPredefinedMessageFilter;
-  protected final CompositeFilter myCustomFilter;
+  protected final CompositeFilter myFilters;
 
   @Nullable private final InputFilter myInputMessageFilter;
 
@@ -285,20 +284,19 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     myPsiDisposedCheck = new DisposedPsiManagerCheck(project);
     myProject = project;
 
-    myCustomFilter = new CompositeFilter(project);
-    myPredefinedMessageFilter = new CompositeFilter(project);
+    myFilters = new CompositeFilter(project);
     if (usePredefinedMessageFilter) {
       for (ConsoleFilterProvider eachProvider : Extensions.getExtensions(ConsoleFilterProvider.FILTER_PROVIDERS)) {
         Filter[] filters = eachProvider instanceof ConsoleFilterProviderEx
                            ? ((ConsoleFilterProviderEx)eachProvider).getDefaultFilters(project, searchScope)
                            : eachProvider.getDefaultFilters(project);
         for (Filter filter : filters) {
-          myPredefinedMessageFilter.addFilter(filter);
+          myFilters.addFilter(filter, OrderableFilter.DEFAULT_EXTENSION_FILTER_ORDER);
         }
       }
     }
     myHeavyUpdateTicket = 0;
-    myHeavyAlarm = myPredefinedMessageFilter.isAnyHeavy() ? new Alarm(Alarm.ThreadToUse.SHARED_THREAD, this) : null;
+    myHeavyAlarm = myFilters.isAnyHeavy() ? new Alarm(Alarm.ThreadToUse.SHARED_THREAD, this) : null;
 
 
     ConsoleInputFilterProvider[] inputFilters = Extensions.getExtensions(ConsoleInputFilterProvider.INPUT_FILTER_PROVIDERS);
@@ -306,26 +304,9 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
       CompositeInputFilter compositeInputFilter = new CompositeInputFilter(project);
       myInputMessageFilter = compositeInputFilter;
       for (ConsoleInputFilterProvider eachProvider : inputFilters) {
-        InputFilter[] filters = eachProvider.getDefaultFilters(project);
-        for (final InputFilter filter : filters) {
-          compositeInputFilter.addFilter(new InputFilter() {
-            boolean isBroken;
-
-            @Nullable
-            @Override
-            public List<Pair<String, ConsoleViewContentType>> applyFilter(String text, ConsoleViewContentType contentType) {
-              if (!isBroken) {
-                try {
-                  return filter.applyFilter(text, contentType);
-                }
-                catch (Throwable e) {
-                  isBroken = true;
-                  LOG.error(e);
-                }
-              }
-              return null;
-            }
-          });
+        addInputFilters(compositeInputFilter, eachProvider.getDefaultFilters(project));
+        if (eachProvider instanceof ConsoleInputFilterProviderEx) {
+          addInputFilters(compositeInputFilter, ((ConsoleInputFilterProviderEx)eachProvider).getDefaultFilters(project, this));
         }
       }
     }
@@ -339,6 +320,32 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
         myJLayeredPane.finishUpdating();
       }
     };
+  }
+
+  private void addInputFilters(CompositeInputFilter compositeInputFilter, @Nullable InputFilter[] filters) {
+    if (compositeInputFilter == null) {
+      return;
+    }
+    for (final InputFilter filter : filters) {
+      compositeInputFilter.addFilter(new InputFilter() {
+        boolean isBroken;
+
+        @Nullable
+        @Override
+        public List<Pair<String, ConsoleViewContentType>> applyFilter(String text, ConsoleViewContentType contentType) {
+          if (!isBroken) {
+            try {
+              return filter.applyFilter(text, contentType);
+            }
+            catch (Throwable e) {
+              isBroken = true;
+              LOG.error(e);
+            }
+          }
+          return null;
+        }
+      });
+    }
   }
 
   @Override
@@ -474,7 +481,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
   public JComponent getComponent() {
     if (myMainPanel == null) {
       myMainPanel = new JPanel(new BorderLayout());
-      myJLayeredPane = new MyDiffContainer(myMainPanel, myPredefinedMessageFilter.getUpdateMessage());
+      myJLayeredPane = new MyDiffContainer(myMainPanel, myFilters.getUpdateMessage());
       Disposer.register(this, myJLayeredPane);
       add(myJLayeredPane, BorderLayout.CENTER);
     }
@@ -840,7 +847,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
 
   @Override
   public void addMessageFilter(final Filter filter) {
-    myCustomFilter.addFilter(filter);
+    myFilters.addFilter(filter, OrderableFilter.DEFAULT_FILTER_ORDER);
   }
 
   @Override
@@ -959,7 +966,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
   }
 
   private void highlightHyperlinksAndFoldings(RangeMarker lastProcessedOutput) {
-    boolean canHighlightHyperlinks = !myCustomFilter.isEmpty() || !myPredefinedMessageFilter.isEmpty();
+    boolean canHighlightHyperlinks = !myFilters.isEmpty() || !myFilters.isEmpty();
 
     if (!canHighlightHyperlinks && myUpdateFoldingsEnabled) {
       return;
@@ -970,10 +977,10 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     ApplicationManager.getApplication().assertIsDispatchThread();
     PsiDocumentManager.getInstance(myProject).commitAllDocuments();
     if (canHighlightHyperlinks) {
-      myHyperlinks.highlightHyperlinks(myCustomFilter, myPredefinedMessageFilter, line1, endLine);
+      myHyperlinks.highlightHyperlinks(myFilters, line1, endLine);
     }
 
-    if (myAllowHeavyFilters && myPredefinedMessageFilter.isAnyHeavy() && myPredefinedMessageFilter.shouldRunHeavy()) {
+    if (myAllowHeavyFilters && myFilters.isAnyHeavy() && myFilters.shouldRunHeavy()) {
       runHeavyFilters(line1, endLine);
     }
     if (myUpdateFoldingsEnabled) {
@@ -996,9 +1003,9 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     myHeavyAlarm.addRequest(new Runnable() {
       @Override
       public void run() {
-        if (! myPredefinedMessageFilter.shouldRunHeavy()) return;
+        if (!myFilters.shouldRunHeavy()) return;
         try {
-          myPredefinedMessageFilter.applyHeavyFilter(documentCopy, startOffset, startLine, new Consumer<FilterMixin.AdditionalHighlight>() {
+          myFilters.applyHeavyFilter(documentCopy, startOffset, startLine, new Consumer<FilterMixin.AdditionalHighlight>() {
             @Override
             public void consume(final FilterMixin.AdditionalHighlight additionalHighlight) {
               if (myFlushAlarm.isDisposed()) return;

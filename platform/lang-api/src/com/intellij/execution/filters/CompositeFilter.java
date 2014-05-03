@@ -29,7 +29,7 @@ import java.util.List;
 public class CompositeFilter implements Filter, FilterMixin {
   private static final Logger LOG = Logger.getInstance(CompositeFilter.class);
 
-  private final List<Filter> myFilters = new ArrayList<Filter>();
+  private final OrderedFilters myOrderedFilters = new OrderedFilters();
   private boolean myIsAnyHeavy;
   private final DumbService myDumbService;
 
@@ -45,7 +45,7 @@ public class CompositeFilter implements Filter, FilterMixin {
   @Nullable
   public Result applyFilter(final String line, final int entireLength) {
     final boolean dumb = myDumbService.isDumb();
-    List<Filter> filters = myFilters;
+    List<Filter> filters = myOrderedFilters.getFilters();
     int count = filters.size();
     //noinspection ForLoopReplaceableByForEach
     Result finalResult = null;
@@ -98,7 +98,7 @@ public class CompositeFilter implements Filter, FilterMixin {
 
   @Override
   public boolean shouldRunHeavy() {
-    for (Filter filter : myFilters) {
+    for (Filter filter : myOrderedFilters.getFilters()) {
       if (filter instanceof FilterMixin && ((FilterMixin)filter).shouldRunHeavy()) return true;
     }
     return false;
@@ -107,7 +107,7 @@ public class CompositeFilter implements Filter, FilterMixin {
   @Override
   public void applyHeavyFilter(Document copiedFragment, int startOffset, int startLineNumber, Consumer<AdditionalHighlight> consumer) {
     final boolean dumb = myDumbService.isDumb();
-    List<Filter> filters = myFilters;
+    List<Filter> filters = myOrderedFilters.getFilters();
     int count = filters.size();
     //noinspection ForLoopReplaceableByForEach
     for (int i = 0; i < count; i++) {
@@ -122,7 +122,7 @@ public class CompositeFilter implements Filter, FilterMixin {
   @Override
   public String getUpdateMessage() {
     final boolean dumb = myDumbService.isDumb();
-    List<Filter> filters = myFilters;
+    List<Filter> filters = myOrderedFilters.getFilters();
     final List<String> updateMessage = new ArrayList<String>();
     int count = filters.size();
     //noinspection ForLoopReplaceableByForEach
@@ -138,7 +138,7 @@ public class CompositeFilter implements Filter, FilterMixin {
   }
 
   public boolean isEmpty() {
-    return myFilters.isEmpty();
+    return myOrderedFilters.isEmpty();
   }
 
   public boolean isAnyHeavy() {
@@ -146,7 +146,11 @@ public class CompositeFilter implements Filter, FilterMixin {
   }
 
   public void addFilter(final Filter filter) {
-    myFilters.add(filter);
+    addFilter(filter, OrderableFilter.DEFAULT_FILTER_ORDER);
+  }
+
+  public void addFilter(Filter filter, int defaultFilterOrder) {
+    myOrderedFilters.addFilter(filter, defaultFilterOrder);
     myIsAnyHeavy |= filter instanceof FilterMixin;
   }
 }
