@@ -149,6 +149,12 @@ public class PythonDebugLanguageConsoleView extends JPanel implements ConsoleVie
   }
 
   @Override
+  public void resetHighlightersAndHyperlinks() {
+    myPydevConsoleView.resetHighlightersAndHyperlinks();
+    myTextConsole.resetHighlightersAndHyperlinks();
+  }
+
+  @Override
   public void scrollTo(int offset) {
     myPydevConsoleView.getLanguageConsole().getHistoryViewer().getCaretModel().moveToOffset(offset);
     myPydevConsoleView.getLanguageConsole().getHistoryViewer().getScrollingModel().scrollToCaret(ScrollType.MAKE_VISIBLE);

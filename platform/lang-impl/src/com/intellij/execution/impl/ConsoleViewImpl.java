@@ -374,6 +374,12 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
   }
 
   @Override
+  public void resetHighlightersAndHyperlinks() {
+    myEditor.getMarkupModel().removeAllHighlighters();
+    myHyperlinks.highlightHyperlinks(myFilters, 0, myEditor.getDocument().getLineCount() - 1);
+  }
+
+  @Override
   public void scrollTo(final int offset) {
     if (myEditor == null || myFlushAlarm.isDisposed()) return;
     class ScrollRunnable extends MyFlushRunnable {

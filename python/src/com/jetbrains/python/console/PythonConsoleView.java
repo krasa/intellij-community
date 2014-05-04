@@ -239,6 +239,11 @@ public class PythonConsoleView extends JPanel implements LanguageConsoleView, Ob
   }
 
   @Override
+  public void resetHighlightersAndHyperlinks() {
+    myLanguageConsoleView.resetHighlightersAndHyperlinks();
+  }
+
+  @Override
   public void scrollTo(int offset) {
     myLanguageConsoleView.scrollTo(offset);
   }

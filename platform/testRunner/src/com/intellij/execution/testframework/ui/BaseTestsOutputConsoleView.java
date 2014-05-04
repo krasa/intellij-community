@@ -102,6 +102,11 @@ public abstract class BaseTestsOutputConsoleView implements ConsoleView, Observa
   }
 
   @Override
+  public void resetHighlightersAndHyperlinks() {
+    myConsole.resetHighlightersAndHyperlinks();
+  }
+  
+  @Override
   public boolean hasDeferredOutput() {
     return myConsole.hasDeferredOutput();
   }

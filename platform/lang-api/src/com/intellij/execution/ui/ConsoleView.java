@@ -25,6 +25,8 @@ public interface ConsoleView extends ExecutionConsole {
   void print(@NotNull String s, @NotNull ConsoleViewContentType contentType);
 
   void clear();
+  
+  void resetHighlightersAndHyperlinks();
 
   void scrollTo(int offset);
 
