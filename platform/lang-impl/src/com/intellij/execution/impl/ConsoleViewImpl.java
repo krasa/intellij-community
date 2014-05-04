@@ -769,7 +769,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     return textLength > myBuffer.getCyclicBufferSize() / consoleTooMuchTextBufferRatio;
   }
 
-  private void clearHyperlinkAndFoldings() {
+  public void clearHyperlinkAndFoldings() {
     myEditor.getMarkupModel().removeAllHighlighters();
 
     myPendingFoldRegions.clear();
@@ -968,7 +968,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     menu.getComponent().show(mouseEvent.getComponent(), mouseEvent.getX(), mouseEvent.getY());
   }
 
-  private void highlightHyperlinksAndFoldings(RangeMarker lastProcessedOutput) {
+  public void highlightHyperlinksAndFoldings(RangeMarker lastProcessedOutput) {
     boolean canHighlightHyperlinks = !myFilters.isEmpty() || !myFilters.isEmpty();
 
     if (!canHighlightHyperlinks && myUpdateFoldingsEnabled) {
