@@ -16,6 +16,8 @@
 package com.intellij.execution.filters;
 
 import com.intellij.openapi.diagnostic.Logger;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -25,37 +27,66 @@ public class OrderedFilters {
   private static final Logger log = Logger.getInstance(OrderedFilters.class.getName());
 
   private List<OrderableFilter> myFilters = new ArrayList<OrderableFilter>();
+  @Nullable
   private List<Filter> myOrderedFiltersCache;
 
-  public OrderedFilters() {
-  }
-
   public void addFilter(Filter filter, int defaultFilterOrder) {
-    OrderableFilter orderableFilter;
-    if (filter instanceof OrderableFilter) {
-      orderableFilter = (OrderableFilter)filter;
-    }
-    else {
-      orderableFilter = new OrderableFilterWrapper(filter, defaultFilterOrder);
-    }
     checkDuplicates(filter, myFilters);
 
-    myFilters.add(orderableFilter);
-
-
-    sort(myFilters);
+    myFilters.add(toOrderableFilter(filter, defaultFilterOrder));
 
     myOrderedFiltersCache = null;
   }
 
-  private void checkDuplicates(Filter filter, List<OrderableFilter> orderedFiltersCache) {
-    for (OrderableFilter filter1 : orderedFiltersCache) {
+  @NotNull
+  public List<Filter> getFilters() {
+    if (myOrderedFiltersCache == null) {
+      sort(myFilters);
+      myOrderedFiltersCache = unwrap(myFilters);
+      if (log.isDebugEnabled()) {
+        log.debug("filters:\n" + Arrays.toString(myOrderedFiltersCache.toArray()).replace(", ", "\n, "));
+      }
+    }
+    return myOrderedFiltersCache;
+  }
+
+  public boolean isEmpty() {
+    return myFilters.isEmpty();
+  }
+
+  private void checkDuplicates(Filter filter, List<OrderableFilter> filters) {
+    for (OrderableFilter filter1 : filters) {
       if (unwrap(filter1).getClass().equals(filter.getClass())) {
         log.warn("Filter of class " + filter.getClass().getName() + " already present");
       }
     }
   }
 
+  private Filter unwrap(OrderableFilter filter) {
+    final Filter result;
+    if (filter instanceof OrderableFilterWrapper) {
+      result = ((OrderableFilterWrapper)filter).myFilter;
+    }
+    else {
+      result = (Filter)filter;
+    }
+    return result;
+  }
+
+  private OrderableFilter toOrderableFilter(Filter filter, int order) {
+    OrderableFilter orderableFilter;
+    if (filter instanceof OrderableFilter) {
+      orderableFilter = (OrderableFilter)filter;
+    }
+    else {
+      orderableFilter = new OrderableFilterWrapper(filter, order);
+    }
+    return orderableFilter;
+  }
+
+  private void sort(List<OrderableFilter> filters) {
+    OrderableFilterComparator.sort(filters);
+  }
 
   private List<Filter> unwrap(List<OrderableFilter> filters) {
     final List<Filter> list = new ArrayList<Filter>(filters.size());
@@ -63,35 +94,6 @@ public class OrderedFilters {
       list.add(unwrap(filter));
     }
     return list;
-  }
-
-  private Filter unwrap(OrderableFilter filter) {
-    final Filter filter1;
-    if (filter instanceof OrderableFilterWrapper) {
-      filter1 = ((OrderableFilterWrapper)filter).myFilter;
-    }
-    else {
-      filter1 = (Filter)filter;
-    }
-    return filter1;
-  }
-
-  private void sort(List<OrderableFilter> filters) {
-    OrderableFilterComparator.sort(filters);
-  }
-
-  public boolean isEmpty() {
-    return myFilters.isEmpty();
-  }
-
-  public List<Filter> getFilters() {
-    if (myOrderedFiltersCache == null) {
-      myOrderedFiltersCache = unwrap(myFilters);
-      if (log.isDebugEnabled()) {
-        log.debug("created filters list:\n" + Arrays.toString(myOrderedFiltersCache.toArray()).replace(", ", "\n, "));
-      }
-    }
-    return myOrderedFiltersCache;
   }
 
   /**
