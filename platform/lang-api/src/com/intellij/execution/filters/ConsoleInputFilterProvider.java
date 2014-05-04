@@ -16,16 +16,17 @@
 
 package com.intellij.execution.filters;
 
+import com.intellij.execution.ui.ConsoleView;
 import com.intellij.openapi.extensions.ExtensionPointName;
 import com.intellij.openapi.project.Project;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-public interface ConsoleInputFilterProvider {
-  ExtensionPointName<ConsoleInputFilterProvider> INPUT_FILTER_PROVIDERS =
+public abstract class ConsoleInputFilterProvider {
+  
+  public static final ExtensionPointName<ConsoleInputFilterProvider> INPUT_FILTER_PROVIDERS =
     ExtensionPointName.create("com.intellij.consoleInputFilterProvider");
 
-  @Deprecated
   @Nullable
-  InputFilter[] getDefaultFilters(@NotNull Project project);
+  public abstract InputFilter[] getDefaultFilters(@NotNull Project project, @NotNull ConsoleView console);
 }
