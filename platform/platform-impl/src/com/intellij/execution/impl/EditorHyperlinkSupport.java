@@ -135,13 +135,11 @@ public class EditorHyperlinkSupport {
 
   @Nullable
   private RangeHighlighter findLinkRangeAt(final int offset) {
+    //noinspection LoopStatementThatDoesntLoop
     for (final RangeHighlighter highlighter : getHyperlinks(offset, offset, myEditor)) {
-      if (highlighter.isValid()) {
         return highlighter;
-      }
     }
     return null;
-
   }
 
   @Nullable
@@ -157,7 +155,6 @@ public class EditorHyperlinkSupport {
   }
 
   public static List<RangeHighlighter> getHyperlinks(int startOffset, int endOffset, final Editor editor) {
-    List<RangeHighlighter> list = new ArrayList<RangeHighlighter>();
     final MarkupModelEx markupModel = (MarkupModelEx)editor.getMarkupModel();
     final CommonProcessors.CollectProcessor<RangeHighlighterEx> processor = new CommonProcessors.CollectProcessor<RangeHighlighterEx>();
     markupModel.processRangeHighlightersOverlappingWith(startOffset, endOffset,
@@ -165,11 +162,11 @@ public class EditorHyperlinkSupport {
                                                           @Override
                                                           public boolean value(RangeHighlighterEx rangeHighlighterEx) {
                                                             return HYPERLINK_LAYER == rangeHighlighterEx.getLayer() &&
+                                                                   rangeHighlighterEx.isValid() &&
                                                                    getHyperlinkInfo(rangeHighlighterEx) != null;
                                                           }
                                                         }, processor));
-    list.addAll(processor.getResults());
-    return list;
+    return new ArrayList<RangeHighlighter>(processor.getResults());
   }
 
   public void removeHyperlink(@NotNull RangeHighlighter hyperlink) {
