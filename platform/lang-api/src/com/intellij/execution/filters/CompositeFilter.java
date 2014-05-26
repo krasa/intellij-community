@@ -33,7 +33,7 @@ public class CompositeFilter implements Filter, FilterMixin {
 
   private final List<Filter> myFilters = new ArrayList<Filter>();
   private boolean myIsAnyHeavy;
-  private boolean forceUseAllFilters = true;
+  private boolean forceUseAllFilters = false;
   private final DumbService myDumbService;
 
   public CompositeFilter(@NotNull Project project) {
