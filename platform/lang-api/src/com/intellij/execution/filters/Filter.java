@@ -34,10 +34,13 @@ public interface Filter {
     protected NextAction myNextAction = NextAction.EXIT;
     protected final List<ResultItem> myResultItems;
 
+    @Deprecated
+    @SuppressWarnings("deprecation")
     public Result(final int highlightStartOffset, final int highlightEndOffset, @Nullable final HyperlinkInfo hyperlinkInfo) {
       this(highlightStartOffset, highlightEndOffset, hyperlinkInfo, null);
     }
 
+    @Deprecated
     public Result(final int highlightStartOffset, final int highlightEndOffset, @Nullable final HyperlinkInfo hyperlinkInfo, @Nullable final TextAttributes highlightAttributes) {
       super(highlightStartOffset, highlightEndOffset, hyperlinkInfo, highlightAttributes);
       myResultItems = null;
