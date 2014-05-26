@@ -192,6 +192,7 @@ public class TestResultsXmlFormatter {
     StringTokenizer t = new StringTokenizer(text.toString(), "\n");
     while (t.hasMoreTokens()) {
       String line = StringUtil.escapeXml(t.nextToken()) + "\n";
+      //TODO delete?
       Filter.Result result = null;//filter.applyFilter(line, line.length());
       if (result != null && result.hyperlinkInfo instanceof OpenFileHyperlinkInfo) {
         output.append(line.substring(0, result.highlightStartOffset));
