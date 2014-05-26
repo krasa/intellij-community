@@ -34,11 +34,11 @@ public interface Filter {
     protected NextAction myNextAction = NextAction.EXIT;
     protected final List<ResultItem> myResultItems;
 
-    public Result(final int highlightStartOffset, final int highlightEndOffset, final HyperlinkInfo hyperlinkInfo) {
+    public Result(final int highlightStartOffset, final int highlightEndOffset, @Nullable final HyperlinkInfo hyperlinkInfo) {
       this(highlightStartOffset, highlightEndOffset, hyperlinkInfo, null);
     }
 
-    public Result(final int highlightStartOffset, final int highlightEndOffset, final HyperlinkInfo hyperlinkInfo, final TextAttributes highlightAttributes) {
+    public Result(final int highlightStartOffset, final int highlightEndOffset, @Nullable final HyperlinkInfo hyperlinkInfo, @Nullable final TextAttributes highlightAttributes) {
       super(highlightStartOffset, highlightEndOffset, hyperlinkInfo, highlightAttributes);
       myResultItems = null;
     }
@@ -56,6 +56,47 @@ public interface Filter {
       return resultItems;
     }
 
+    @Deprecated
+    @Override
+    public int getHighlightStartOffset() {
+      return super.getHighlightStartOffset();
+    }
+
+    @Deprecated
+    @Override
+    public int getHighlightEndOffset() {
+      return super.getHighlightEndOffset();
+    }
+
+    @Deprecated
+    @Nullable
+    @Override
+    public TextAttributes getHighlightAttributes() {
+      return super.getHighlightAttributes();
+    }
+
+    @Deprecated
+    @Nullable
+    @Override
+    public HyperlinkInfo getHyperlinkInfo() {
+      return super.getHyperlinkInfo();
+    }
+
+    @Nullable
+    public HyperlinkInfo getFirstHyperlinkInfo() {
+      HyperlinkInfo info = super.getHyperlinkInfo();
+      if (info == null && myResultItems != null) {
+        //noinspection ForLoopReplaceableByForEach
+        for (int i = 0; i < myResultItems.size(); i++) {
+          ResultItem resultItem = myResultItems.get(i);
+          if (resultItem.getHyperlinkInfo() != null) {
+            return resultItem.getHyperlinkInfo();
+          }
+        }
+      }
+      return info;
+    }
+
     public NextAction getNextAction() {
       return myNextAction;
     }
@@ -70,20 +111,50 @@ public interface Filter {
   }
 
   class ResultItem {
+    @Deprecated
     public final int highlightStartOffset;
+    @Deprecated
     public final int highlightEndOffset;
+    @Deprecated
+    @Nullable
     public final TextAttributes highlightAttributes;
+    @Deprecated
+    @Nullable
     public final HyperlinkInfo hyperlinkInfo;
 
-    public ResultItem(final int highlightStartOffset, final int highlightEndOffset, final HyperlinkInfo hyperlinkInfo) {
+    @SuppressWarnings("deprecation")
+    public ResultItem(final int highlightStartOffset, final int highlightEndOffset,@Nullable final HyperlinkInfo hyperlinkInfo) {
       this(highlightStartOffset, highlightEndOffset, hyperlinkInfo, null);
     }
 
-    public ResultItem(final int highlightStartOffset, final int highlightEndOffset, final HyperlinkInfo hyperlinkInfo, final TextAttributes highlightAttributes) {
+    @SuppressWarnings("deprecation")
+    public ResultItem(final int highlightStartOffset, final int highlightEndOffset, @Nullable final HyperlinkInfo hyperlinkInfo, @Nullable final TextAttributes highlightAttributes) {
       this.highlightStartOffset = highlightStartOffset;
       this.highlightEndOffset = highlightEndOffset;
       this.hyperlinkInfo = hyperlinkInfo;
       this.highlightAttributes = highlightAttributes;
+    }
+
+    public int getHighlightStartOffset() {
+      //noinspection deprecation
+      return highlightStartOffset;
+    }
+
+    public int getHighlightEndOffset() {
+      //noinspection deprecation
+      return highlightEndOffset;
+    }
+
+    @Nullable
+    public TextAttributes getHighlightAttributes() {
+      //noinspection deprecation
+      return highlightAttributes;
+    }
+
+    @Nullable
+    public HyperlinkInfo getHyperlinkInfo() {
+      //noinspection deprecation
+      return hyperlinkInfo;
     }
   }
 
