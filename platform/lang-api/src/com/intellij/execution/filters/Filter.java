@@ -34,23 +34,32 @@ public interface Filter {
     protected NextAction myNextAction = NextAction.EXIT;
     protected final List<ResultItem> myResultItems;
 
+    /**
+     * @deprecated Use {@link #Result(java.util.List)} instead.
+     */
     @Deprecated
     @SuppressWarnings("deprecation")
     public Result(final int highlightStartOffset, final int highlightEndOffset, @Nullable final HyperlinkInfo hyperlinkInfo) {
       this(highlightStartOffset, highlightEndOffset, hyperlinkInfo, null);
     }
 
+    /**
+     * @deprecated Use {@link #Result(java.util.List)} instead.
+     */
     @Deprecated
-    public Result(final int highlightStartOffset, final int highlightEndOffset, @Nullable final HyperlinkInfo hyperlinkInfo, @Nullable final TextAttributes highlightAttributes) {
+    public Result(final int highlightStartOffset,
+                  final int highlightEndOffset,
+                  @Nullable final HyperlinkInfo hyperlinkInfo,
+                  @Nullable final TextAttributes highlightAttributes) {
       super(highlightStartOffset, highlightEndOffset, hyperlinkInfo, highlightAttributes);
       myResultItems = null;
     }
-    
+
     public Result(@NotNull List<ResultItem> resultItems) {
       super(-1, -1, null, null);
       myResultItems = resultItems;
     }
-    
+
     public List<ResultItem> getResultItems() {
       List<ResultItem> resultItems = myResultItems;
       if (resultItems == null) {
@@ -59,18 +68,27 @@ public interface Filter {
       return resultItems;
     }
 
+    /**
+     * @deprecated Result may be constructed using ResultItems, in that case this method will return incorrect value. Use {@link #getResultItems()} instead.
+     */
     @Deprecated
     @Override
     public int getHighlightStartOffset() {
       return super.getHighlightStartOffset();
     }
 
+    /**
+     * @deprecated Result may be constructed using ResultItems, in that case this method will return incorrect value. Use {@link #getResultItems()} instead.
+     */
     @Deprecated
     @Override
     public int getHighlightEndOffset() {
       return super.getHighlightEndOffset();
     }
 
+    /**
+     * @deprecated Result may be constructed using ResultItems, in that case this method will return incorrect value. Use {@link #getResultItems()} instead.
+     */
     @Deprecated
     @Nullable
     @Override
@@ -78,6 +96,9 @@ public interface Filter {
       return super.getHighlightAttributes();
     }
 
+    /**
+     * @deprecated Result may be constructed using ResultItems, in that case this method will return incorrect value. Use {@link #getResultItems()} or {@link #getFirstHyperlinkInfo()} instead.
+     */
     @Deprecated
     @Nullable
     @Override
@@ -114,24 +135,37 @@ public interface Filter {
   }
 
   class ResultItem {
+    /**
+     * @deprecated use getter, the visibility of this field will be decreased.
+     */
     @Deprecated
     public final int highlightStartOffset;
+    /**
+     * @deprecated use getter, the visibility of this field will be decreased.
+     */
     @Deprecated
     public final int highlightEndOffset;
-    @Deprecated
-    @Nullable
+    /**
+     * @deprecated use getter, the visibility of this field will be decreased.
+     */
+    @Deprecated @Nullable
     public final TextAttributes highlightAttributes;
-    @Deprecated
-    @Nullable
+    /**
+     * @deprecated use getter, the visibility of this field will be decreased.
+     */
+    @Deprecated @Nullable
     public final HyperlinkInfo hyperlinkInfo;
 
     @SuppressWarnings("deprecation")
-    public ResultItem(final int highlightStartOffset, final int highlightEndOffset,@Nullable final HyperlinkInfo hyperlinkInfo) {
+    public ResultItem(final int highlightStartOffset, final int highlightEndOffset, @Nullable final HyperlinkInfo hyperlinkInfo) {
       this(highlightStartOffset, highlightEndOffset, hyperlinkInfo, null);
     }
 
     @SuppressWarnings("deprecation")
-    public ResultItem(final int highlightStartOffset, final int highlightEndOffset, @Nullable final HyperlinkInfo hyperlinkInfo, @Nullable final TextAttributes highlightAttributes) {
+    public ResultItem(final int highlightStartOffset,
+                      final int highlightEndOffset,
+                      @Nullable final HyperlinkInfo hyperlinkInfo,
+                      @Nullable final TextAttributes highlightAttributes) {
       this.highlightStartOffset = highlightStartOffset;
       this.highlightEndOffset = highlightEndOffset;
       this.hyperlinkInfo = hyperlinkInfo;
@@ -164,16 +198,10 @@ public interface Filter {
   /**
    * Filters line by creating an instance of {@link Result}.
    *
-   *
-   * @param line
-   *     The line to be filtered. Note that the line must contain a line
-   *     separator at the end.
-   *
-   * @param entireLength
-   *     The length of the entire text including the line passed for filtration.
-   *
-   * @return
-   *    <tt>null</tt>, if there was no match, otherwise, an instance of {@link Result}
+   * @param line         The line to be filtered. Note that the line must contain a line
+   *                     separator at the end.
+   * @param entireLength The length of the entire text including the line passed for filtration.
+   * @return <tt>null</tt>, if there was no match, otherwise, an instance of {@link Result}
    */
   @Nullable
   Result applyFilter(String line, int entireLength);
