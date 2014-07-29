@@ -65,6 +65,10 @@ public abstract class WizardPopup extends AbstractPopup implements ActionListene
 
   private final ActionMap myActionMap = new ActionMap();
   private final InputMap myInputMap = new InputMap();
+  /**
+   * when false, allow events processing when old popups are open -> allow to invoke e.g. Ctrl-Q from psi popups (IDEA-93897)
+   */
+  protected boolean consumeKeyEventsByRegisteredActions = false;
 
   public WizardPopup(@NotNull PopupStep<Object> aStep) {
     this(null, aStep);
@@ -273,6 +277,10 @@ public abstract class WizardPopup extends AbstractPopup implements ActionListene
     myActionMap.put(aActionName, aAction);
   }
 
+  public void setConsumeKeyEventsByRegisteredActions(boolean consumeKeyEventsByRegisteredActions) {
+    this.consumeKeyEventsByRegisteredActions = consumeKeyEventsByRegisteredActions;
+  }
+
   protected abstract InputMap getInputMap();
 
   protected abstract ActionMap getActionMap();
@@ -339,7 +347,10 @@ public abstract class WizardPopup extends AbstractPopup implements ActionListene
 
     if (event.getID() == KeyEvent.KEY_PRESSED) {
       final KeyStroke stroke = KeyStroke.getKeyStroke(event.getKeyCode(), event.getModifiers(), false);
-      if (proceedKeyEvent(event, stroke)) return false;
+      boolean consumed = proceedKeyEvent(event, stroke);
+      if (consumed) {
+        return consumeKeyEventsByRegisteredActions;
+      }
     }
 
     if (event.getID() == KeyEvent.KEY_RELEASED) {
