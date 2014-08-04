@@ -132,7 +132,7 @@ public class AntExplorer extends SimpleToolWindowPanel implements DataProvider, 
         if (row >= 0) {
           final Rectangle bounds = myTree.getRowBounds(row);
           if (bounds != null && eventY > bounds.getY() && eventY < bounds.getY() + bounds.getHeight()) {
-            runSelection(DataManager.getInstance().getDataContext(myTree));
+            runSelection(DataManager.getInstance().getDataContext(myTree), false);
             return true;
           }
         }
@@ -142,7 +142,7 @@ public class AntExplorer extends SimpleToolWindowPanel implements DataProvider, 
 
     myTree.registerKeyboardAction(new AbstractAction() {
       public void actionPerformed(ActionEvent e) {
-        runSelection(DataManager.getInstance().getDataContext(myTree));
+        runSelection(DataManager.getInstance().getDataContext(myTree), true);
       }
     }, KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), WHEN_FOCUSED);
     myTree.setLineStyleAngled();
@@ -282,8 +282,8 @@ public class AntExplorer extends SimpleToolWindowPanel implements DataProvider, 
     }
   }
 
-  private void runSelection(final DataContext dataContext) {
-    if (!canRunSelection()) {
+  private void runSelection(final DataContext dataContext, boolean runBuildFileNode) {
+    if (!canRunSelection(runBuildFileNode)) {
       return;
     }
     final AntBuildFileBase buildFile = getCurrentBuildFile();
@@ -294,7 +294,7 @@ public class AntExplorer extends SimpleToolWindowPanel implements DataProvider, 
     }
   }
 
-  private boolean canRunSelection() {
+  private boolean canRunSelection(boolean runBuildFileNode) {
     if (myTree == null) {
       return false;
     }
@@ -313,7 +313,7 @@ public class AntExplorer extends SimpleToolWindowPanel implements DataProvider, 
       if (userObject instanceof AntTargetNodeDescriptor) {
         buildFileNodeDescriptor = (AntBuildFileNodeDescriptor)((DefaultMutableTreeNode)node.getParent()).getUserObject();
       }
-      else if (userObject instanceof AntBuildFileNodeDescriptor){
+      else if (userObject instanceof AntBuildFileNodeDescriptor && runBuildFileNode){
         buildFileNodeDescriptor = (AntBuildFileNodeDescriptor)userObject;
       }
       else {
@@ -559,7 +559,7 @@ public class AntExplorer extends SimpleToolWindowPanel implements DataProvider, 
     }
 
     public void actionPerformed(AnActionEvent e) {
-      runSelection(e.getDataContext());
+      runSelection(e.getDataContext(), true);
     }
 
     public void update(AnActionEvent event) {
@@ -584,7 +584,7 @@ public class AntExplorer extends SimpleToolWindowPanel implements DataProvider, 
         }
       }
 
-      presentation.setEnabled(canRunSelection());
+      presentation.setEnabled(canRunSelection(true));
     }
   }
   private final class MakeAntRunConfigurationAction extends AnAction {
@@ -597,7 +597,7 @@ public class AntExplorer extends SimpleToolWindowPanel implements DataProvider, 
       super.update(e);
 
       final Presentation presentation = e.getPresentation();
-      presentation.setEnabled(myTree.getSelectionCount() == 1 && canRunSelection());
+      presentation.setEnabled(myTree.getSelectionCount() == 1 && canRunSelection(true));
     }
 
     @Override
@@ -736,7 +736,7 @@ public class AntExplorer extends SimpleToolWindowPanel implements DataProvider, 
 
     public void update(AnActionEvent e) {
       final TreePath[] paths = myTree.getSelectionPaths();
-      e.getPresentation().setEnabled(paths != null && paths.length > 1 && canRunSelection());
+      e.getPresentation().setEnabled(paths != null && paths.length > 1 && canRunSelection(true));
     }
   }
 
