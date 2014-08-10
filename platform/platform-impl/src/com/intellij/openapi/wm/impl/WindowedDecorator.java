@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2012 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,25 +15,19 @@
  */
 package com.intellij.openapi.wm.impl;
 
-import com.intellij.openapi.Disposable;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.FrameWrapper;
-import com.intellij.openapi.wm.WindowManager;
-
-import javax.swing.*;
-import java.awt.*;
-import java.awt.event.WindowEvent;
-import java.awt.event.WindowFocusListener;
 
 public final class WindowedDecorator extends FrameWrapper {
   private static final Logger LOG = Logger.getInstance("#com.intellij.openapi.wm.impl.WindowedDecorator");
-  protected final Project myProject;
+
+  private final Project myProject;
 
   WindowedDecorator(final IdeFrameImpl owner, final WindowInfoImpl info, final InternalDecorator internalDecorator) {
-    super(owner.getProject(), "dimensionServiceKey:" + internalDecorator.getToolWindow().getId());
+    super(owner.getProject(), "WindowedDecorator-" + internalDecorator.getToolWindow().getId());
     myProject = owner.getProject();
-    setTitle(info.getId());
+    setTitle(myProject.getName() + " - " + info.getId());
   }
 
   public Project getProject() {
