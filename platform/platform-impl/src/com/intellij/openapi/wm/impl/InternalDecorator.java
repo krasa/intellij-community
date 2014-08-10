@@ -67,6 +67,7 @@ public final class InternalDecorator extends JPanel implements Queryable, TypeSa
   private final TogglePinnedModeAction myToggleAutoHideModeAction;
   private final ToggleDockModeAction myToggleDockModeAction;
   private final ToggleFloatingModeAction myToggleFloatingModeAction;
+  private final ToggleWindowedModeAction myToggleWindowedModeAction;
   private final ToggleSideModeAction myToggleSideModeAction;
   private final ToggleContentUiTypeAction myToggleContentUiTypeAction;
 
@@ -79,6 +80,7 @@ public final class InternalDecorator extends JPanel implements Queryable, TypeSa
   @NonNls public static final String TOGGLE_PINNED_MODE_ACTION_ID = "TogglePinnedMode";
   @NonNls public static final String TOGGLE_DOCK_MODE_ACTION_ID = "ToggleDockMode";
   @NonNls public static final String TOGGLE_FLOATING_MODE_ACTION_ID = "ToggleFloatingMode";
+  @NonNls public static final String TOGGLE_WINDOWED_MODE_ACTION_ID = "ToggleWindowedMode";
   @NonNls public static final String TOGGLE_SIDE_MODE_ACTION_ID = "ToggleSideMode";
   @NonNls private static final String TOGGLE_CONTENT_UI_TYPE_ACTION_ID = "ToggleContentUiTypeMode";
 
@@ -92,6 +94,7 @@ public final class InternalDecorator extends JPanel implements Queryable, TypeSa
     myDivider = new MyDivider();
 
     myToggleFloatingModeAction = new ToggleFloatingModeAction();
+    myToggleWindowedModeAction = new ToggleWindowedModeAction();
     myToggleSideModeAction = new ToggleSideModeAction();
     myToggleDockModeAction = new ToggleDockModeAction();
     myToggleAutoHideModeAction = new TogglePinnedModeAction();
@@ -415,15 +418,23 @@ public final class InternalDecorator extends JPanel implements Queryable, TypeSa
       group.add(myToggleAutoHideModeAction);
       group.add(myToggleDockModeAction);
       group.add(myToggleFloatingModeAction);
+      group.add(myToggleWindowedModeAction);
       group.add(myToggleSideModeAction);
     }
     else if (myInfo.isFloating()) {
       group.add(myToggleAutoHideModeAction);
       group.add(myToggleFloatingModeAction);
+      group.add(myToggleWindowedModeAction);
+    }
+    else if (myInfo.isWindowed()) {
+      group.add(myToggleAutoHideModeAction);
+      group.add(myToggleFloatingModeAction);
+      group.add(myToggleWindowedModeAction);
     }
     else if (myInfo.isSliding()) {
       group.add(myToggleDockModeAction);
       group.add(myToggleFloatingModeAction);
+      group.add(myToggleWindowedModeAction);
       group.add(myToggleSideModeAction);
     }
     return group;
@@ -544,6 +555,27 @@ public final class InternalDecorator extends JPanel implements Queryable, TypeSa
       }
       else {
         fireTypeChanged(ToolWindowType.FLOATING);
+      }
+    }
+  }
+
+  private final class ToggleWindowedModeAction extends ToggleAction implements DumbAware {
+    public ToggleWindowedModeAction() {
+      copyFrom(ActionManager.getInstance().getAction(TOGGLE_WINDOWED_MODE_ACTION_ID));
+    }
+
+    @Override
+    public final boolean isSelected(final AnActionEvent event) {
+      return myInfo.isWindowed();
+    }
+
+    @Override
+    public final void setSelected(final AnActionEvent event, final boolean flag) {
+      if (myInfo.isWindowed()) {
+        fireTypeChanged(myInfo.getInternalType());
+      }
+      else {
+        fireTypeChanged(ToolWindowType.WINDOWED);
       }
     }
   }

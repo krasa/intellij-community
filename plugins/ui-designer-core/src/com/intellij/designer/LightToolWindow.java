@@ -66,6 +66,7 @@ public class LightToolWindow extends JPanel {
   private final TogglePinnedModeAction myToggleAutoHideModeAction = new TogglePinnedModeAction();
   private final ToggleDockModeAction myToggleDockModeAction = new ToggleDockModeAction();
   private final ToggleFloatingModeAction myToggleFloatingModeAction = new ToggleFloatingModeAction();
+  private final ToggleWindowedModeAction myToggleWindowedModeAction = new ToggleWindowedModeAction();
   private final ToggleSideModeAction myToggleSideModeAction = new ToggleSideModeAction();
 
   private final ComponentListener myWidthListener = new ComponentAdapter() {
@@ -328,15 +329,23 @@ public class LightToolWindow extends JPanel {
       group.add(myToggleAutoHideModeAction);
       group.add(myToggleDockModeAction);
       group.add(myToggleFloatingModeAction);
+      group.add(myToggleWindowedModeAction);
       group.add(myToggleSideModeAction);
     }
     else if (type == ToolWindowType.FLOATING) {
       group.add(myToggleAutoHideModeAction);
       group.add(myToggleFloatingModeAction);
+      group.add(myToggleWindowedModeAction);
+    }
+    else if (type == ToolWindowType.WINDOWED) {
+      group.add(myToggleAutoHideModeAction);
+      group.add(myToggleFloatingModeAction);
+      group.add(myToggleWindowedModeAction);
     }
     else if (type == ToolWindowType.SLIDING) {
       group.add(myToggleDockModeAction);
       group.add(myToggleFloatingModeAction);
+      group.add(myToggleWindowedModeAction);
     }
 
     return group;
@@ -451,6 +460,29 @@ public class LightToolWindow extends JPanel {
       }
       else {
         window.setType(ToolWindowType.FLOATING, null);
+      }
+      myManager.setEditorMode(null);
+    }
+  }
+  private class ToggleWindowedModeAction extends ToggleAction {
+    public ToggleWindowedModeAction() {
+      copyFrom(ActionManager.getInstance().getAction(InternalDecorator.TOGGLE_WINDOWED_MODE_ACTION_ID));
+    }
+
+    @Override
+    public boolean isSelected(AnActionEvent e) {
+      return myManager.getToolWindow().getType() == ToolWindowType.WINDOWED;
+    }
+
+    @Override
+    public void setSelected(AnActionEvent e, boolean state) {
+      ToolWindow window = myManager.getToolWindow();
+      ToolWindowType type = window.getType();
+      if (type == ToolWindowType.WINDOWED) {
+        window.setType(((ToolWindowEx)window).getInternalType(), null);
+      }
+      else {
+        window.setType(ToolWindowType.WINDOWED, null);
       }
       myManager.setEditorMode(null);
     }
