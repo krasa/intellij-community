@@ -827,7 +827,7 @@ public final class ToolWindowManagerImpl extends ToolWindowManagerEx implements 
         appendRemoveFloatingDecoratorCmd(info, commandsList);
       }
       else if (info.isWindowed()) {
-         //keep it
+        appendRemoveWindowedDecoratorCmd(info, commandsList);
       }
       else { // docked and sliding windows
         appendRemoveDecoratorCmd(id, false, commandsList);
@@ -2115,36 +2115,28 @@ public final class ToolWindowManagerImpl extends ToolWindowManagerEx implements 
    * This command creates and shows <code>WindowedDecorator</code>.
    */
   private final class AddWindowedDecoratorCmd extends FinalizableCommand {
-    private WindowedDecorator myWindowedDecorator;
-    private boolean myShow;
+    private final WindowedDecorator myWindowedDecorator;
 
     /**
      * Creates floating decorator for specified floating decorator.
      */
     private AddWindowedDecoratorCmd(final InternalDecorator decorator, final WindowInfoImpl info) {
       super(myWindowManager.getCommandProcessor());
-      myWindowedDecorator = myId2WindowedDecorator.get(info.getId());
-      if (myWindowedDecorator == null) {
-        myShow = true;
-        myWindowedDecorator = new WindowedDecorator(myFrame, info.copy(), decorator);
-        myWindowedDecorator.setComponent(decorator);
-        myId2WindowedDecorator.put(info.getId(), myWindowedDecorator);
-
-        myWindowedDecorator.addDisposable(new Disposable() {
-          @Override
-          public void dispose() {
-            myId2WindowedDecorator.remove(info.getId());
-          }
-        });
-      }
+      myWindowedDecorator = new WindowedDecorator(myFrame, info.copy(), decorator);
+      myWindowedDecorator.setComponent(decorator);
+      myId2WindowedDecorator.put(info.getId(), myWindowedDecorator);
+      myWindowedDecorator.addDisposable(new Disposable() {
+        @Override
+        public void dispose() {
+          hideToolWindow(info.getId(), false);
+        }
+      });
     }
 
     @Override
     public void run() {
       try {
-        if (myShow) {
-          myWindowedDecorator.show();
-        }
+        myWindowedDecorator.show();
       }
       finally {
         finish();
