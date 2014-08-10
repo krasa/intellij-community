@@ -427,7 +427,6 @@ public final class InternalDecorator extends JPanel implements Queryable, TypeSa
       group.add(myToggleWindowedModeAction);
     }
     else if (myInfo.isWindowed()) {
-      group.add(myToggleAutoHideModeAction);
       group.add(myToggleFloatingModeAction);
       group.add(myToggleWindowedModeAction);
     }

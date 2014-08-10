@@ -719,7 +719,7 @@ public final class ToolWindowManagerImpl extends ToolWindowManagerEx implements 
   }
 
   private boolean isToHide(final WindowInfoImpl info) {
-    return (info.isAutoHide() || info.isSliding()) && !(info.isFloating() && hasModalChild(info));
+    return (info.isAutoHide() || info.isSliding()) && !(info.isFloating() && hasModalChild(info)) && !info.isWindowed();
   }
 
   /**
