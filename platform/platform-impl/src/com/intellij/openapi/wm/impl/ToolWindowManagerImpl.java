@@ -2128,7 +2128,9 @@ public final class ToolWindowManagerImpl extends ToolWindowManagerEx implements 
       myWindowedDecorator.addDisposable(new Disposable() {
         @Override
         public void dispose() {
-          hideToolWindow(info.getId(), false);
+          if (myId2WindowedDecorator.get(info.getId()) != null) {
+            hideToolWindow(info.getId(), false);
+          }
         }
       });
     }
