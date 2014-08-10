@@ -22,11 +22,11 @@ import com.intellij.openapi.wm.IdeFrame;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 
-public class WindowedToolWindowToFrontOnFocusGained extends WindowAdapter {
+public class WindowedToolWindowsToFrontOnFocusGained extends WindowAdapter {
 
   protected final Project project;
 
-  public WindowedToolWindowToFrontOnFocusGained(Project project) {
+  public WindowedToolWindowsToFrontOnFocusGained(Project project) {
     this.project = project;
   }
 

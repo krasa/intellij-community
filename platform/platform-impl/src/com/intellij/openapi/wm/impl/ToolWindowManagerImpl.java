@@ -95,7 +95,7 @@ public final class ToolWindowManagerImpl extends ToolWindowManagerEx implements 
   private final Map<String, InternalDecorator> myId2InternalDecorator;
   private final Map<String, FloatingDecorator> myId2FloatingDecorator;
   private final Map<String, WindowedDecorator> myId2WindowedDecorator;
-  private final WindowedToolWindowToFrontOnFocusGained myWindowedToolWindowToFrontOnFocusGained;
+  private final WindowedToolWindowsToFrontOnFocusGained myWindowedToolWindowsToFrontOnFocusGained;
   private final Map<String, StripeButton> myId2StripeButton;
   private final Map<String, FocusWatcher> myId2FocusWatcher;
   private final Set<String> myDumbAwareIds = Collections.synchronizedSet(ContainerUtil.<String>newTroveSet());
@@ -238,7 +238,7 @@ public final class ToolWindowManagerImpl extends ToolWindowManagerEx implements 
       }
     };
     KeyboardFocusManager.getCurrentKeyboardFocusManager().addPropertyChangeListener(myFocusListener);
-    myWindowedToolWindowToFrontOnFocusGained = new WindowedToolWindowToFrontOnFocusGained(myProject);
+    myWindowedToolWindowsToFrontOnFocusGained = new WindowedToolWindowsToFrontOnFocusGained(myProject);
   }
 
 
@@ -461,7 +461,7 @@ public final class ToolWindowManagerImpl extends ToolWindowManagerEx implements 
       }
     }, myProject);
     JFrame frame = WindowManager.getInstance().getFrame(myProject);
-    frame.addWindowFocusListener(myWindowedToolWindowToFrontOnFocusGained);
+    frame.addWindowFocusListener(myWindowedToolWindowsToFrontOnFocusGained);
   }
 
   private void disableStripeButtons() {
@@ -553,7 +553,7 @@ public final class ToolWindowManagerImpl extends ToolWindowManagerEx implements 
     final String[] ids = getToolWindowIds();
     JFrame frame = WindowManager.getInstance().getFrame(myProject);
     if (frame != null) {
-      frame.removeWindowFocusListener(myWindowedToolWindowToFrontOnFocusGained);
+      frame.removeWindowFocusListener(myWindowedToolWindowsToFrontOnFocusGained);
     }
     // Remove ToolWindowsPane
     if (myFrame != null) {
