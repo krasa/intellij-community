@@ -95,7 +95,6 @@ public final class ToolWindowManagerImpl extends ToolWindowManagerEx implements 
   private final Map<String, InternalDecorator> myId2InternalDecorator;
   private final Map<String, FloatingDecorator> myId2FloatingDecorator;
   private final Map<String, WindowedDecorator> myId2WindowedDecorator;
-  private final WindowedToolWindowsToFrontOnFocusGained myWindowedToolWindowsToFrontOnFocusGained;
   private final Map<String, StripeButton> myId2StripeButton;
   private final Map<String, FocusWatcher> myId2FocusWatcher;
   private final Set<String> myDumbAwareIds = Collections.synchronizedSet(ContainerUtil.<String>newTroveSet());
@@ -238,7 +237,6 @@ public final class ToolWindowManagerImpl extends ToolWindowManagerEx implements 
       }
     };
     KeyboardFocusManager.getCurrentKeyboardFocusManager().addPropertyChangeListener(myFocusListener);
-    myWindowedToolWindowsToFrontOnFocusGained = new WindowedToolWindowsToFrontOnFocusGained(myProject);
   }
 
 
@@ -460,8 +458,6 @@ public final class ToolWindowManagerImpl extends ToolWindowManagerEx implements 
         return false;
       }
     }, myProject);
-    JFrame frame = WindowManager.getInstance().getFrame(myProject);
-    frame.addWindowFocusListener(myWindowedToolWindowsToFrontOnFocusGained);
   }
 
   private void disableStripeButtons() {
@@ -551,10 +547,7 @@ public final class ToolWindowManagerImpl extends ToolWindowManagerEx implements 
   public void projectClosed() {
     final ArrayList<FinalizableCommand> commandsList = new ArrayList<FinalizableCommand>();
     final String[] ids = getToolWindowIds();
-    JFrame frame = WindowManager.getInstance().getFrame(myProject);
-    if (frame != null) {
-      frame.removeWindowFocusListener(myWindowedToolWindowsToFrontOnFocusGained);
-    }
+
     // Remove ToolWindowsPane
     if (myFrame != null) {
       ((IdeRootPane)myFrame.getRootPane()).setToolWindowsPane(null);

@@ -24,6 +24,7 @@ import com.intellij.openapi.wm.WindowManager;
 import com.intellij.openapi.wm.ex.ToolWindowManagerEx;
 import com.intellij.openapi.wm.impl.ToolWindowManagerImpl;
 import com.intellij.openapi.wm.impl.WindowedDecorator;
+import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
 import java.util.Collection;
@@ -36,10 +37,12 @@ public class WindowedToolWindowsToFrontAction extends DumbAwareAction {
   @Override
   public void actionPerformed(AnActionEvent e) {
     Project project = e.getProject();
-    windowedToolWindowsToFront(project);
+    if (project != null) {
+      windowedToolWindowsToFront(project);
+    }
   }
 
-  public static void windowedToolWindowsToFront(Project project) {
+  private static void windowedToolWindowsToFront(@NotNull Project project) {
     ToolWindowManagerImpl instance = (ToolWindowManagerImpl)ToolWindowManagerEx.getInstance(project);
     Collection<WindowedDecorator> windowedToolWindows = instance.getWindowedToolWindows();
     for (WindowedDecorator windowedToolWindow : windowedToolWindows) {
