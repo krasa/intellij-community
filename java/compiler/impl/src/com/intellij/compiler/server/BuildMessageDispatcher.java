@@ -16,6 +16,7 @@
 package com.intellij.compiler.server;
 
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.project.Project;
 import com.intellij.util.containers.ConcurrentHashSet;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
@@ -42,14 +43,22 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
   private static final AttributeKey<SessionData> SESSION_DATA = AttributeKey.valueOf("BuildMessageDispatcher.sessionData");
 
   private final Map<UUID, SessionData> myMessageHandlers = new ConcurrentHashMap<UUID, SessionData>(16, 0.75f, 1);
+  private final Map<String, Channel> myProjectPathToChannel = new ConcurrentHashMap<String, Channel>(16, 0.75f, 1);
   private final Set<UUID> myCanceledSessions = new ConcurrentHashSet<UUID>();
 
-  public void registerBuildMessageHandler(UUID sessionId,
+  public void registerBuildMessageHandler(Project project, UUID sessionId,
                                           BuilderMessageHandler handler,
                                           CmdlineRemoteProto.Message.ControllerMessage params) {
-    myMessageHandlers.put(sessionId, new SessionData(sessionId, handler, params));
+    SessionData value = new SessionData(sessionId, handler, params, project.getProjectFilePath());
+    myMessageHandlers.put(sessionId, value);
+    Channel channel = myProjectPathToChannel.get(project.getProjectFilePath());
+    if (channel != null) {
+      LOG.info("Reusing channel");
+      value.channel = channel;
+      channel.attr(SESSION_DATA).set(value);
+    } 
   }
-
+  
   @Nullable
   public BuilderMessageHandler unregisterBuildMessageHandler(UUID sessionId) {
     myCanceledSessions.remove(sessionId);
@@ -78,6 +87,14 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
     return data != null? data.channel : null;
   }
 
+  public void remove(Project project) {
+    myProjectPathToChannel.remove(project.getProjectFilePath());
+  }
+
+  @Nullable
+  public Channel getAssociatedChannel(Project project) {
+    return myProjectPathToChannel.get(project.getProjectFilePath());
+  }
 
   @Override
   protected void messageReceived(ChannelHandlerContext context, CmdlineRemoteProto.Message message) throws Exception {
@@ -93,6 +110,7 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
       if (sessionData != null) {
         sessionData.channel = context.channel();
         context.attr(SESSION_DATA).set(sessionData);
+        myProjectPathToChannel.put(sessionData.myProjectFilePath, context.channel());
       }
       if (myCanceledSessions.contains(sessionId)) {
         context.channel().writeAndFlush(CmdlineProtoUtil.toMessage(sessionId, CmdlineProtoUtil.createCancelCommand()));
@@ -167,13 +185,18 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
   private static final class SessionData {
     final UUID sessionId;
     final BuilderMessageHandler handler;
+    final String myProjectFilePath;
     volatile CmdlineRemoteProto.Message.ControllerMessage params;
     volatile Channel channel;
 
-    private SessionData(UUID sessionId, BuilderMessageHandler handler, CmdlineRemoteProto.Message.ControllerMessage params) {
+    private SessionData(UUID sessionId,
+                        BuilderMessageHandler handler,
+                        CmdlineRemoteProto.Message.ControllerMessage params,
+                        String projectFilePath) {
       this.sessionId = sessionId;
       this.handler = handler;
       this.params = params;
+      myProjectFilePath = projectFilePath;
     }
   }
 }

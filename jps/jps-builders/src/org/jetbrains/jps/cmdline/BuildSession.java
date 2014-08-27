@@ -74,6 +74,7 @@ final class BuildSession implements Runnable, CanceledStatus {
   private final boolean myForceModelLoading;
   private final BuildType myBuildType;
   private final List<TargetTypeBuildScope> myScopes;
+  private volatile boolean myFinished;
 
   BuildSession(UUID sessionId,
                Channel channel,
@@ -530,14 +531,15 @@ final class BuildSession implements Runnable, CanceledStatus {
         lastMessage = CmdlineProtoUtil.toMessage(mySessionId, CmdlineProtoUtil.createFailure(messageText.toString(), cause));
       }
       else {
-        CmdlineRemoteProto.Message.BuilderMessage.BuildEvent.Status status = CmdlineRemoteProto.Message.BuilderMessage.BuildEvent.Status.SUCCESS;
+        CmdlineRemoteProto.Message.BuilderMessage.BuildEvent.Status status =
+          CmdlineRemoteProto.Message.BuilderMessage.BuildEvent.Status.SUCCESS;
         if (myCanceled) {
           status = CmdlineRemoteProto.Message.BuilderMessage.BuildEvent.Status.CANCELED;
         }
         else if (hadBuildErrors) {
           status = CmdlineRemoteProto.Message.BuilderMessage.BuildEvent.Status.ERRORS;
         }
-        else if (!doneSomething){
+        else if (!doneSomething) {
           status = CmdlineRemoteProto.Message.BuilderMessage.BuildEvent.Status.UP_TO_DATE;
         }
         lastMessage = CmdlineProtoUtil.toMessage(mySessionId, CmdlineProtoUtil.createBuildCompletedEvent("build completed", status));
@@ -553,11 +555,16 @@ final class BuildSession implements Runnable, CanceledStatus {
       catch (InterruptedException e) {
         LOG.info(e);
       }
+      myFinished = true;
     }
   }
 
   public void cancel() {
     myCanceled = true;
+  }
+
+  public boolean isFinished() {
+    return myFinished;
   }
 
   @Override

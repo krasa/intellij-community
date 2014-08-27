@@ -128,7 +128,7 @@ public class BuildMain {
   }
 
   private static class MyMessageHandler extends SimpleChannelInboundHandler<CmdlineRemoteProto.Message> {
-    private final UUID mySessionId;
+    private volatile UUID mySessionId;
     private volatile BuildSession mySession;
 
     private MyMessageHandler(UUID sessionId) {
@@ -145,8 +145,9 @@ public class BuildMain {
         switch (controllerMessage.getType()) {
 
           case BUILD_PARAMETERS: {
-            if (mySession == null) {
-              final CmdlineRemoteProto.Message.ControllerMessage.FSEvent delta = controllerMessage.hasFsEvent()? controllerMessage.getFsEvent() : null;
+            if (mySession == null || mySession.isFinished()) {
+              final CmdlineRemoteProto.Message.ControllerMessage.FSEvent delta =
+                controllerMessage.hasFsEvent() ? controllerMessage.getFsEvent() : null;
               final BuildSession session = new BuildSession(mySessionId, channel, controllerMessage.getParamsMessage(), delta);
               mySession = session;
               SharedThreadPool.getInstance().executeOnPooledThread(new Runnable() {
@@ -157,8 +158,8 @@ public class BuildMain {
                     session.run();
                   }
                   finally {
-                    channel.close();
-                    System.exit(0);
+                    //channel.close();
+                    //System.exit(0);
                   }
                 }
               });
@@ -177,6 +178,19 @@ public class BuildMain {
             return;
           }
 
+          case BUILD_REQUEST: {
+            if (mySession == null || mySession.isFinished()) {
+              CmdlineRemoteProto.Message.UUID id = message.getSessionId();
+              mySessionId = new UUID(id.getMostSigBits(), id.getLeastSigBits());
+              LOG.info("BUILD_REQUEST mySessionId=" + mySessionId);
+              channel.writeAndFlush(CmdlineProtoUtil.toMessage(mySessionId, CmdlineProtoUtil.createParamRequest()));
+            }
+            else {
+              LOG.info("Cannot request another build, because one is already running");
+            }
+            return;
+          }
+
           case CONSTANT_SEARCH_RESULT: {
             final BuildSession session = mySession;
             if (session != null) {
@@ -187,12 +201,13 @@ public class BuildMain {
 
           case CANCEL_BUILD_COMMAND: {
             final BuildSession session = mySession;
-            if (session != null) {
-              session.cancel();
-            }
-            else {
+            if (session == null || session.isFinished()) {
               LOG.info("Cannot cancel build: no build session is running");
               channel.close();
+              System.exit(0);
+            }
+            else {
+              session.cancel();
             }
             return;
           }

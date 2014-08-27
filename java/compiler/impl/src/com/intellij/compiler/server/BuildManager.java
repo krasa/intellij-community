@@ -83,6 +83,7 @@ import com.intellij.util.net.NetUtils;
 import gnu.trove.THashSet;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.handler.codec.protobuf.ProtobufDecoder;
@@ -104,7 +105,10 @@ import javax.tools.*;
 import java.awt.*;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.nio.channels.IllegalSelectorException;
 import java.nio.charset.Charset;
 import java.util.*;
 import java.util.List;
@@ -153,6 +157,8 @@ public class BuildManager implements ApplicationComponent{
   private final BuildProcessClasspathManager myClasspathManager = new BuildProcessClasspathManager();
   private final SequentialTaskExecutor myRequestsProcessor = new SequentialTaskExecutor(PooledThreadExecutor.INSTANCE);
   private final Map<String, ProjectData> myProjectDataMap = Collections.synchronizedMap(new HashMap<String, ProjectData>());
+  //TODO clean it on project close and maybe think up some smart strategy
+  private final Map<String, CompileProcessHolder> processPool = new HashMap<String, CompileProcessHolder>();
 
   private final BuildManagerPeriodicTask myAutoMakeTask = new BuildManagerPeriodicTask() {
     @Override
@@ -646,7 +652,7 @@ public class BuildManager implements ApplicationComponent{
                                                          userData, globals, currentFSChanges);
           }
 
-          myMessageDispatcher.registerBuildMessageHandler(sessionId, new MessageHandlerWrapper(handler) {
+          myMessageDispatcher.registerBuildMessageHandler(project, sessionId, new MessageHandlerWrapper(handler) {
             @Override
             public void sessionTerminated(UUID sessionId) {
               try {
@@ -656,10 +662,39 @@ public class BuildManager implements ApplicationComponent{
                 future.setDone();
               }
             }
+
+            @Override
+            public void handleBuildMessage(Channel channel, UUID sessionId, CmdlineRemoteProto.Message.BuilderMessage msg) {
+              try {
+                super.handleBuildMessage(channel, sessionId, msg);
+              }
+              finally {
+                switch (msg.getType()) {
+                  case BUILD_EVENT:
+                    final CmdlineRemoteProto.Message.BuilderMessage.BuildEvent event = msg.getBuildEvent();
+                    switch (event.getEventType()) {
+                      case BUILD_COMPLETED: {
+                        future.setDone();
+                      }
+                    }
+                }
+              }
+            }
+
+            @Override
+            public void handleFailure(UUID sessionId, CmdlineRemoteProto.Message.Failure failure) {
+              try {
+                super.handleFailure(sessionId, failure);
+              }
+              finally {
+                future.setDone();
+              }
+            }
+
           }, params);
 
           try {
-            projectTaskQueue.submit(new Runnable() {
+              projectTaskQueue.submit(new Runnable() {
               @Override
               public void run() {
                 Throwable execFailure = null;
@@ -668,42 +703,13 @@ public class BuildManager implements ApplicationComponent{
                     return;
                   }
                   myBuildsInProgress.put(projectPath, future);
-                  final OSProcessHandler processHandler = launchBuildProcess(project, myListenPort, sessionId);
-                  final StringBuilder stdErrOutput = new StringBuilder();
-                  processHandler.addProcessListener(new ProcessAdapter() {
-                    @Override
-                    public void onTextAvailable(ProcessEvent event, Key outputType) {
-                      // re-translate builder's output to idea.log
-                      final String text = event.getText();
-                      if (!StringUtil.isEmptyOrSpaces(text)) {
-                        LOG.info("BUILDER_PROCESS [" + outputType.toString() + "]: " + text.trim());
-                        if (stdErrOutput.length() < 1024 && ProcessOutputTypes.STDERR.equals(outputType)) {
-                          stdErrOutput.append(text);
-                        }
-                      }
-                    }
-                  });
-                  processHandler.startNotify();
-                  final boolean terminated = processHandler.waitFor();
-                  if (terminated) {
-                    final int exitValue = processHandler.getProcess().exitValue();
-                    if (exitValue != 0) {
-                      final StringBuilder msg = new StringBuilder();
-                      msg.append("Abnormal build process termination: ");
-                      if (stdErrOutput.length() > 0) {
-                        msg.append("\n").append(stdErrOutput);
-                      }
-                      else {
-                        msg.append("unknown error");
-                      }
-                      handler.handleFailure(sessionId, CmdlineProtoUtil.createFailure(msg.toString(), null));
-                    }
-                  }
-                  else {
-                    handler.handleFailure(sessionId, CmdlineProtoUtil.createFailure("Disconnected from build process", null));
-                  }
+                  
+                  notifyCompileProcessFromPoolOrCreateNew(project, sessionId);
+              
+                  future.get();
                 }
                 catch (Throwable e) {
+                  handler.handleFailure(sessionId, CmdlineProtoUtil.createFailure(e.toString(), e)); //todo  not tested
                   execFailure = e;
                 }
                 finally {
@@ -742,6 +748,42 @@ public class BuildManager implements ApplicationComponent{
 
     return null;
   }
+
+  public CompileProcessHolder notifyCompileProcessFromPoolOrCreateNew(Project project, UUID sessionId) throws ExecutionException {
+    CompileProcessHolder process = getRunningProcess(project);
+    if (process == null) {
+      LOG.info("Launching new build process");
+      process = new CompileProcessHolder(project, sessionId).createNewProcess();
+      OSProcessHandler processHandler = process.getProcessHandler();
+      processHandler.startNotify();
+    }
+    else {
+      LOG.info("Reusing build process");
+      Channel associatedChannel = myMessageDispatcher.getAssociatedChannel(project);
+      requestNewBuild(project, sessionId, process, associatedChannel);
+    } 
+    return process;
+  }
+
+  private void requestNewBuild(Project project, UUID sessionId, CompileProcessHolder process, @Nullable Channel associatedChannel) {
+    try {
+      if (project == null) {
+        throw new IllegalStateException("associatedChannel is null");
+      }
+      CmdlineRemoteProto.Message.ControllerMessage message =
+        CmdlineRemoteProto.Message.ControllerMessage.newBuilder().setType(CmdlineRemoteProto.Message.ControllerMessage.Type.BUILD_REQUEST)
+          .build();
+      ChannelFuture channelFuture = associatedChannel.writeAndFlush(CmdlineProtoUtil.toMessage(sessionId, message));
+      channelFuture.get(1, TimeUnit.SECONDS);
+    }
+    catch (Throwable e) {
+      process.getProcessHandler().destroyProcess(); //todo not tested
+      processPool.remove(project.getProjectFilePath());
+      myMessageDispatcher.remove(project);
+      throw new RuntimeException(e);
+    }
+  }
+
 
   @Override
   public void initComponent() {
@@ -1337,5 +1379,52 @@ public class BuildManager implements ApplicationComponent{
       return "/";
     }
   }
-  
+
+
+  @Nullable
+  private CompileProcessHolder getRunningProcess(Project project) {
+    CompileProcessHolder compileProcessHolder = processPool.get(project.getProjectFilePath());
+    if (compileProcessHolder != null) {
+      if (compileProcessHolder.getProcessHandler().isProcessTerminated() ||
+          compileProcessHolder.getProcessHandler().isProcessTerminating()) {
+        LOG.info("process died, removing from pool, project={}" + project.getName());
+        processPool.remove(project.getProjectFilePath());
+        return null;
+      }
+
+    }
+    return compileProcessHolder;
+  }
+
+  private class CompileProcessHolder {
+    private Project myProject;
+    private UUID mySessionId;
+    private OSProcessHandler myProcessHandler;
+
+    public CompileProcessHolder(Project project, UUID sessionId) {
+      myProject = project;
+      mySessionId = sessionId;
+    }
+
+    public OSProcessHandler getProcessHandler() {
+      return myProcessHandler;
+    }
+
+    public CompileProcessHolder createNewProcess() throws ExecutionException {
+      myProcessHandler = launchBuildProcess(myProject, myListenPort, mySessionId);
+      
+      myProcessHandler.addProcessListener(new ProcessAdapter() {
+        @Override
+        public void onTextAvailable(ProcessEvent event, Key outputType) {
+          // re-translate builder's output to idea.log
+          final String text = event.getText();
+          if (!StringUtil.isEmptyOrSpaces(text)) {
+            LOG.info("BUILDER_PROCESS [" + outputType.toString() + "]: " + text.trim());
+          }
+        }
+      });
+      processPool.put(myProject.getProjectFilePath(), this);
+      return this;
+    }
+  }
 }
