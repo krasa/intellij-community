@@ -13,37 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.intellij.dvcs.push;
+package com.siyeh.ig.junit;
 
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
+import com.siyeh.ig.InspectionGadgetsFix;
+import com.siyeh.ig.fixes.RenameFix;
 
 /**
- * For a single repository, specifies what is pushed and where.
+ * @author Bas Leijdekkers
  */
-public class PushSpec<S extends PushSource, T extends PushTarget> {
-
-  @NotNull private S mySource;
-  @Nullable private T myTarget;
-
-  public PushSpec(@NotNull S source, @Nullable T target) {
-    mySource = source;
-    myTarget = target;
-  }
-
-  @NotNull
-  public S getSource() {
-    return mySource;
-  }
-
-  @Nullable
-  public T getTarget() {
-    return myTarget;
-  }
+public class JUnit3MethodNamingConventionInspection extends JUnit3MethodNamingConventionInspectionBase {
 
   @Override
-  public String toString() {
-    return mySource + "->" + myTarget;
+  protected InspectionGadgetsFix buildFix(Object... infos) {
+    return new RenameFix();
   }
-
 }

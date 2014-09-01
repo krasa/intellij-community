@@ -224,6 +224,18 @@ public class GraphInferenceHighlightingTest extends LightDaemonAnalyzerTestCase 
     doTest();
   }
 
+  public void testSameMethodNestedChainedCallsNearFunctionInterfaces() throws Exception {
+    doTest();
+  }
+
+  public void testInfiniteTypes() throws Exception {
+    doTest();
+  }
+
+  public void testIDEA126163() throws Exception {
+    doTest();
+  }
+
   private void doTest() throws Exception {
     doTest(false);
   }

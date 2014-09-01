@@ -36,6 +36,7 @@ import org.jetbrains.jps.api.CmdlineProtoUtil;
 import org.jetbrains.jps.api.CmdlineRemoteProto;
 import org.jetbrains.jps.api.GlobalOptions;
 import org.jetbrains.jps.incremental.Utils;
+import org.jetbrains.jps.javac.JavacMain;
 import org.jetbrains.jps.service.SharedThreadPool;
 
 import java.io.*;
@@ -158,6 +159,8 @@ public class BuildMain {
                     session.run();
                   }
                   finally {
+                    JavacMain.clearCompilerZipFileCache();
+                    mySession=null;
                     //channel.close();
                     //System.exit(0);
                   }

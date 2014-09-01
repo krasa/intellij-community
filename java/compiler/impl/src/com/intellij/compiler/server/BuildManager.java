@@ -105,10 +105,7 @@ import javax.tools.*;
 import java.awt.*;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.InetSocketAddress;
-import java.nio.channels.IllegalSelectorException;
 import java.nio.charset.Charset;
 import java.util.*;
 import java.util.List;
@@ -571,6 +568,7 @@ public class BuildManager implements ApplicationComponent{
         }
         finally {
           try {
+            //todo AssertionError: Already disposed
             ApplicationManager.getApplication().getMessageBus().syncPublisher(BuildManagerListener.TOPIC).buildFinished(project, sessionId, isAutomake);
           }
           catch (Throwable e) {
@@ -652,46 +650,7 @@ public class BuildManager implements ApplicationComponent{
                                                          userData, globals, currentFSChanges);
           }
 
-          myMessageDispatcher.registerBuildMessageHandler(project, sessionId, new MessageHandlerWrapper(handler) {
-            @Override
-            public void sessionTerminated(UUID sessionId) {
-              try {
-                super.sessionTerminated(sessionId);
-              }
-              finally {
-                future.setDone();
-              }
-            }
-
-            @Override
-            public void handleBuildMessage(Channel channel, UUID sessionId, CmdlineRemoteProto.Message.BuilderMessage msg) {
-              try {
-                super.handleBuildMessage(channel, sessionId, msg);
-              }
-              finally {
-                switch (msg.getType()) {
-                  case BUILD_EVENT:
-                    final CmdlineRemoteProto.Message.BuilderMessage.BuildEvent event = msg.getBuildEvent();
-                    switch (event.getEventType()) {
-                      case BUILD_COMPLETED: {
-                        future.setDone();
-                      }
-                    }
-                }
-              }
-            }
-
-            @Override
-            public void handleFailure(UUID sessionId, CmdlineRemoteProto.Message.Failure failure) {
-              try {
-                super.handleFailure(sessionId, failure);
-              }
-              finally {
-                future.setDone();
-              }
-            }
-
-          }, params);
+          myMessageDispatcher.registerBuildMessageHandler(project, sessionId, new BuildDoneMonitorWrapper(handler, future), params);
 
           try {
               projectTaskQueue.submit(new Runnable() {
@@ -1133,6 +1092,53 @@ public class BuildManager implements ApplicationComponent{
       }
       else {
         schedule();
+      }
+    }
+  }
+
+  private static class BuildDoneMonitorWrapper extends MessageHandlerWrapper {
+    private final RequestFuture<BuilderMessageHandler> myFuture;
+
+    public BuildDoneMonitorWrapper(BuilderMessageHandler handler, RequestFuture<BuilderMessageHandler> future) {
+      super(handler);
+      myFuture = future;
+    }
+
+    @Override
+    public void sessionTerminated(UUID sessionId) {
+      try {
+        super.sessionTerminated(sessionId);
+      }
+      finally {
+        myFuture.setDone();
+      }
+    }
+
+    @Override
+    public void handleBuildMessage(Channel channel, UUID sessionId, CmdlineRemoteProto.Message.BuilderMessage msg) {
+      try {
+        super.handleBuildMessage(channel, sessionId, msg);
+      }
+      finally {
+        switch (msg.getType()) {
+          case BUILD_EVENT:
+            final CmdlineRemoteProto.Message.BuilderMessage.BuildEvent event = msg.getBuildEvent();
+            switch (event.getEventType()) {
+              case BUILD_COMPLETED: {
+                myFuture.setDone();
+              }
+            }
+        }
+      }
+    }
+
+    @Override
+    public void handleFailure(UUID sessionId, CmdlineRemoteProto.Message.Failure failure) {
+      try {
+        super.handleFailure(sessionId, failure);
+      }
+      finally {
+        myFuture.setDone();
       }
     }
   }
