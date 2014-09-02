@@ -15,6 +15,7 @@
  */
 package com.intellij.dvcs.push.ui;
 
+import com.intellij.dvcs.push.TargetEditor;
 import com.intellij.openapi.actionSystem.CommonShortcuts;
 import com.intellij.openapi.actionSystem.DataKey;
 import com.intellij.openapi.actionSystem.DataSink;
@@ -25,7 +26,10 @@ import com.intellij.openapi.vcs.VcsDataKeys;
 import com.intellij.openapi.vcs.changes.Change;
 import com.intellij.openapi.vcs.changes.committed.CommittedChangesTreeBrowser;
 import com.intellij.openapi.vcs.changes.ui.ChangesBrowser;
-import com.intellij.ui.*;
+import com.intellij.ui.CheckboxTree;
+import com.intellij.ui.CheckedTreeNode;
+import com.intellij.ui.ColoredTreeCellRenderer;
+import com.intellij.ui.ScrollPaneFactory;
 import com.intellij.ui.components.JBTextField;
 import com.intellij.util.ArrayUtil;
 import com.intellij.util.ui.tree.TreeUtil;
@@ -89,6 +93,17 @@ public class PushLog extends JPanel implements TypeSafeDataProvider {
         }
         return "";
       }
+
+      @Override
+      public boolean stopEditing() {
+        DefaultMutableTreeNode node = (DefaultMutableTreeNode)myTree.getLastSelectedPathComponent();
+        if (node instanceof EditableTreeNode) {
+          JComponent editedComponent = (JComponent)node.getUserObject();
+          InputVerifier verifier = editedComponent.getInputVerifier();
+          if (verifier != null && !verifier.verify(editedComponent)) return false;
+        }
+        return super.stopEditing();
+      }
     };
     myTree.setEditable(true);
     MyTreeCellEditor treeCellEditor = new MyTreeCellEditor(new JBTextField());
@@ -122,10 +137,13 @@ public class PushLog extends JPanel implements TypeSafeDataProvider {
         TreePath[] nodes = myTree.getSelectionPaths();
         if (nodes != null) {
           ArrayList<Change> changes = new ArrayList<Change>();
-          for (TreePath node : nodes) {
-            Object nodeInfo = ((DefaultMutableTreeNode)node.getLastPathComponent()).getUserObject();
-            if (nodeInfo instanceof VcsFullCommitDetails) {
-              changes.addAll(((VcsFullCommitDetails)nodeInfo).getChanges());
+          for (TreePath path : nodes) {
+            if (path.getLastPathComponent() instanceof VcsFullCommitDetailsNode) {
+              VcsFullCommitDetailsNode commitDetailsNode = (VcsFullCommitDetailsNode)path.getLastPathComponent();
+              changes.addAll(commitDetailsNode.getUserObject().getChanges());
+            }
+            else if (path.getLastPathComponent() instanceof RepositoryNode) {
+              changes.addAll(collectAllChanges((RepositoryNode)path.getLastPathComponent()));
             }
           }
           myChangesBrowser.getViewer().setEmptyText("No differences");
@@ -154,8 +172,27 @@ public class PushLog extends JPanel implements TypeSafeDataProvider {
     add(splitter);
   }
 
+  @NotNull
+  private static Collection<? extends Change> collectAllChanges(@NotNull RepositoryNode rootNode) {
+    ArrayList<Change> changes = new ArrayList<Change>();
+    if (rootNode.getChildCount() <= 0) return changes;
+    for (DefaultMutableTreeNode childNode = (DefaultMutableTreeNode)rootNode.getFirstChild();
+         childNode != null;
+         childNode = (DefaultMutableTreeNode)rootNode.getChildAfter(childNode)) {
+      if (childNode instanceof VcsFullCommitDetailsNode) {
+        changes.addAll(((VcsFullCommitDetailsNode)childNode).getUserObject().getChanges());
+      }
+    }
+    return changes;
+  }
+
   private void setDefaultEmptyText() {
     myChangesBrowser.getViewer().setEmptyText("No commits selected");
+  }
+
+  public void selectNode(@NotNull DefaultMutableTreeNode node) {
+    TreePath selectionPath = new TreePath(node.getPath());
+    myTree.addSelectionPath(selectionPath);
   }
 
   // Make changes available for diff action
@@ -188,6 +225,10 @@ public class PushLog extends JPanel implements TypeSafeDataProvider {
     setChildren(parentNode, Collections.singleton(loading));
   }
 
+  public JComponent getPreferredFocusedComponent() {
+    return myTree;
+  }
+
   private class MyTreeCellEditor extends DefaultCellEditor {
 
     public MyTreeCellEditor(JTextField field) {
@@ -213,7 +254,7 @@ public class PushLog extends JPanel implements TypeSafeDataProvider {
         Object tag = me.getClickCount() >= clickCountToStart
                      ? PushLogTreeUtil.getTagAtForRenderer(myTreeCellRenderer, me)
                      : null;
-        return tag instanceof EditorTextField;
+        return tag instanceof TargetEditor;
       }
       //if keyboard event - then anEvent will be null =( See BasicTreeUi
       TreePath treePath = myTree.getAnchorSelectionPath();
@@ -225,7 +266,7 @@ public class PushLog extends JPanel implements TypeSafeDataProvider {
 
     //Implement the one CellEditor method that AbstractCellEditor doesn't.
     public Object getCellEditorValue() {
-      return ((RepositoryWithBranchPanel)editorComponent).getRemoteTargetName();
+      return ((RepositoryWithBranchPanel)editorComponent).getEditableValue();
     }
   }
 
