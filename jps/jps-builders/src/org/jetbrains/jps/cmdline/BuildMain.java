@@ -161,6 +161,7 @@ public class BuildMain {
                   finally {
                     JavacMain.clearCompilerZipFileCache();
                     mySession=null;
+                    //todo clean kotlin classloader
                     //channel.close();
                     //System.exit(0);
                   }
