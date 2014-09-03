@@ -154,8 +154,6 @@ public class BuildManager implements ApplicationComponent{
   private final BuildProcessClasspathManager myClasspathManager = new BuildProcessClasspathManager();
   private final SequentialTaskExecutor myRequestsProcessor = new SequentialTaskExecutor(PooledThreadExecutor.INSTANCE);
   private final Map<String, ProjectData> myProjectDataMap = Collections.synchronizedMap(new HashMap<String, ProjectData>());
-  //TODO clean it on project close and maybe think up some smart strategy
-  private final Map<String, CompileProcessHolder> processPool = new HashMap<String, CompileProcessHolder>();
 
   private final BuildManagerPeriodicTask myAutoMakeTask = new BuildManagerPeriodicTask() {
     @Override
@@ -650,8 +648,8 @@ public class BuildManager implements ApplicationComponent{
                                                          userData, globals, currentFSChanges);
           }
 
-          myMessageDispatcher.registerBuildMessageHandler(project, sessionId, new BuildDoneMonitorWrapper(handler, future), params);
-
+          final BuildMessageDispatcher.SessionData sessionData =
+            myMessageDispatcher.registerBuildMessageHandler(project, sessionId, new BuildDoneMonitorWrapper(handler, future), params);
           try {
               projectTaskQueue.submit(new Runnable() {
               @Override
@@ -662,9 +660,15 @@ public class BuildManager implements ApplicationComponent{
                     return;
                   }
                   myBuildsInProgress.put(projectPath, future);
-                  
-                  notifyCompileProcessFromPoolOrCreateNew(project, sessionId);
-              
+
+                  if (sessionData.getState() == BuildMessageDispatcher.ProcessState.INIT) {
+                    startProcess(project, sessionId);
+                  }
+                  else {
+                    requestNewBuild(sessionData);
+                  }
+                  sessionData.setState(BuildMessageDispatcher.ProcessState.WORKING);
+
                   future.get();
                 }
                 catch (Throwable e) {
@@ -708,37 +712,24 @@ public class BuildManager implements ApplicationComponent{
     return null;
   }
 
-  public CompileProcessHolder notifyCompileProcessFromPoolOrCreateNew(Project project, UUID sessionId) throws ExecutionException {
-    CompileProcessHolder process = getRunningProcess(project);
-    if (process == null) {
-      LOG.info("Launching new build process");
-      process = new CompileProcessHolder(project, sessionId).createNewProcess();
-      OSProcessHandler processHandler = process.getProcessHandler();
-      processHandler.startNotify();
-    }
-    else {
-      LOG.info("Reusing build process");
-      Channel associatedChannel = myMessageDispatcher.getAssociatedChannel(project);
-      requestNewBuild(project, sessionId, process, associatedChannel);
-    } 
-    return process;
+  public void startProcess(Project project, UUID sessionId) throws ExecutionException {
+    LOG.info("Launching new build process");
+    CompileProcessHolder process = new CompileProcessHolder(project, sessionId).createNewProcess();
+    OSProcessHandler processHandler = process.getProcessHandler();
+    processHandler.startNotify();
   }
 
-  private void requestNewBuild(Project project, UUID sessionId, CompileProcessHolder process, @Nullable Channel associatedChannel) {
+  private void requestNewBuild(@NotNull BuildMessageDispatcher.SessionData sessionData) {
+    LOG.info("Reusing build process");
+    Channel channel = sessionData.channel;
     try {
-      if (project == null) {
-        throw new IllegalStateException("associatedChannel is null");
-      }
       CmdlineRemoteProto.Message.ControllerMessage message =
         CmdlineRemoteProto.Message.ControllerMessage.newBuilder().setType(CmdlineRemoteProto.Message.ControllerMessage.Type.BUILD_REQUEST)
           .build();
-      ChannelFuture channelFuture = associatedChannel.writeAndFlush(CmdlineProtoUtil.toMessage(sessionId, message));
+      ChannelFuture channelFuture = channel.writeAndFlush(CmdlineProtoUtil.toMessage(sessionData.sessionId, message));
       channelFuture.get(1, TimeUnit.SECONDS);
     }
     catch (Throwable e) {
-      process.getProcessHandler().destroyProcess(); //todo not tested
-      processPool.remove(project.getProjectFilePath());
-      myMessageDispatcher.remove(project);
       throw new RuntimeException(e);
     }
   }
@@ -1386,22 +1377,6 @@ public class BuildManager implements ApplicationComponent{
     }
   }
 
-
-  @Nullable
-  private CompileProcessHolder getRunningProcess(Project project) {
-    CompileProcessHolder compileProcessHolder = processPool.get(project.getProjectFilePath());
-    if (compileProcessHolder != null) {
-      if (compileProcessHolder.getProcessHandler().isProcessTerminated() ||
-          compileProcessHolder.getProcessHandler().isProcessTerminating()) {
-        LOG.info("process died, removing from pool, project={}" + project.getName());
-        processPool.remove(project.getProjectFilePath());
-        return null;
-      }
-
-    }
-    return compileProcessHolder;
-  }
-
   private class CompileProcessHolder {
     private Project myProject;
     private UUID mySessionId;
@@ -1429,7 +1404,6 @@ public class BuildManager implements ApplicationComponent{
           }
         }
       });
-      processPool.put(myProject.getProjectFilePath(), this);
       return this;
     }
   }

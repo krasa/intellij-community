@@ -93,7 +93,7 @@ public abstract class XmlElementStorage implements StateStorage, Disposable {
   }
 
   @Nullable
-  protected abstract Element loadDocument();
+  protected abstract Element loadLocalData();
 
   @Nullable
   public synchronized Element getState(@NotNull String componentName) {
@@ -136,36 +136,37 @@ public abstract class XmlElementStorage implements StateStorage, Disposable {
 
   @NotNull
   protected StorageData loadData(boolean useProvidersData, @Nullable RoamingType roamingType) {
-    Element element = loadDocument();
     StorageData result = createStorageData();
 
+    if (useProvidersData && myStreamProvider != null && myStreamProvider.isEnabled()) {
+      try {
+        if (roamingType == null) {
+          loadDataFromStreamProvider(result, RoamingType.PER_USER);
+          loadDataFromStreamProvider(result, RoamingType.PER_PLATFORM);
+        }
+        else if (roamingType != RoamingType.DISABLED) {
+          loadDataFromStreamProvider(result, roamingType);
+        }
+      }
+      catch (Exception e) {
+        LOG.warn(e);
+      }
+    }
+
+    Element element = loadLocalData();
     if (element != null) {
       loadState(result, element);
     }
 
-    if (useProvidersData && myStreamProvider != null && myStreamProvider.isEnabled()) {
-      if (roamingType == null) {
-        loadDataFromStreamProvider(result, RoamingType.PER_USER);
-        loadDataFromStreamProvider(result, RoamingType.PER_PLATFORM);
-      }
-      else if (roamingType != RoamingType.DISABLED) {
-        loadDataFromStreamProvider(result, roamingType);
-      }
-    }
     return result;
   }
 
-  private void loadDataFromStreamProvider(@NotNull StorageData result, @NotNull RoamingType roamingType) {
+  private void loadDataFromStreamProvider(@NotNull StorageData result, @NotNull RoamingType roamingType) throws IOException {
     assert myStreamProvider != null;
-    try {
-      Document sharedDocument = StorageUtil.loadDocument(myStreamProvider.loadContent(myFileSpec, roamingType));
-      if (sharedDocument != null) {
-        filterOutOfDate(sharedDocument.getRootElement());
-        loadState(result, sharedDocument.getRootElement());
-      }
-    }
-    catch (Exception e) {
-      LOG.warn(e);
+    Document sharedDocument = StorageUtil.loadDocument(myStreamProvider.loadContent(myFileSpec, roamingType));
+    if (sharedDocument != null) {
+      filterOutOfDate(sharedDocument.getRootElement());
+      loadState(result, sharedDocument.getRootElement());
     }
   }
 
@@ -484,7 +485,7 @@ public abstract class XmlElementStorage implements StateStorage, Disposable {
     @Nullable
     public Set<String> analyzeExternalChanges(@NotNull final Set<Pair<VirtualFile,StateStorage>> changedFiles) {
       try {
-        Element element = loadDocument();
+        Element element = loadLocalData();
         StorageData storageData = createStorageData();
         if (element == null) {
           return Collections.emptySet();
