@@ -663,11 +663,11 @@ public class BuildManager implements ApplicationComponent{
 
                   if (sessionData.getState() == BuildMessageDispatcher.ProcessState.INIT) {
                     startProcess(project, sessionId);
+                    sessionData.setState(BuildMessageDispatcher.ProcessState.WORKING);
                   }
                   else {
                     requestNewBuild(sessionData);
                   }
-                  sessionData.setState(BuildMessageDispatcher.ProcessState.WORKING);
 
                   future.get();
                 }
@@ -1088,11 +1088,18 @@ public class BuildManager implements ApplicationComponent{
   }
 
   private static class BuildDoneMonitorWrapper extends MessageHandlerWrapper {
+    private static final Logger LOG = Logger.getInstance("#com.intellij.compiler.server.BuildManager.BuildDoneMonitorWrapper");
+
     private final RequestFuture<BuilderMessageHandler> myFuture;
 
     public BuildDoneMonitorWrapper(BuilderMessageHandler handler, RequestFuture<BuilderMessageHandler> future) {
       super(handler);
       myFuture = future;
+    }
+
+    private void done(String message) {
+      LOG.info(message);
+      myFuture.setDone();
     }
 
     @Override
@@ -1101,10 +1108,17 @@ public class BuildManager implements ApplicationComponent{
         super.sessionTerminated(sessionId);
       }
       finally {
-        myFuture.setDone();
+        done("build was terminated");
       }
     }
 
+    @Override
+    public void buildStarted(UUID sessionId) {
+      LOG.info("buildStarted");
+      super.buildStarted(sessionId);
+    }
+
+    @SuppressWarnings("EnumSwitchStatementWhichMissesCases")
     @Override
     public void handleBuildMessage(Channel channel, UUID sessionId, CmdlineRemoteProto.Message.BuilderMessage msg) {
       try {
@@ -1116,7 +1130,7 @@ public class BuildManager implements ApplicationComponent{
             final CmdlineRemoteProto.Message.BuilderMessage.BuildEvent event = msg.getBuildEvent();
             switch (event.getEventType()) {
               case BUILD_COMPLETED: {
-                myFuture.setDone();
+                done("build was completed");
               }
             }
         }
@@ -1129,7 +1143,7 @@ public class BuildManager implements ApplicationComponent{
         super.handleFailure(sessionId, failure);
       }
       finally {
-        myFuture.setDone();
+        done("build failed");
       }
     }
   }

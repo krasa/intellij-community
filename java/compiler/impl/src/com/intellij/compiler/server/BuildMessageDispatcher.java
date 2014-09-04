@@ -84,7 +84,7 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
        if (sessionData.state == ProcessState.IDLE) {
          LOG.info("Reusing channel");
          value.channel = sessionData.channel;
-         value.setState(ProcessState.IDLE);
+         value.setState(ProcessState.WORKING);
          sessionData.channel.attr(SESSION_DATA).set(value);
          myMessageHandlers.remove(sessionData.sessionId);
        }
@@ -235,6 +235,8 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
   }
 
   static final class SessionData {
+    private static final Logger LOG = Logger.getInstance("#com.intellij.compiler.server.BuildMessageDispatcher.SessionData");
+
     final UUID sessionId;
     final BuilderMessageHandler handler;
     final String myProjectFilePath;
