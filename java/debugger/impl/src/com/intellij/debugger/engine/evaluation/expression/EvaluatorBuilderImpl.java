@@ -962,12 +962,16 @@ public class EvaluatorBuilderImpl implements EvaluatorBuilder {
         }
       }
 
+      boolean defaultInterfaceMethod = false;
+
       if (psiMethod != null) {
         processBoxingConversions(psiMethod.getParameterList().getParameters(), argExpressions, resolveResult.getSubstitutor(), argumentEvaluators);
         argumentEvaluators = wrapVarargs(psiMethod.getParameterList().getParameters(), argExpressions, resolveResult.getSubstitutor(), argumentEvaluators);
+        defaultInterfaceMethod = psiMethod.hasModifierProperty(PsiModifier.DEFAULT);
       }
 
-      myResult = new MethodEvaluator(objectEvaluator, contextClass, methodExpr.getReferenceName(), psiMethod != null ? JVMNameUtil.getJVMSignature(psiMethod) : null, argumentEvaluators);
+      myResult = new MethodEvaluator(objectEvaluator, contextClass, methodExpr.getReferenceName(),
+                                     psiMethod != null ? JVMNameUtil.getJVMSignature(psiMethod) : null, argumentEvaluators, defaultInterfaceMethod);
     }
 
     @Override
@@ -1082,6 +1086,16 @@ public class EvaluatorBuilderImpl implements EvaluatorBuilder {
     }
 
     @Override
+    public void visitLambdaExpression(PsiLambdaExpression expression) {
+      throw new EvaluateRuntimeException(new UnsupportedExpressionException(DebuggerBundle.message("evaluation.error.lambda.evaluation.not.supported")));
+    }
+
+    @Override
+    public void visitMethodReferenceExpression(PsiMethodReferenceExpression expression) {
+      throw new EvaluateRuntimeException(new UnsupportedExpressionException(DebuggerBundle.message("evaluation.error.method.reference.evaluation.not.supported")));
+    }
+
+    @Override
     public void visitNewExpression(final PsiNewExpression expression) {
       PsiType expressionPsiType = expression.getType();
       if (expressionPsiType instanceof PsiArrayType) {
@@ -1142,7 +1156,7 @@ public class EvaluatorBuilderImpl implements EvaluatorBuilder {
       else if (expressionPsiType instanceof PsiClassType){ // must be a class ref
         PsiClass aClass = ((PsiClassType)expressionPsiType).resolve();
         if(aClass instanceof PsiAnonymousClass) {
-          throwEvaluateException(DebuggerBundle.message("evaluation.error.anonymous.class.evaluation.not.supported"));
+          throw new EvaluateRuntimeException(new UnsupportedExpressionException(DebuggerBundle.message("evaluation.error.anonymous.class.evaluation.not.supported")));
         }
         PsiExpressionList argumentList = expression.getArgumentList();
         if (argumentList == null) {
