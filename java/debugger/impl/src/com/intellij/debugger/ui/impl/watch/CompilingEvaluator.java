@@ -34,6 +34,11 @@ import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiJavaFile;
 import com.intellij.refactoring.extractMethodObject.ExtractLightMethodObjectHandler;
 import com.sun.jdi.*;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.org.objectweb.asm.ClassReader;
+import org.jetbrains.org.objectweb.asm.ClassVisitor;
+import org.jetbrains.org.objectweb.asm.ClassWriter;
+import org.jetbrains.org.objectweb.asm.Opcodes;
 
 import javax.tools.*;
 import java.io.ByteArrayOutputStream;
@@ -41,7 +46,6 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Locale;
 
 /**
 * @author egor
@@ -50,15 +54,13 @@ public class CompilingEvaluator implements ExpressionEvaluator {
   private final TextWithImports myText;
   private final PsiCodeFragment myCodeFragment;
   private final PsiElement myPsiContext;
-  private final ExtractLightMethodObjectHandler.ExtractedData myData;
+  @NotNull private final ExtractLightMethodObjectHandler.ExtractedData myData;
   private final EvaluationDescriptor myDescriptor;
-
-  public static Key<ExtractLightMethodObjectHandler.ExtractedData> COMPILING_EVALUATOR_DATA = new Key<ExtractLightMethodObjectHandler.ExtractedData>("COMPILING_EVALUATOR_DATA");
 
   public CompilingEvaluator(TextWithImports text,
                             PsiCodeFragment codeFragment,
                             PsiElement context,
-                            ExtractLightMethodObjectHandler.ExtractedData data,
+                            @NotNull ExtractLightMethodObjectHandler.ExtractedData data,
                             EvaluationDescriptor descriptor) {
     myText = text;
     myCodeFragment = codeFragment;
@@ -138,16 +140,34 @@ public class CompilingEvaluator implements ExpressionEvaluator {
 
     VirtualMachineProxyImpl proxy = (VirtualMachineProxyImpl)process.getVirtualMachineProxy();
     for (OutputFileObject cls : classes) {
-      Method defineMethod = ((ClassType)classLoader.referenceType()).concreteMethodByName("defineClass", "(Ljava/lang/String;[BII)Ljava/lang/Class;");
-      byte[] bytes = cls.toByteArray();
-      ArrayList<Value> args = new ArrayList<Value>();
-      args.add(proxy.mirrorOf(cls.myOrigName));
-      args.add(mirrorOf(bytes, context, process));
-      args.add(proxy.mirrorOf(0));
-      args.add(proxy.mirrorOf(bytes.length));
-      classLoader.invokeMethod(threadReference, defineMethod, args, ClassType.INVOKE_SINGLE_THREADED);
+      if (cls.getName().contains(getGenClassName())) {
+        Method defineMethod =
+          ((ClassType)classLoader.referenceType()).concreteMethodByName("defineClass", "(Ljava/lang/String;[BII)Ljava/lang/Class;");
+        byte[] bytes = changeSuperToMagicAccessor(cls.toByteArray());
+        ArrayList<Value> args = new ArrayList<Value>();
+        args.add(proxy.mirrorOf(cls.myOrigName));
+        args.add(mirrorOf(bytes, context, process));
+        args.add(proxy.mirrorOf(0));
+        args.add(proxy.mirrorOf(bytes.length));
+        classLoader.invokeMethod(threadReference, defineMethod, args, ClassType.INVOKE_SINGLE_THREADED);
+      }
     }
     return (ClassType)process.findClass(context, getGenPackageName() + '.' + getGenClassName(), classLoader);
+  }
+
+  private static byte[] changeSuperToMagicAccessor(byte[] bytes) {
+    ClassWriter classWriter = new ClassWriter(0);
+    ClassVisitor classVisitor = new ClassVisitor(Opcodes.ASM5, classWriter) {
+      @Override
+      public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
+        if ("java/lang/Object".equals(superName)) {
+          superName = "sun/reflect/MagicAccessorImpl";
+        }
+        super.visit(version, access, name, signature, superName, interfaces);
+      }
+    };
+    new ClassReader(bytes).accept(classVisitor, 0);
+    return classWriter.toByteArray();
   }
 
   private static ArrayReference mirrorOf(byte[] bytes, EvaluationContext context, DebugProcess process)
