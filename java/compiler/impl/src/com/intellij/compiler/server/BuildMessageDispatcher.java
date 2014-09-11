@@ -22,7 +22,6 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.util.AttributeKey;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.io.SimpleChannelInboundHandlerAdapter;
 import org.jetbrains.jps.api.CmdlineProtoUtil;
@@ -52,11 +51,11 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
     SessionData value = new SessionData(sessionId, handler, params, project.getProjectFilePath());
     reuseChannel(value);
     myMessageHandlers.put(sessionId, value);
-    closeOldChannels(value);
+    destroyOldChannels(value);
     return value;
   }
 
-  public void reuseChannel(@NotNull SessionData value) {
+  public void reuseChannel(SessionData value) {
     SessionData sessionData = getPreviousSessionByProject(value);
     if (sessionData != null) {
       if (sessionData.state == ProcessState.IDLE) {
@@ -73,7 +72,7 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
   }
 
   @Nullable
-  private SessionData getPreviousSessionByProject(@NotNull SessionData project) {
+  private SessionData getPreviousSessionByProject(SessionData project) {
     String projectFilePath = project.myProjectFilePath;
     SessionData result = null;
     for (SessionData sessionData : myMessageHandlers.values()) {
@@ -87,7 +86,7 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
     return result;
   }
 
-  private void closeOldChannels(@NotNull SessionData actualSession) {
+  private void destroyOldChannels(SessionData actualSession) {
     List<SessionData> idleSessions = new ArrayList<SessionData>();
     for (SessionData sessionData : myMessageHandlers.values()) {
       if (sessionData.state == ProcessState.IDLE && sessionData != actualSession) {
@@ -104,28 +103,10 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
     for (int i = 0; i < idleSessions.size(); i++) {
       SessionData sessionData = idleSessions.get(i);
       if (i + 1 >= MAX_IDLE_CHANNELS) {
-        closeChannel(sessionData);
+        LOG.info("Destroying idle channel for " + sessionData.myProjectFilePath);
+        sessionData.channel.close();
       }
     }
-  }
-
-  public void projectClosed(@NotNull Project project) {
-    String projectFilePath = project.getProjectFilePath();
-    for (SessionData sessionData : myMessageHandlers.values()) {
-      if (projectFilePath.equals(sessionData.myProjectFilePath)) {
-        if (sessionData.state == ProcessState.IDLE) {
-          closeChannel(sessionData);
-        }
-        else {
-          throw new IllegalStateException("SessionData in strange state=" + sessionData.state + " for project " + projectFilePath);
-        }
-      }
-    }
-  }
-
-  private void closeChannel(@NotNull SessionData sessionData) {
-    LOG.info("Closing channel for " + sessionData.myProjectFilePath);
-    sessionData.channel.close();
   }
 
   @Nullable

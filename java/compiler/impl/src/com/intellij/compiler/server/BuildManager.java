@@ -674,6 +674,7 @@ public class BuildManager implements ApplicationComponent{
                   future.get();
                 }
                 catch (Throwable e) {
+                  handler.handleFailure(sessionId, CmdlineProtoUtil.createFailure(e.toString(), e)); //todo  not tested
                   execFailure = e;
                 }
                 finally {
@@ -906,15 +907,13 @@ public class BuildManager implements ApplicationComponent{
       cmdLine.addParameter("-D" + CharsetToolkit.FILE_ENCODING_PROPERTY + "=" + mySystemCharset.name());
     }
     cmdLine.addParameter("-D" + JpsGlobalLoader.FILE_TYPES_COMPONENT_NAME_KEY + "=" + FileTypeManagerImpl.getFileTypeComponentName());
-    for (String name : new String[]{"user.language", "user.country", "user.region", PathManager.PROPERTY_PATHS_SELECTOR}) {
+    for (String name : new String[]{"user.language", "user.country", "user.region", PathManager.PROPERTY_HOME_PATH,
+                                    PathManager.PROPERTY_CONFIG_PATH, PathManager.PROPERTY_PLUGINS_PATH, PathManager.PROPERTY_PATHS_SELECTOR}) {
       final String value = System.getProperty(name);
       if (value != null) {
         cmdLine.addParameter("-D" + name + "=" + value);
       }
     }
-    cmdLine.addParameter("-D" + PathManager.PROPERTY_HOME_PATH + "=" + PathManager.getHomePath());
-    cmdLine.addParameter("-D" + PathManager.PROPERTY_CONFIG_PATH + "=" + PathManager.getConfigPath());
-    cmdLine.addParameter("-D" + PathManager.PROPERTY_PLUGINS_PATH + "=" + PathManager.getPluginsPath());
 
     cmdLine.addParameter("-D" + GlobalOptions.LOG_DIR_OPTION + "=" + FileUtil.toSystemIndependentName(getBuildLogDirectory().getAbsolutePath()));
 
@@ -1145,6 +1144,67 @@ public class BuildManager implements ApplicationComponent{
     }
   }
 
+  private static class BuildDoneMonitorWrapper extends MessageHandlerWrapper {
+    private static final Logger LOG = Logger.getInstance("#com.intellij.compiler.server.BuildManager.BuildDoneMonitorWrapper");
+
+    private final RequestFuture<BuilderMessageHandler> myFuture;
+
+    public BuildDoneMonitorWrapper(BuilderMessageHandler handler, RequestFuture<BuilderMessageHandler> future) {
+      super(handler);
+      myFuture = future;
+    }
+
+    private void done(String message) {
+      LOG.info(message);
+      myFuture.setDone();
+    }
+
+    @Override
+    public void sessionTerminated(UUID sessionId) {
+      try {
+        super.sessionTerminated(sessionId);
+      }
+      finally {
+        done("build was terminated");
+      }
+    }
+
+    @Override
+    public void buildStarted(UUID sessionId) {
+      LOG.info("buildStarted");
+      super.buildStarted(sessionId);
+    }
+
+    @SuppressWarnings("EnumSwitchStatementWhichMissesCases")
+    @Override
+    public void handleBuildMessage(Channel channel, UUID sessionId, CmdlineRemoteProto.Message.BuilderMessage msg) {
+      try {
+        super.handleBuildMessage(channel, sessionId, msg);
+      }
+      finally {
+        switch (msg.getType()) {
+          case BUILD_EVENT:
+            final CmdlineRemoteProto.Message.BuilderMessage.BuildEvent event = msg.getBuildEvent();
+            switch (event.getEventType()) {
+              case BUILD_COMPLETED: {
+                done("build was completed");
+              }
+            }
+        }
+      }
+    }
+
+    @Override
+    public void handleFailure(UUID sessionId, CmdlineRemoteProto.Message.Failure failure) {
+      try {
+        super.handleFailure(sessionId, failure);
+      }
+      finally {
+        done("build failed");
+      }
+    }
+  }
+
   private class ProjectWatcher extends ProjectManagerAdapter {
     private final Map<Project, MessageBusConnection> myConnections = new HashMap<Project, MessageBusConnection>();
 
@@ -1240,7 +1300,6 @@ public class BuildManager implements ApplicationComponent{
       if (conn != null) {
         conn.disconnect();
       }
-      myMessageDispatcher.projectClosed(project);
     }
   }
 
@@ -1388,5 +1447,35 @@ public class BuildManager implements ApplicationComponent{
       return "/";
     }
   }
-  
+
+  private class CompileProcessHolder {
+    private Project myProject;
+    private UUID mySessionId;
+    private OSProcessHandler myProcessHandler;
+
+    public CompileProcessHolder(Project project, UUID sessionId) {
+      myProject = project;
+      mySessionId = sessionId;
+    }
+
+    public OSProcessHandler getProcessHandler() {
+      return myProcessHandler;
+    }
+
+    public CompileProcessHolder createNewProcess() throws ExecutionException {
+      myProcessHandler = launchBuildProcess(myProject, myListenPort, mySessionId);
+      
+      myProcessHandler.addProcessListener(new ProcessAdapter() {
+        @Override
+        public void onTextAvailable(ProcessEvent event, Key outputType) {
+          // re-translate builder's output to idea.log
+          final String text = event.getText();
+          if (!StringUtil.isEmptyOrSpaces(text)) {
+            LOG.info("BUILDER_PROCESS [" + outputType.toString() + "]: " + text.trim());
+          }
+        }
+      });
+      return this;
+    }
+  }
 }
