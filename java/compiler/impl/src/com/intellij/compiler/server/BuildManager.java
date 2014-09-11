@@ -652,7 +652,7 @@ public class BuildManager implements ApplicationComponent{
           }
 
           final BuildMessageDispatcher.SessionData sessionData =
-            myMessageDispatcher.registerBuildMessageHandler(project, sessionId, new BuildDoneMonitorWrapper(handler, future), params);
+            myMessageDispatcher.registerBuildMessageHandler(project, sessionId, new BuildDoneMonitor(handler, future), params);
           try {
               projectTaskQueue.submit(new Runnable() {
               @Override
@@ -663,7 +663,6 @@ public class BuildManager implements ApplicationComponent{
                     return;
                   }
                   myBuildsInProgress.put(projectPath, future);
-
                   if (sessionData.getState() == BuildMessageDispatcher.ProcessState.INIT) {
                     startProcess(project, sessionId);
                     sessionData.setState(BuildMessageDispatcher.ProcessState.WORKING);
@@ -715,11 +714,20 @@ public class BuildManager implements ApplicationComponent{
     return null;
   }
 
-  public void startProcess(Project project, UUID sessionId) throws ExecutionException {
+  private void startProcess(Project project, UUID sessionId) throws ExecutionException {
     LOG.info("Launching new build process");
-    CompileProcessHolder process = new CompileProcessHolder(project, sessionId).createNewProcess();
-    OSProcessHandler processHandler = process.getProcessHandler();
-    processHandler.startNotify();
+    OSProcessHandler process = launchBuildProcess(project, myListenPort, sessionId);
+    process.addProcessListener(new ProcessAdapter() {
+      @Override
+      public void onTextAvailable(ProcessEvent event, Key outputType) {
+        // re-translate builder's output to idea.log
+        final String text = event.getText();
+        if (!StringUtil.isEmptyOrSpaces(text)) {
+          LOG.info("BUILDER_PROCESS [" + outputType.toString() + "]: " + text.trim());
+        }
+      }
+    });
+    process.startNotify();
   }
 
   private void requestNewBuild(@NotNull BuildMessageDispatcher.SessionData sessionData) {
@@ -1071,6 +1079,67 @@ public class BuildManager implements ApplicationComponent{
       }
       else {
         schedule();
+      }
+    }
+  }
+
+  private static class BuildDoneMonitor extends MessageHandlerWrapper {
+    private static final Logger LOG = Logger.getInstance("#com.intellij.compiler.server.BuildManager.BuildDoneMonitorWrapper");
+
+    private final RequestFuture<BuilderMessageHandler> myFuture;
+
+    public BuildDoneMonitor(BuilderMessageHandler handler, RequestFuture<BuilderMessageHandler> future) {
+      super(handler);
+      myFuture = future;
+    }
+
+    private void done(String message) {
+      LOG.info(message);
+      myFuture.setDone();
+    }
+
+    @Override
+    public void sessionTerminated(UUID sessionId) {
+      try {
+        super.sessionTerminated(sessionId);
+      }
+      finally {
+        done("build was terminated");
+      }
+    }
+
+    @Override
+    public void buildStarted(UUID sessionId) {
+      LOG.info("buildStarted");
+      super.buildStarted(sessionId);
+    }
+
+    @SuppressWarnings("EnumSwitchStatementWhichMissesCases")
+    @Override
+    public void handleBuildMessage(Channel channel, UUID sessionId, CmdlineRemoteProto.Message.BuilderMessage msg) {
+      try {
+        super.handleBuildMessage(channel, sessionId, msg);
+      }
+      finally {
+        switch (msg.getType()) {
+          case BUILD_EVENT:
+            final CmdlineRemoteProto.Message.BuilderMessage.BuildEvent event = msg.getBuildEvent();
+            switch (event.getEventType()) {
+              case BUILD_COMPLETED: {
+                done("build was completed");
+              }
+            }
+        }
+      }
+    }
+
+    @Override
+    public void handleFailure(UUID sessionId, CmdlineRemoteProto.Message.Failure failure) {
+      try {
+        super.handleFailure(sessionId, failure);
+      }
+      finally {
+        done("build failed");
       }
     }
   }

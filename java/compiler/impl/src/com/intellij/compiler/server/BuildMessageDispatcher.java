@@ -55,43 +55,20 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
     return value;
   }
 
-  private void destroyOldChannels(SessionData actualSession) {
-    List<SessionData> sessionDatas = new ArrayList<SessionData>();
-    for (SessionData sessionData : myMessageHandlers.values()) {
-      if (sessionData.state == ProcessState.IDLE && sessionData!= actualSession) {
-        sessionDatas.add(sessionData);
-      }
-    }
-    Collections.sort(sessionDatas, new Comparator<SessionData>() {
-      @Override
-      public int compare(SessionData o1, SessionData o2) {
-        if (o1.idleFrom == null || o2.idleFrom == null) return 0;
-        return o2.idleFrom.compareTo(o1.idleFrom);
-      }
-    });
-    for (int i = 0; i < sessionDatas.size(); i++) {
-      SessionData sessionData = sessionDatas.get(i);
-      if (i+1 >= MAX_IDLE_CHANNELS) {
-        LOG.info("Destroying channel for "+sessionData.myProjectFilePath);
-        sessionData.channel.close();
-      }
-    }
-  }
-
   public void reuseChannel(SessionData value) {
     SessionData sessionData = getPreviousSessionByProject(value);
-     if (sessionData != null) {
-       if (sessionData.state == ProcessState.IDLE) {
-         LOG.info("Reusing channel");
-         value.channel = sessionData.channel;
-         value.setState(ProcessState.WORKING);
-         sessionData.channel.attr(SESSION_DATA).set(value);
-         myMessageHandlers.remove(sessionData.sessionId);
-       }
-       else {
-         throw new IllegalStateException("SessionData are in a strange state: " + sessionData.state);
-       }
-     }
+    if (sessionData != null) {
+      if (sessionData.state == ProcessState.IDLE) {
+        LOG.info("Reusing channel");
+        value.channel = sessionData.channel;
+        value.setState(ProcessState.WORKING);
+        sessionData.channel.attr(SESSION_DATA).set(value);
+        myMessageHandlers.remove(sessionData.sessionId);
+      }
+      else {
+        throw new IllegalStateException("SessionData is in a strange state: " + sessionData.state);
+      }
+    }
   }
 
   @Nullable
@@ -101,7 +78,7 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
     for (SessionData sessionData : myMessageHandlers.values()) {
       if (sessionData.myProjectFilePath.equals(projectFilePath)) {
         if (result != null) {
-          throw new IllegalStateException("more than one session for project, state:" + result.state + "," + sessionData.state);
+          throw new IllegalStateException("More than one session for project, state:" + result.state + "," + sessionData.state);
         }
         result = sessionData;
       }
@@ -109,12 +86,35 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
     return result;
   }
 
+  private void destroyOldChannels(SessionData actualSession) {
+    List<SessionData> idleSessions = new ArrayList<SessionData>();
+    for (SessionData sessionData : myMessageHandlers.values()) {
+      if (sessionData.state == ProcessState.IDLE && sessionData != actualSession) {
+        idleSessions.add(sessionData);
+      }
+    }
+    Collections.sort(idleSessions, new Comparator<SessionData>() {
+      @Override
+      public int compare(SessionData o1, SessionData o2) {
+        if (o1.idleFrom == null || o2.idleFrom == null) return 0;
+        return o2.idleFrom.compareTo(o1.idleFrom);
+      }
+    });
+    for (int i = 0; i < idleSessions.size(); i++) {
+      SessionData sessionData = idleSessions.get(i);
+      if (i + 1 >= MAX_IDLE_CHANNELS) {
+        LOG.info("Destroying idle channel for " + sessionData.myProjectFilePath);
+        sessionData.channel.close();
+      }
+    }
+  }
+
   @Nullable
   public BuilderMessageHandler unregisterBuildMessageHandler(UUID sessionId) {
     myCanceledSessions.remove(sessionId);
     final SessionData data = myMessageHandlers.remove(sessionId);
     if (data != null) {
-      LOG.info("session removed for "+data.myProjectFilePath);
+      LOG.info("session removed for " + data.myProjectFilePath);
     }
     return data != null ? data.handler : null;
   }
