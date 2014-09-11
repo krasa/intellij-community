@@ -652,7 +652,7 @@ public class BuildManager implements ApplicationComponent{
           }
 
           final BuildMessageDispatcher.SessionData sessionData =
-            myMessageDispatcher.registerBuildMessageHandler(project, sessionId, new BuildDoneMonitorWrapper(handler, future), params);
+            myMessageDispatcher.registerBuildMessageHandler(project, sessionId, new BuildDoneMonitor(handler, future), params);
           try {
               projectTaskQueue.submit(new Runnable() {
               @Override
@@ -663,7 +663,6 @@ public class BuildManager implements ApplicationComponent{
                     return;
                   }
                   myBuildsInProgress.put(projectPath, future);
-
                   if (sessionData.getState() == BuildMessageDispatcher.ProcessState.INIT) {
                     startProcess(project, sessionId);
                     sessionData.setState(BuildMessageDispatcher.ProcessState.WORKING);
@@ -675,7 +674,6 @@ public class BuildManager implements ApplicationComponent{
                   future.get();
                 }
                 catch (Throwable e) {
-                  handler.handleFailure(sessionId, CmdlineProtoUtil.createFailure(e.toString(), e)); //todo  not tested
                   execFailure = e;
                 }
                 finally {
@@ -715,11 +713,20 @@ public class BuildManager implements ApplicationComponent{
     return null;
   }
 
-  public void startProcess(Project project, UUID sessionId) throws ExecutionException {
+  private void startProcess(Project project, UUID sessionId) throws ExecutionException {
     LOG.info("Launching new build process");
-    CompileProcessHolder process = new CompileProcessHolder(project, sessionId).createNewProcess();
-    OSProcessHandler processHandler = process.getProcessHandler();
-    processHandler.startNotify();
+    OSProcessHandler process = launchBuildProcess(project, myListenPort, sessionId);
+    process.addProcessListener(new ProcessAdapter() {
+      @Override
+      public void onTextAvailable(ProcessEvent event, Key outputType) {
+        // re-translate builder's output to idea.log
+        final String text = event.getText();
+        if (!StringUtil.isEmptyOrSpaces(text)) {
+          LOG.info("BUILDER_PROCESS [" + outputType.toString() + "]: " + text.trim());
+        }
+      }
+    });
+    process.startNotify();
   }
 
   private void requestNewBuild(@NotNull BuildMessageDispatcher.SessionData sessionData) {
@@ -1075,12 +1082,12 @@ public class BuildManager implements ApplicationComponent{
     }
   }
 
-  private static class BuildDoneMonitorWrapper extends MessageHandlerWrapper {
+  private static class BuildDoneMonitor extends MessageHandlerWrapper {
     private static final Logger LOG = Logger.getInstance("#com.intellij.compiler.server.BuildManager.BuildDoneMonitorWrapper");
 
     private final RequestFuture<BuilderMessageHandler> myFuture;
 
-    public BuildDoneMonitorWrapper(BuilderMessageHandler handler, RequestFuture<BuilderMessageHandler> future) {
+    public BuildDoneMonitor(BuilderMessageHandler handler, RequestFuture<BuilderMessageHandler> future) {
       super(handler);
       myFuture = future;
     }
@@ -1378,35 +1385,5 @@ public class BuildManager implements ApplicationComponent{
       return "/";
     }
   }
-
-  private class CompileProcessHolder {
-    private Project myProject;
-    private UUID mySessionId;
-    private OSProcessHandler myProcessHandler;
-
-    public CompileProcessHolder(Project project, UUID sessionId) {
-      myProject = project;
-      mySessionId = sessionId;
-    }
-
-    public OSProcessHandler getProcessHandler() {
-      return myProcessHandler;
-    }
-
-    public CompileProcessHolder createNewProcess() throws ExecutionException {
-      myProcessHandler = launchBuildProcess(myProject, myListenPort, mySessionId);
-      
-      myProcessHandler.addProcessListener(new ProcessAdapter() {
-        @Override
-        public void onTextAvailable(ProcessEvent event, Key outputType) {
-          // re-translate builder's output to idea.log
-          final String text = event.getText();
-          if (!StringUtil.isEmptyOrSpaces(text)) {
-            LOG.info("BUILDER_PROCESS [" + outputType.toString() + "]: " + text.trim());
-          }
-        }
-      });
-      return this;
-    }
-  }
+  
 }
