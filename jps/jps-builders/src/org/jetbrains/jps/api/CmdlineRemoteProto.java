@@ -2092,6 +2092,12 @@ public final class CmdlineRemoteProto {
          * <code>CONSTANT_SEARCH_RESULT = 4;</code>
          */
         CONSTANT_SEARCH_RESULT(3, 4),
+        
+        /**
+         * <code>OVERRIDE_SESSION_VALUE = 5;</code>
+         */
+        BUILD_REQUEST(4, 5),
+        
         ;
 
         /**
@@ -2110,6 +2116,10 @@ public final class CmdlineRemoteProto {
          * <code>CONSTANT_SEARCH_RESULT = 4;</code>
          */
         public static final int CONSTANT_SEARCH_RESULT_VALUE = 4;
+        /**
+         * <code>BUILD_REQUEST = 5;</code>
+         */
+        public static final int OVERRIDE_SESSION_VALUE = 5;
 
 
         public final int getNumber() { return value; }
@@ -2120,6 +2130,7 @@ public final class CmdlineRemoteProto {
             case 2: return CANCEL_BUILD_COMMAND;
             case 3: return FS_EVENT;
             case 4: return CONSTANT_SEARCH_RESULT;
+            case 5: return BUILD_REQUEST;
             default: return null;
           }
         }

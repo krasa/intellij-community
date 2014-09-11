@@ -86,6 +86,7 @@ import com.intellij.util.net.NetUtils;
 import gnu.trove.THashSet;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.handler.codec.protobuf.ProtobufDecoder;
@@ -568,6 +569,7 @@ public class BuildManager implements ApplicationComponent{
         }
         finally {
           try {
+            //todo AssertionError: Already disposed
             ApplicationManager.getApplication().getMessageBus().syncPublisher(BuildManagerListener.TOPIC).buildFinished(project, sessionId, isAutomake);
           }
           catch (Throwable e) {
@@ -649,20 +651,10 @@ public class BuildManager implements ApplicationComponent{
                                                          userData, globals, currentFSChanges);
           }
 
-          myMessageDispatcher.registerBuildMessageHandler(sessionId, new MessageHandlerWrapper(handler) {
-            @Override
-            public void sessionTerminated(UUID sessionId) {
-              try {
-                super.sessionTerminated(sessionId);
-              }
-              finally {
-                future.setDone();
-              }
-            }
-          }, params);
-
+          final BuildMessageDispatcher.SessionData sessionData =
+            myMessageDispatcher.registerBuildMessageHandler(project, sessionId, new BuildDoneMonitor(handler, future), params);
           try {
-            projectTaskQueue.submit(new Runnable() {
+              projectTaskQueue.submit(new Runnable() {
               @Override
               public void run() {
                 Throwable execFailure = null;
@@ -671,40 +663,15 @@ public class BuildManager implements ApplicationComponent{
                     return;
                   }
                   myBuildsInProgress.put(projectPath, future);
-                  final OSProcessHandler processHandler = launchBuildProcess(project, myListenPort, sessionId);
-                  final StringBuilder stdErrOutput = new StringBuilder();
-                  processHandler.addProcessListener(new ProcessAdapter() {
-                    @Override
-                    public void onTextAvailable(ProcessEvent event, Key outputType) {
-                      // re-translate builder's output to idea.log
-                      final String text = event.getText();
-                      if (!StringUtil.isEmptyOrSpaces(text)) {
-                        LOG.info("BUILDER_PROCESS [" + outputType.toString() + "]: " + text.trim());
-                        if (stdErrOutput.length() < 1024 && ProcessOutputTypes.STDERR.equals(outputType)) {
-                          stdErrOutput.append(text);
-                        }
-                      }
-                    }
-                  });
-                  processHandler.startNotify();
-                  final boolean terminated = processHandler.waitFor();
-                  if (terminated) {
-                    final int exitValue = processHandler.getProcess().exitValue();
-                    if (exitValue != 0) {
-                      final StringBuilder msg = new StringBuilder();
-                      msg.append("Abnormal build process termination: ");
-                      if (stdErrOutput.length() > 0) {
-                        msg.append("\n").append(stdErrOutput);
-                      }
-                      else {
-                        msg.append("unknown error");
-                      }
-                      handler.handleFailure(sessionId, CmdlineProtoUtil.createFailure(msg.toString(), null));
-                    }
+                  if (sessionData.getState() == BuildMessageDispatcher.ProcessState.INIT) {
+                    startProcess(project, sessionId);
+                    sessionData.setState(BuildMessageDispatcher.ProcessState.WORKING);
                   }
                   else {
-                    handler.handleFailure(sessionId, CmdlineProtoUtil.createFailure("Disconnected from build process", null));
+                    requestNewBuild(sessionData);
                   }
+
+                  future.get();
                 }
                 catch (Throwable e) {
                   execFailure = e;
@@ -745,6 +712,38 @@ public class BuildManager implements ApplicationComponent{
 
     return null;
   }
+
+  private void startProcess(Project project, UUID sessionId) throws ExecutionException {
+    LOG.info("Launching new build process");
+    OSProcessHandler process = launchBuildProcess(project, myListenPort, sessionId);
+    process.addProcessListener(new ProcessAdapter() {
+      @Override
+      public void onTextAvailable(ProcessEvent event, Key outputType) {
+        // re-translate builder's output to idea.log
+        final String text = event.getText();
+        if (!StringUtil.isEmptyOrSpaces(text)) {
+          LOG.info("BUILDER_PROCESS [" + outputType.toString() + "]: " + text.trim());
+        }
+      }
+    });
+    process.startNotify();
+  }
+
+  private void requestNewBuild(@NotNull BuildMessageDispatcher.SessionData sessionData) {
+    LOG.info("Reusing build process");
+    Channel channel = sessionData.channel;
+    try {
+      CmdlineRemoteProto.Message.ControllerMessage message =
+        CmdlineRemoteProto.Message.ControllerMessage.newBuilder().setType(CmdlineRemoteProto.Message.ControllerMessage.Type.BUILD_REQUEST)
+          .build();
+      ChannelFuture channelFuture = channel.writeAndFlush(CmdlineProtoUtil.toMessage(sessionData.sessionId, message));
+      channelFuture.get(1, TimeUnit.SECONDS);
+    }
+    catch (Throwable e) {
+      throw new RuntimeException(e);
+    }
+  }
+
 
   @Override
   public void initComponent() {
@@ -1079,6 +1078,67 @@ public class BuildManager implements ApplicationComponent{
       }
       else {
         schedule();
+      }
+    }
+  }
+
+  private static class BuildDoneMonitor extends MessageHandlerWrapper {
+    private static final Logger LOG = Logger.getInstance("#com.intellij.compiler.server.BuildManager.BuildDoneMonitorWrapper");
+
+    private final RequestFuture<BuilderMessageHandler> myFuture;
+
+    public BuildDoneMonitor(BuilderMessageHandler handler, RequestFuture<BuilderMessageHandler> future) {
+      super(handler);
+      myFuture = future;
+    }
+
+    private void done(String message) {
+      LOG.info(message);
+      myFuture.setDone();
+    }
+
+    @Override
+    public void sessionTerminated(UUID sessionId) {
+      try {
+        super.sessionTerminated(sessionId);
+      }
+      finally {
+        done("build was terminated");
+      }
+    }
+
+    @Override
+    public void buildStarted(UUID sessionId) {
+      LOG.info("buildStarted");
+      super.buildStarted(sessionId);
+    }
+
+    @SuppressWarnings("EnumSwitchStatementWhichMissesCases")
+    @Override
+    public void handleBuildMessage(Channel channel, UUID sessionId, CmdlineRemoteProto.Message.BuilderMessage msg) {
+      try {
+        super.handleBuildMessage(channel, sessionId, msg);
+      }
+      finally {
+        switch (msg.getType()) {
+          case BUILD_EVENT:
+            final CmdlineRemoteProto.Message.BuilderMessage.BuildEvent event = msg.getBuildEvent();
+            switch (event.getEventType()) {
+              case BUILD_COMPLETED: {
+                done("build was completed");
+              }
+            }
+        }
+      }
+    }
+
+    @Override
+    public void handleFailure(UUID sessionId, CmdlineRemoteProto.Message.Failure failure) {
+      try {
+        super.handleFailure(sessionId, failure);
+      }
+      finally {
+        done("build failed");
       }
     }
   }
