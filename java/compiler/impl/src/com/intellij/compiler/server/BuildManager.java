@@ -1448,34 +1448,4 @@ public class BuildManager implements ApplicationComponent{
     }
   }
 
-  private class CompileProcessHolder {
-    private Project myProject;
-    private UUID mySessionId;
-    private OSProcessHandler myProcessHandler;
-
-    public CompileProcessHolder(Project project, UUID sessionId) {
-      myProject = project;
-      mySessionId = sessionId;
-    }
-
-    public OSProcessHandler getProcessHandler() {
-      return myProcessHandler;
-    }
-
-    public CompileProcessHolder createNewProcess() throws ExecutionException {
-      myProcessHandler = launchBuildProcess(myProject, myListenPort, mySessionId);
-      
-      myProcessHandler.addProcessListener(new ProcessAdapter() {
-        @Override
-        public void onTextAvailable(ProcessEvent event, Key outputType) {
-          // re-translate builder's output to idea.log
-          final String text = event.getText();
-          if (!StringUtil.isEmptyOrSpaces(text)) {
-            LOG.info("BUILDER_PROCESS [" + outputType.toString() + "]: " + text.trim());
-          }
-        }
-      });
-      return this;
-    }
-  }
 }
