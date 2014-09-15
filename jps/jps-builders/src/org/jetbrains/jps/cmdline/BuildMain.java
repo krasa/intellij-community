@@ -162,6 +162,8 @@ public class BuildMain {
                   finally {
                     JavacMain.clearCompilerZipFileCache();
                     mySession=null;
+                    //not really important, but can reduce allocated memory
+                    System.gc();
                     //todo clean kotlin classloader
                     //channel.close();
                     //System.exit(0);

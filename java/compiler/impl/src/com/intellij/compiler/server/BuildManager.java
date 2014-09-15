@@ -1240,6 +1240,7 @@ public class BuildManager implements ApplicationComponent{
       if (conn != null) {
         conn.disconnect();
       }
+      myMessageDispatcher.projectClosed(project);
     }
   }
 
