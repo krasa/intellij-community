@@ -13,16 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jetbrains.plugins.coursecreator;
+package com.intellij.xdebugger.impl.actions;
 
+import com.intellij.openapi.actionSystem.RegistryToggleAction;
 
-import com.intellij.openapi.fileTypes.FileTypeConsumer;
-import com.intellij.openapi.fileTypes.FileTypeFactory;
-import org.jetbrains.annotations.NotNull;
-
-public class AnswerFileTypeFactory extends FileTypeFactory {
-  @Override
-  public void createFileTypes(@NotNull FileTypeConsumer fileTypeConsumer) {
-    fileTypeConsumer.consume(AnswerFileType.INSTANCE, "answer");
+/**
+ * @author Konstantin Bulenkov
+ */
+public class UseInlineDebuggerAction extends RegistryToggleAction {
+  public UseInlineDebuggerAction() {
+    super("ide.debugger.inline");
   }
 }
