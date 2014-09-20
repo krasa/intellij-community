@@ -31,7 +31,6 @@ public class IndentOptionsDetectorImpl implements IndentOptionsDetector {
   private static Logger LOG = Logger.getInstance("#com.intellij.psi.codeStyle.CommonCodeStyleSettings.IndentOptionsDetector");
 
   private static final double RATE_THRESHOLD = 0.8;
-  private static final int MIN_LINES_THRESHOLD = 20;
   private static final int MAX_INDENT_TO_DETECT = 8;
 
   private final PsiFile myFile;
@@ -63,20 +62,25 @@ public class IndentOptionsDetectorImpl implements IndentOptionsDetector {
     int linesWithWhiteSpaceIndent = stats.getTotalLinesWithLeadingSpaces();
 
     if (linesWithTabs > linesWithWhiteSpaceIndent) {
-      if (!indentOptions.USE_TAB_CHARACTER) {
-        indentOptions.USE_TAB_CHARACTER = true;
-        LOG.info("Detected tab usage in" + myFile);
-      }
+      setUseTabs(indentOptions, true);
     }
-    else if (linesWithWhiteSpaceIndent > MIN_LINES_THRESHOLD) {
+    else {
+      setUseTabs(indentOptions, false);
+
       int newIndentSize = getPositiveIndentSize(stats);
       if (newIndentSize > 0) {
-        indentOptions.USE_TAB_CHARACTER = false;
         if (indentOptions.INDENT_SIZE != newIndentSize) {
           indentOptions.INDENT_SIZE = newIndentSize;
           LOG.info("Detected indent size: " + newIndentSize + " for file " + myFile);
         }
       }
+    }
+  }
+
+  private void setUseTabs(@NotNull IndentOptions indentOptions, boolean useTabs) {
+    if (indentOptions.USE_TAB_CHARACTER != useTabs) {
+      indentOptions.USE_TAB_CHARACTER = useTabs;
+      LOG.info("Tab usage set to " + useTabs + " for file " + myFile);
     }
   }
 
