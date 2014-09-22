@@ -1,16 +1,15 @@
 package com.intellij.json.editor.folding;
 
 import com.intellij.json.JsonElementTypes;
-import com.intellij.json.psi.JsonLiteral;
-import com.intellij.json.psi.JsonObject;
-import com.intellij.json.psi.JsonProperty;
-import com.intellij.json.psi.JsonValue;
+import com.intellij.json.psi.*;
 import com.intellij.lang.ASTNode;
 import com.intellij.lang.folding.FoldingBuilder;
 import com.intellij.lang.folding.FoldingDescriptor;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.project.DumbAware;
+import com.intellij.openapi.util.Couple;
 import com.intellij.openapi.util.TextRange;
+import com.intellij.psi.PsiElement;
 import com.intellij.psi.tree.IElementType;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -37,6 +36,18 @@ public class JsonFoldingBuilder implements FoldingBuilder, DumbAware {
     if ((type == JsonElementTypes.OBJECT || type == JsonElementTypes.ARRAY) && spanMultipleLines(node, document)) {
       descriptors.add(new FoldingDescriptor(node, node.getTextRange()));
     }
+    else if (type == JsonElementTypes.BLOCK_COMMENT) {
+      descriptors.add(new FoldingDescriptor(node, node.getTextRange()));
+    }
+    else if (type == JsonElementTypes.LINE_COMMENT) {
+      final Couple<PsiElement> commentRange = expandLineCommentsRange(node.getPsi());
+      final int startOffset = commentRange.getFirst().getTextRange().getStartOffset();
+      final int endOffset = commentRange.getSecond().getTextRange().getEndOffset();
+      if (document.getLineNumber(startOffset) != document.getLineNumber(endOffset)) {
+        descriptors.add(new FoldingDescriptor(node, new TextRange(startOffset, endOffset)));
+      }
+    }
+
     for (ASTNode child : node.getChildren(null)) {
       collectDescriptorsRecursively(child, document, descriptors);
     }
@@ -72,12 +83,23 @@ public class JsonFoldingBuilder implements FoldingBuilder, DumbAware {
     else if (type == JsonElementTypes.ARRAY) {
       return "[...]";
     }
+    else if (type == JsonElementTypes.LINE_COMMENT) {
+      return "//...";
+    }
+    else if (type == JsonElementTypes.BLOCK_COMMENT) {
+      return "/*...*/";
+    }
     return "...";
   }
 
   @Override
   public boolean isCollapsedByDefault(@NotNull ASTNode node) {
     return false;
+  }
+
+  @NotNull
+  public static Couple<PsiElement> expandLineCommentsRange(@NotNull PsiElement anchor) {
+    return Couple.of(JsonPsiUtil.findFurthestSiblingOfSameType(anchor, false), JsonPsiUtil.findFurthestSiblingOfSameType(anchor, true));
   }
 
   private static boolean spanMultipleLines(@NotNull ASTNode node, @NotNull Document document) {
