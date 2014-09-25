@@ -84,14 +84,14 @@ public class InspectionsConfigTreeTable extends TreeTable {
         final int row = rowAtPoint(point);
         final Object maybeIcon = getModel().getValueAt(row, column);
         if (maybeIcon instanceof MultiScopeSeverityIcon) {
-          final LinkedHashMap<String, HighlightSeverity> scopeToAverageSeverityMap =
+          final LinkedHashMap<String, HighlightDisplayLevel> scopeToAverageSeverityMap =
             ((MultiScopeSeverityIcon)maybeIcon).getScopeToAverageSeverityMap();
           final JComponent component;
           if (scopeToAverageSeverityMap.size() == 1) {
-            final HighlightSeverity severity = ContainerUtil.getFirstItem(scopeToAverageSeverityMap.values());
+            final HighlightDisplayLevel level = ContainerUtil.getFirstItem(scopeToAverageSeverityMap.values());
             final JLabel label = new JLabel();
-            label.setIcon(HighlightDisplayLevel.find(severity).getIcon());
-            label.setText(SingleInspectionProfilePanel.renderSeverity(severity));
+            label.setIcon(level.getIcon());
+            label.setText(SingleInspectionProfilePanel.renderSeverity(level.getSeverity()));
             component = label;
           } else {
             component = new ScopesAndSeveritiesHintTable(scopeToAverageSeverityMap);
@@ -389,6 +389,9 @@ public class InspectionsConfigTreeTable extends TreeTable {
     }
 
     private void putOne(final ScopeToolState state) {
+      if (!state.isEnabled()) {
+        return;
+      }
       final Icon icon = state.getLevel().getIcon();
       final String scopeName = state.getScopeName();
       if (icon instanceof HighlightDisplayLevel.SingleColorIconWithMask) {

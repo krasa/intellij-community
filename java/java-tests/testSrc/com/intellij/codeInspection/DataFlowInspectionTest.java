@@ -91,6 +91,7 @@ public class DataFlowInspectionTest extends LightCodeInsightFixtureTestCase {
   public void testVisitFinallyOnce() throws Throwable { doTest(); }
   public void testNotEqualsDoesntImplyNotNullity() throws Throwable { doTest(); }
   public void testEqualsEnumConstant() throws Throwable { doTest(); }
+  public void testEnumConstantNotNull() throws Throwable { doTest(); }
   public void testEqualsConstant() throws Throwable { doTest(); }
   public void testFinalLoopVariableInstanceof() throws Throwable { doTest(); }
   public void testGreaterIsNotEquals() throws Throwable { doTest(); }
@@ -239,6 +240,7 @@ public class DataFlowInspectionTest extends LightCodeInsightFixtureTestCase {
   public void testManyDisjunctiveFieldAssignmentsInLoopNotComplex() { doTest(); }
   public void testManyContinuesNotComplex() { doTest(); }
   public void testFinallyNotComplex() { doTest(); }
+  public void testFlushFurtherUnusedVariables() { doTest(); }
 
   public void testVariablesDiverge() { doTest(); }
   public void testMergeByNullability() { doTest(); }

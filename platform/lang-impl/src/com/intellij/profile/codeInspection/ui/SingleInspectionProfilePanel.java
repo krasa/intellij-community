@@ -375,6 +375,7 @@ public class SingleInspectionProfilePanel extends JPanel {
       @Override
       public void actionPerformed(AnActionEvent e) {
         mySelectedProfile.resetToEmpty(e.getProject());
+        initToolStates();
         postProcessModification();
       }
     });
@@ -387,6 +388,7 @@ public class SingleInspectionProfilePanel extends JPanel {
 
       @Override
       protected void postProcessModification() {
+        initToolStates();
         SingleInspectionProfilePanel.this.postProcessModification();
       }
     });
@@ -782,6 +784,7 @@ public class SingleInspectionProfilePanel extends JPanel {
 
           @Override
           protected void onScopeAdded() {
+            myTreeTable.getTree().updateUI();
             updateOptionsAndDescriptionPanel();
           }
         };
@@ -823,6 +826,7 @@ public class SingleInspectionProfilePanel extends JPanel {
 
             @Override
             protected void onScopeAdded() {
+              myTreeTable.updateUI();
               updateOptionsAndDescriptionPanel();
             }
 
@@ -978,7 +982,7 @@ public class SingleInspectionProfilePanel extends JPanel {
     myBrowser = new JEditorPane(UIUtil.HTML_MIME, EMPTY_HTML);
     myBrowser.setEditable(false);
     myBrowser.setBorder(IdeBorderFactory.createEmptyBorder(5, 5, 5, 5));
-    myBrowser.addHyperlinkListener(new BrowserHyperlinkListener());
+    myBrowser.addHyperlinkListener(BrowserHyperlinkListener.INSTANCE);
 
     initToolStates();
     fillTreeData(myProfileFilter != null ? myProfileFilter.getFilter() : null, true);

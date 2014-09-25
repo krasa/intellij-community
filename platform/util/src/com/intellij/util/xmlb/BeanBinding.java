@@ -74,15 +74,13 @@ class BeanBinding implements Binding {
   }
 
   @Override
+  @Nullable
   public Object serialize(@NotNull Object o, Object context, SerializationFilter filter) {
-    Element element = new Element(myTagName);
-
-    serializeInto(o, element, filter);
-
-    return element;
+    return serializeInto(o, null, filter);
   }
 
-  public void serializeInto(@NotNull final Object o, final Element element, SerializationFilter filter) {
+  @Nullable
+  public Element serializeInto(@NotNull Object o, @Nullable Element element, @NotNull SerializationFilter filter) {
     for (Binding binding : myPropertyBindingsList) {
       Accessor accessor = myPropertyBindings.get(binding);
       if (!filter.accepts(accessor, o)) continue;
@@ -101,8 +99,12 @@ class BeanBinding implements Binding {
         }
       }
 
+      if (element == null) {
+        element = new Element(myTagName);
+      }
+
       Object node = binding.serialize(o, element, filter);
-      if (node != element) {
+      if (node != null && node != element) {
         if (node instanceof org.jdom.Attribute) {
           org.jdom.Attribute attr = (org.jdom.Attribute)node;
           element.setAttribute(attr.getName(), attr.getValue());
@@ -112,6 +114,7 @@ class BeanBinding implements Binding {
         }
       }
     }
+    return element;
   }
 
   public void deserializeInto(final Object bean, @NotNull Element element) {
@@ -131,6 +134,9 @@ class BeanBinding implements Binding {
     }
 
     if (nodes.size() != 1) {
+      if (nodes.isEmpty()) {
+        return result;
+      }
       throw new XmlSerializationException("Wrong set of nodes: " + nodes + " for bean" + myBeanClass + " in " + myAccessor);
     }
     assert nodes.get(0) instanceof Element : "Wrong node: " + nodes;

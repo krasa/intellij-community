@@ -35,6 +35,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
+import com.intellij.util.PathUtil;
 import com.intellij.util.containers.HashMap;
 import com.jetbrains.python.run.PythonConfigurationType;
 import com.jetbrains.python.run.PythonRunConfiguration;
@@ -99,6 +100,7 @@ public class CCRunTests extends AnAction {
         if (task == null) {
           return;
         }
+        clearTestEnvironment(taskDir, project);
         for (final Map.Entry<String, TaskFile> entry : task.getTaskFiles().entrySet()) {
           final String name = entry.getKey();
           createTestEnvironment(taskDir, name, entry.getValue(), project);
@@ -107,7 +109,6 @@ public class CCRunTests extends AnAction {
             return;
           }
           executeTests(project, virtualFile, taskDir, testFile);
-          clearTestEnvironment(taskDir, project);
         }
       }
     });
@@ -189,7 +190,7 @@ public class CCRunTests extends AnAction {
     if (courseDir == null) {
       return;
     }
-    configuration.setScriptParameters(courseDir.getPath() + " " + userFile.getPath());
+    configuration.setScriptParameters(PathUtil.toSystemDependentName(courseDir.getPath()) + " " + PathUtil.toSystemDependentName(userFile.getPath()));
     Executor executor = DefaultRunExecutor.getRunExecutorInstance();
     ProgramRunnerUtil.executeConfiguration(project, settings, executor);
   }
