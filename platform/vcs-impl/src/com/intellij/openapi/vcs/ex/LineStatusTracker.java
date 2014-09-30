@@ -44,7 +44,10 @@ import com.intellij.util.diff.FilesTooBigForDiffException;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.BitSet;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * @author irengrig
@@ -209,12 +212,25 @@ public class LineStatusTracker {
 
   public void release() {
     synchronized (myLock) {
+      myReleased = true;
       if (myDocumentListener != null) {
         myDocument.removeDocumentListener(myDocumentListener);
       }
-      removeAnathema();
-      removeHighlightersFromMarkupModel();
-      myReleased = true;
+
+      if (myApplication.isDispatchThread()) {
+        removeAnathema();
+        removeHighlightersFromMarkupModel();
+      }
+      else {
+        invalidateRanges();
+        myApplication.invokeLater(new Runnable() {
+          @Override
+          public void run() {
+            removeAnathema();
+            removeHighlightersFromMarkupModel();
+          }
+        });
+      }
     }
   }
 
@@ -256,6 +272,8 @@ public class LineStatusTracker {
   }
 
   private void removeHighlightersFromMarkupModel() {
+    myApplication.assertIsDispatchThread();
+
     synchronized (myLock) {
       for (Range range : myRanges) {
         if (range.getHighlighter() != null) {
@@ -264,6 +282,14 @@ public class LineStatusTracker {
         range.invalidate();
       }
       myRanges.clear();
+    }
+  }
+
+  private void invalidateRanges() {
+    synchronized (myLock) {
+      for (Range range : myRanges) {
+        range.invalidate();
+      }
     }
   }
 
@@ -352,7 +378,7 @@ public class LineStatusTracker {
         int linesShift = afterChangedLines - myBeforeChangedLines;
 
         int line1 = myLine1;
-        int line2 = line1 + myBeforeChangedLines; // TODO: optimize some whole-line-changed cases
+        int line2 = line1 + myBeforeChangedLines;
 
         int[] fixed = fixRanges(e, line1, line2);
         line1 = fixed[0];
@@ -551,7 +577,9 @@ public class LineStatusTracker {
 
       // Expand on ranges, that are separated from changes only by empty/whitespaces lines
       // This is needed to reduce amount of confusing cases, when changed blocks are matched wrong due to matched empty lines between them
+      // TODO: try to simplify logic, it's too high change that current one is broken somehow
       CharSequence sequence = myDocument.getCharsSequence();
+      int lineCount = getLineCount(myDocument);
 
       while (true) {
         if (lastBefore == -1) break;
@@ -563,7 +591,8 @@ public class LineStatusTracker {
           }
         }
 
-        if (beforeChangedLine1 >= getLineCount(myDocument)) break;
+        if (beforeChangedLine1 < 0) break;
+        if (beforeChangedLine1 >= lineCount) break;
         int offset1 = myDocument.getLineStartOffset(beforeChangedLine1) - 2;
 
         int deltaLines = 0;
@@ -593,8 +622,11 @@ public class LineStatusTracker {
           }
         }
 
-        if (beforeChangedLine2 + linesShift < 1) break;
-        int offset2 = myDocument.getLineEndOffset(beforeChangedLine2 + linesShift - 1) + 1;
+        // TODO: "afterChangedLine2 >= getLineCount(myDocument)" shouldn't ever be true, but it is sometimes for some reason
+        int afterChangedLine2 = beforeChangedLine2 + linesShift - 1;
+        if (afterChangedLine2 < 0) break;
+        if (afterChangedLine2 >= lineCount) break;
+        int offset2 = myDocument.getLineEndOffset(afterChangedLine2) + 1;
 
         int deltaLines = 0;
         while (offset2 < sequence.length()) {
