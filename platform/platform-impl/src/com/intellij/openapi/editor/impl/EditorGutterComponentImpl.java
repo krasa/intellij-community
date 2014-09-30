@@ -210,6 +210,7 @@ class EditorGutterComponentImpl extends EditorGutterComponentEx implements Mouse
         paintFoldingBackground(g, clip);
         paintFoldingLines((Graphics2D)g, clip);
         paintLineMarkers(g, clip, firstVisibleOffset, lastVisibleOffset);
+        paintEditorBackgrounds(g, clip, firstVisibleOffset, lastVisibleOffset);
         paintFoldingTree(g, clip, firstVisibleOffset, lastVisibleOffset);
         paintLineNumbers(g, clip);
       }
@@ -221,6 +222,25 @@ class EditorGutterComponentImpl extends EditorGutterComponentEx implements Mouse
     }
     finally {
       ((ApplicationImpl)ApplicationManager.getApplication()).editorPaintFinish();
+    }
+  }
+
+  private void paintEditorBackgrounds(Graphics g, Rectangle clip, int firstVisibleOffset, int lastVisibleOffset) {
+    int startX = getWhitespaceSeparatorOffset() + 1;
+    IterationState state = new IterationState(myEditor, firstVisibleOffset, lastVisibleOffset, true, false);
+    while (!state.atEnd()) {
+      VisualPosition visualStart = myEditor.offsetToVisualPosition(state.getStartOffset());
+      int startY = myEditor.visualPositionToXY(visualStart).y;
+      int endY = myEditor.visualPositionToXY(myEditor.offsetToVisualPosition(state.getEndOffset())).y;
+      if (visualStart.getColumn() == 0) {
+        g.setColor(myEditor.getBackgroundColor(state.getMergedAttributes()));
+        g.fillRect(startX, startY, clip.width - startX, endY - startY + myEditor.getLineHeight());
+      }
+      else if (startY != endY) {
+        g.setColor(myEditor.getBackgroundColor(state.getMergedAttributes()));
+        g.fillRect(startX, startY + myEditor.getLineHeight(), clip.width - startX, endY - startY + myEditor.getLineHeight());
+      }
+      state.advance();
     }
   }
 
