@@ -123,6 +123,9 @@ public class JavaDebugProcess extends XDebugProcess {
             });
           }
         }
+        else if (event == DebuggerSession.EVENT_ATTACHED) {
+          getSession().rebuildViews(); // to refresh variables views message
+        }
       }
     });
 
@@ -318,7 +321,9 @@ public class JavaDebugProcess extends XDebugProcess {
     leftToolbar.add(ActionManager.getInstance().getAction(DebuggerActions.DUMP_THREADS), beforeRunner);
     leftToolbar.add(Separator.getInstance(), beforeRunner);
 
+    addActionToGroup(settings, XDebuggerActions.INLINE_DEBUGGER);
     addActionToGroup(settings, XDebuggerActions.AUTO_TOOLTIP);
+    addActionToGroup(settings, XDebuggerActions.AUTO_TOOLTIP_ON_SELECTION);
     settings.addAction(new AutoVarsSwitchAction(), Constraints.FIRST);
     settings.addAction(new WatchLastMethodReturnValueAction(), Constraints.FIRST);
   }
@@ -420,6 +425,12 @@ public class JavaDebugProcess extends XDebugProcess {
 
   public NodeManagerImpl getNodeManager() {
     return myNodeManager;
+  }
+
+  @Override
+  public String getCurrentStateMessage() {
+    String description = myJavaSession.getStateDescription();
+    return description != null ? description : super.getCurrentStateMessage();
   }
 
   @Nullable

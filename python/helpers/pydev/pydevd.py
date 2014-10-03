@@ -9,8 +9,6 @@ pydev_monkey_qt.patch_qt()
 
 import traceback
 
-from pydevd_plugin_utils import load_plugins, NullProxy, bind_func_to_method, clear_bindings
-
 from pydevd_frame_utils import add_exception_to_frame
 import pydev_imports
 from pydevd_breakpoints import * #@UnusedWildImport
@@ -95,6 +93,10 @@ import _pydev_threading as threading
 import os
 import atexit
 
+SUPPORT_PLUGINS = not IS_JYTH_LESS25
+PluginManager = None
+if SUPPORT_PLUGINS:
+    from pydevd_plugin_utils import PluginManager
 
 threadingEnumerate = threading.enumerate
 threadingCurrentThread = threading.currentThread
@@ -113,6 +115,11 @@ DONT_TRACE = {
               'linecache.py':1,
               'threading.py':1,
 
+              # thirs party libs that we don't want to trace
+              'pluginbase.py':1,
+              'pkgutil_old.py':1,
+              'uuid_old.py':1,
+
               #things from pydev that we don't want to trace
               '_pydev_execfile.py':1,
               '_pydev_jython_execfile.py':1,
@@ -122,6 +129,7 @@ DONT_TRACE = {
               'jinja2_debug.py':1,
               'pydev_log.py':1,
               'pydev_monkey.py':1 ,
+              'pydev_monkey_qt.py':1 ,
               'pydevd.py':1 ,
               'pydevd_additional_thread_info.py':1,
               'pydevd_comm.py':1,
@@ -345,17 +353,16 @@ class PyDB:
         # This attribute holds the file-> lines which have an @IgnoreException.
         self.filename_to_lines_where_exceptions_are_ignored = {}
 
-        #working with plugins
+        #working with plugins (lazily initialized)
+        self.plugin = None
+        self.has_plugin_line_breaks = False
+        self.has_plugin_exception_breaks = False
+        
+    def get_plugin_lazy_init(self):
+        if self.plugin is None and SUPPORT_PLUGINS:
+            self.plugin = PluginManager(self)
+        return self.plugin
 
-        self.plugins = load_plugins('pydevd_plugins')
-        self.plugin = NullProxy()
-        self._plugin_method_prefix = 'plugin_'
-
-    def __getattr__(self, item):
-        if item.startswith(self._plugin_method_prefix):
-            # we lazily cache plugin functions as methods of debugger object
-            return bind_func_to_method(self.plugin, item[len(self._plugin_method_prefix):], self, item)
-        raise AttributeError(item)
 
     def haveAliveThreads(self):
         for t in threadingEnumerate():
@@ -571,7 +578,6 @@ class PyDB:
             break_dict[pybreakpoint.line] = pybreakpoint
 
         breakpoints[file] = break_dict
-
 
     def add_break_on_exception(
         self,
@@ -862,7 +868,10 @@ class PyDB:
                         file_to_id_to_breakpoint = self.file_to_id_to_line_breakpoint
                         supported_type = True
                     else:
-                        result = self.add_plugin_breakpoint('add_line_breakpoint', type, file, line, condition, expression, func_name)
+                        result = None
+                        plugin = self.get_plugin_lazy_init()
+                        if plugin is not None:
+                            result = plugin.add_breakpoint('add_line_breakpoint', self, type, file, line, condition, expression, func_name)
                         if result is not None:
                             supported_type = True
                             breakpoint, breakpoints = result
@@ -884,6 +893,8 @@ class PyDB:
 
                     id_to_pybreakpoint[breakpoint_id] = breakpoint
                     self.consolidate_breakpoints(file, id_to_pybreakpoint, breakpoints)
+                    if self.plugin is not None:
+                        self.has_plugin_line_breaks = self.plugin.has_line_breaks()
 
                     self.setTracingForUntracedContexts(overwrite_prev_trace=True)
 
@@ -907,8 +918,8 @@ class PyDB:
                         if breakpoint_type == 'python-line':
                             breakpoints = self.breakpoints
                             file_to_id_to_breakpoint = self.file_to_id_to_line_breakpoint
-                        else:
-                            result = self.plugin_get_breakpoints(breakpoint_type)
+                        elif self.get_plugin_lazy_init() is not None:
+                            result = self.plugin.get_breakpoints(self, breakpoint_type)
                             if result is not None:
                                 file_to_id_to_breakpoint = self.file_to_id_to_plugin_breakpoint
                                 breakpoints = result
@@ -925,6 +936,9 @@ class PyDB:
 
                                 del id_to_pybreakpoint[breakpoint_id]
                                 self.consolidate_breakpoints(file, id_to_pybreakpoint, breakpoints)
+                                if self.plugin is not None:
+                                    self.has_plugin_line_breaks = self.plugin.has_line_breaks()
+
                             except KeyError:
                                 pydev_log.error("Error removing breakpoint: Breakpoint id not found: %s id: %s. Available ids: %s\n" % (
                                     file, breakpoint_id, DictKeys(id_to_pybreakpoint)))
@@ -1042,7 +1056,7 @@ class PyDB:
                         pass
 
                 elif cmd_id == CMD_ADD_EXCEPTION_BREAK:
-                    if text.find(' ') != -1:
+                    if text.find('\t') != -1:
                         exception, notify_always, notify_on_terminate = text.split('\t', 2)
                     else:
                         exception, notify_always, notify_on_terminate = text, 0, 0
@@ -1063,9 +1077,14 @@ class PyDB:
                         if exception_breakpoint is not None:
                             self.update_after_exceptions_added([exception_breakpoint])
                     else:
-                        supported_type = self.add_plugin_breakpoint('add_exception_breakpoint', type, exception)
+                        supported_type = False
+                        plugin = self.get_plugin_lazy_init()
+                        if plugin is not None:
+                            supported_type = plugin.add_breakpoint('add_exception_breakpoint', self, type, exception)
 
-                        if not supported_type:
+                        if supported_type:
+                            self.has_plugin_exception_breaks = self.plugin.has_exception_breaks()
+                        else:
                             raise NameError(type)
 
 
@@ -1090,9 +1109,17 @@ class PyDB:
                             pydev_log.debug("Error while removing exception %s"%sys.exc_info()[0])
                         update_exception_hook(self)
                     else:
-                        supported_type = self.plugin_remove_exception_breakpoint(type, exception)
+                        supported_type = False
+                        
+                        # I.e.: no need to initialize lazy (if we didn't have it in the first place, we can't remove
+                        # anything from it anyways).
+                        plugin = self.plugin 
+                        if plugin is not None:
+                            supported_type = plugin.remove_exception_breakpoint(self, type, exception)
 
-                        if not supported_type:
+                        if supported_type:
+                            self.has_plugin_exception_breaks = self.plugin.has_exception_breaks()
+                        else:
                             raise NameError(type)
 
                 elif cmd_id == CMD_LOAD_SOURCE:
@@ -1106,14 +1133,21 @@ class PyDB:
 
                 elif cmd_id == CMD_ADD_DJANGO_EXCEPTION_BREAK:
                     exception = text
-
-                    self.add_plugin_breakpoint('add_exception_breakpoint', 'django', exception)
+                    plugin = self.get_plugin_lazy_init()
+                    if plugin is not None:
+                        plugin.add_breakpoint('add_exception_breakpoint', self, 'django', exception)
+                        self.has_plugin_exception_breaks = self.plugin.has_exception_breaks()
 
 
                 elif cmd_id == CMD_REMOVE_DJANGO_EXCEPTION_BREAK:
                     exception = text
 
-                    self.plugin_remove_exception_breakpoint('django', exception)
+                    # I.e.: no need to initialize lazy (if we didn't have it in the first place, we can't remove
+                    # anything from it anyways).
+                    plugin = self.plugin
+                    if plugin is not None:
+                        plugin.remove_exception_breakpoint(self, 'django', exception)
+                        self.has_plugin_exception_breaks = self.plugin.has_exception_breaks()
 
                 elif cmd_id == CMD_EVALUATE_CONSOLE_EXPRESSION:
                     # Command which takes care for the debug console communication
@@ -1593,21 +1627,6 @@ class PyDB:
         self.checkOutputRedirect()
         cmd = self.cmdFactory.makeExitMessage()
         self.writer.addCommand(cmd)
-
-    def add_plugin_breakpoint(self, func_name, *args, **kwargs):
-        # add breakpoint for plugin and remember which plugin to use in tracing
-        for plugin in self.plugins:
-            if hasattr(plugin, func_name):
-                func = getattr(plugin, func_name)
-                result = func(self, *args, **kwargs)
-                if result:
-                    # On adding breakpoint we override plugin that will be used
-                    # That means that we don't work with more then 1 plugin at a time
-                    if self.plugin != plugin:
-                        clear_bindings(self, self._plugin_method_prefix)  # remove plugin methods that are cached already
-                        self.plugin = plugin
-                    return result
-        return None
 
     def wait_for_commands(self, globals):
         thread = threading.currentThread()

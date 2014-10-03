@@ -15,8 +15,12 @@
  */
 package com.intellij.dvcs.push.ui;
 
-import com.intellij.openapi.progress.ProgressIndicator;
+import com.intellij.dvcs.push.OutgoingResult;
 import org.jetbrains.annotations.NotNull;
+
+import javax.swing.*;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicReference;
 
 public interface EditableTreeNode extends CustomRenderedTreeNode {
 
@@ -26,8 +30,7 @@ public interface EditableTreeNode extends CustomRenderedTreeNode {
 
   void fireOnSelectionChange(boolean isSelected);
 
-  void stopLoading();
+  void cancelLoading();
 
-  @NotNull
-  ProgressIndicator startLoading();
+  void startLoading(@NotNull JTree tree, @NotNull Future<AtomicReference<OutgoingResult>> future);
 }

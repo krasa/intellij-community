@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2013 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import com.intellij.lang.java.parser.JavaParser;
 import com.intellij.lang.java.parser.JavaParserUtil;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.util.Condition;
+import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.LowMemoryWatcher;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -49,6 +50,7 @@ import java.util.concurrent.ConcurrentMap;
 
 public abstract class BaseExternalAnnotationsManager extends ExternalAnnotationsManager {
   private static final Logger LOG = Logger.getInstance("#com.intellij.codeInsight.BaseExternalAnnotationsManager");
+  private static final Key<Boolean> EXTERNAL_ANNO_MARKER = Key.create("EXTERNAL_ANNO_MARKER");
   @SuppressWarnings("MismatchedQueryAndUpdateOfCollection")
   @NotNull private static final List<PsiFile> NULL_LIST = new ArrayList<PsiFile>(0);
   @NotNull
@@ -70,7 +72,18 @@ public abstract class BaseExternalAnnotationsManager extends ExternalAnnotations
     return PsiFormatUtil.getExternalName(listOwner, showParamName, Integer.MAX_VALUE);
   }
 
+  @NotNull
+  static PsiModifierListOwner preferCompiledElement(@NotNull PsiModifierListOwner element) {
+    PsiElement original = element.getOriginalElement();
+    return original instanceof PsiModifierListOwner ? (PsiModifierListOwner)original : element;
+  }
+
   protected abstract boolean hasAnyAnnotationsRoots();
+
+  @Override
+  public boolean isExternalAnnotation(@NotNull PsiAnnotation annotation) {
+    return annotation.getUserData(EXTERNAL_ANNO_MARKER) != null;
+  }
 
   @Override
   @Nullable
@@ -213,7 +226,8 @@ public abstract class BaseExternalAnnotationsManager extends ExternalAnnotations
 
   @Override
   @Nullable
-  public List<PsiFile> findExternalAnnotationsFiles(@NotNull PsiModifierListOwner listOwner) {
+  public List<PsiFile> findExternalAnnotationsFiles(@NotNull PsiModifierListOwner _listOwner) {
+    final PsiModifierListOwner listOwner = preferCompiledElement(_listOwner);
     final PsiFile containingFile = listOwner.getContainingFile();
     if (!(containingFile instanceof PsiJavaFile)) {
       return null;
@@ -233,10 +247,6 @@ public abstract class BaseExternalAnnotationsManager extends ExternalAnnotations
       if (allValid) {
         return files;
       }
-    }
-
-    if (virtualFile == null) {
-      return null;
     }
 
     Set<PsiFile> possibleAnnotationsXmls = new THashSet<PsiFile>();
@@ -355,7 +365,8 @@ public abstract class BaseExternalAnnotationsManager extends ExternalAnnotations
     private PsiAnnotation getAnnotation(@NotNull BaseExternalAnnotationsManager context) {
       PsiAnnotation a = annotation;
       if (a == null) {
-        annotation = a = context.createAnnotationFromText("@" + annotationClassFqName + (annotationParameters.isEmpty() ? "" : "("+annotationParameters+")"));
+        a = context.createAnnotationFromText("@" + annotationClassFqName + (annotationParameters.isEmpty() ? "" : "("+annotationParameters+")"));
+        annotation = markAsExternalAnnotation(a);
       }
       return a;
     }
@@ -376,6 +387,16 @@ public abstract class BaseExternalAnnotationsManager extends ExternalAnnotations
       result = 31 * result + annotationParameters.hashCode();
       return result;
     }
+
+    @Override
+    public String toString() {
+      return annotationClassFqName + "("+annotationParameters+")";
+    }
+  }
+
+  private static PsiAnnotation markAsExternalAnnotation(@NotNull PsiAnnotation annotation) {
+    annotation.putUserData(EXTERNAL_ANNO_MARKER, Boolean.TRUE);
+    return annotation;
   }
 
   @NotNull
@@ -387,7 +408,7 @@ public abstract class BaseExternalAnnotationsManager extends ExternalAnnotations
       if (!(element instanceof PsiAnnotation)) {
         throw new IncorrectOperationException("Incorrect annotation \"" + text + "\".");
       }
-      return (PsiAnnotation)element;
+      return markAsExternalAnnotation((PsiAnnotation)element);
     }
   }
   private static final JavaParserUtil.ParserWrapper ANNOTATION = new JavaParserUtil.ParserWrapper() {

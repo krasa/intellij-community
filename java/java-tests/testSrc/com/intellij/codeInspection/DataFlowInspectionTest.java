@@ -67,6 +67,7 @@ public class DataFlowInspectionTest extends LightCodeInsightFixtureTestCase {
   public void testExceptionFromFinally() throws Throwable { doTest(); }
   public void testExceptionFromFinallyNesting() throws Throwable { doTest(); }
   public void testNestedFinally() { doTest(); }
+  public void testTryFinallyInsideFinally() { doTest(); }
   public void testFieldChangedBetweenSynchronizedBlocks() throws Throwable { doTest(); }
 
   public void testGeneratedEquals() throws Throwable { doTest(); }
@@ -91,6 +92,7 @@ public class DataFlowInspectionTest extends LightCodeInsightFixtureTestCase {
   public void testVisitFinallyOnce() throws Throwable { doTest(); }
   public void testNotEqualsDoesntImplyNotNullity() throws Throwable { doTest(); }
   public void testEqualsEnumConstant() throws Throwable { doTest(); }
+  public void testEnumConstantNotNull() throws Throwable { doTest(); }
   public void testEqualsConstant() throws Throwable { doTest(); }
   public void testFinalLoopVariableInstanceof() throws Throwable { doTest(); }
   public void testGreaterIsNotEquals() throws Throwable { doTest(); }
@@ -111,6 +113,7 @@ public class DataFlowInspectionTest extends LightCodeInsightFixtureTestCase {
   public void testSynchronizingOnNullable() throws Throwable { doTest(); }
   public void testSwitchOnNullable() { doTest(); }
   public void testReturningNullFromVoidMethod() throws Throwable { doTest(); }
+  public void testReturningNullConstant() { doTest(); }
 
   public void testCatchRuntimeException() throws Throwable { doTest(); }
   // IDEA-129331
@@ -132,6 +135,13 @@ public class DataFlowInspectionTest extends LightCodeInsightFixtureTestCase {
   public void testSkipAssertions() {
     final DataFlowInspection inspection = new DataFlowInspection();
     inspection.DONT_REPORT_TRUE_ASSERT_STATEMENTS = true;
+    myFixture.enableInspections(inspection);
+    myFixture.testHighlighting(true, false, true, getTestName(false) + ".java");
+  }
+
+  public void testParanoidMode() {
+    final DataFlowInspection inspection = new DataFlowInspection();
+    inspection.TREAT_UNKNOWN_MEMBERS_AS_NULLABLE = true;
     myFixture.enableInspections(inspection);
     myFixture.testHighlighting(true, false, true, getTestName(false) + ".java");
   }
@@ -231,6 +241,7 @@ public class DataFlowInspectionTest extends LightCodeInsightFixtureTestCase {
   public void testManyDisjunctiveFieldAssignmentsInLoopNotComplex() { doTest(); }
   public void testManyContinuesNotComplex() { doTest(); }
   public void testFinallyNotComplex() { doTest(); }
+  public void testFlushFurtherUnusedVariables() { doTest(); }
 
   public void testVariablesDiverge() { doTest(); }
   public void testMergeByNullability() { doTest(); }

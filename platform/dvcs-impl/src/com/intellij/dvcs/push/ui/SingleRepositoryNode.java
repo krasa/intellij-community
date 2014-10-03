@@ -20,17 +20,15 @@ import com.intellij.ui.ColoredTreeCellRenderer;
 import com.intellij.ui.SimpleTextAttributes;
 import org.jetbrains.annotations.NotNull;
 
-import javax.swing.*;
-import javax.swing.border.EmptyBorder;
-import java.awt.*;
-
 public class SingleRepositoryNode extends RepositoryNode {
 
   @NotNull private final RepositoryWithBranchPanel myRepositoryPanel;
+  private final LoadingIcon myEmptyIcon;
 
   public SingleRepositoryNode(@NotNull RepositoryWithBranchPanel repositoryPanel) {
-    super(repositoryPanel);
+    super(repositoryPanel, true);
     myRepositoryPanel = repositoryPanel;
+    myEmptyIcon = LoadingIcon.createEmpty(myLoadingIcon.getIconWidth(), myLoadingIcon.getIconHeight());
   }
 
   @Override
@@ -39,12 +37,24 @@ public class SingleRepositoryNode extends RepositoryNode {
   }
 
   @Override
+  public boolean isChecked() {
+    return true;
+  }
+
+  @Override
+  public void fireOnSelectionChange(boolean isSelected) {
+  }
+
+  @Override
   public void render(@NotNull ColoredTreeCellRenderer renderer) {
+    renderer.setIcon(myLoading.get() ? myLoadingIcon : myEmptyIcon);
+    renderer.setIconOnTheRight(false);
+
+    renderer.append("");
+    renderer.appendFixedTextFragmentWidth(myLoadingIconWidth);
     renderer.append(myRepositoryPanel.getSourceName(), SimpleTextAttributes.REGULAR_ATTRIBUTES);
     renderer.append(myRepositoryPanel.getArrow(), SimpleTextAttributes.REGULAR_ATTRIBUTES);
     PushTargetPanel pushTargetPanel = myRepositoryPanel.getTargetPanel();
     pushTargetPanel.render(renderer);
-    Insets insets = BorderFactory.createEmptyBorder().getBorderInsets(pushTargetPanel);
-    renderer.setBorder(new EmptyBorder(insets));
   }
 }

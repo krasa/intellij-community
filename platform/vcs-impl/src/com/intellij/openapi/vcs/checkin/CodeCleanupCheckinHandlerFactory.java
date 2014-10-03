@@ -21,10 +21,12 @@ import com.intellij.codeInspection.ex.GlobalInspectionContextBase;
 import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vcs.CheckinProjectPanel;
+import com.intellij.openapi.vcs.VcsBundle;
 import com.intellij.openapi.vcs.VcsConfiguration;
 import com.intellij.openapi.vcs.changes.CommitContext;
 import com.intellij.openapi.vcs.ui.RefreshableOnComponent;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.ui.NonFocusableCheckBox;
 import org.jetbrains.annotations.NotNull;
 
 import javax.swing.*;
@@ -33,8 +35,9 @@ import java.util.List;
 
 
 public class CodeCleanupCheckinHandlerFactory extends CheckinHandlerFactory  {
+  @Override
   @NotNull
-  public CheckinHandler createHandler(final CheckinProjectPanel panel, CommitContext commitContext) {
+  public CheckinHandler createHandler(@NotNull final CheckinProjectPanel panel, @NotNull CommitContext commitContext) {
     return new CleanupCodeCheckinHandler(panel);
   }
 
@@ -49,8 +52,9 @@ public class CodeCleanupCheckinHandlerFactory extends CheckinHandlerFactory  {
 
     @Override
     public RefreshableOnComponent getBeforeCheckinConfigurationPanel() {
-      final JCheckBox cleanupCodeCb = new JCheckBox("Cleanup code");
+      final JCheckBox cleanupCodeCb = new NonFocusableCheckBox(VcsBundle.message("before.checkin.cleanup.code"));
       return new RefreshableOnComponent() {
+        @Override
         public JComponent getComponent() {
           final JPanel cbPanel = new JPanel(new BorderLayout());
           cbPanel.add(cleanupCodeCb, BorderLayout.WEST);
@@ -59,13 +63,16 @@ public class CodeCleanupCheckinHandlerFactory extends CheckinHandlerFactory  {
           return cbPanel;
         }
 
+        @Override
         public void refresh() {
         }
 
+        @Override
         public void saveState() {
           VcsConfiguration.getInstance(myProject).CHECK_CODE_CLEANUP_BEFORE_PROJECT_COMMIT = cleanupCodeCb.isSelected();
         }
 
+        @Override
         public void restoreState() {
           cleanupCodeCb.setSelected(VcsConfiguration.getInstance(myProject).CHECK_CODE_CLEANUP_BEFORE_PROJECT_COMMIT);
         }

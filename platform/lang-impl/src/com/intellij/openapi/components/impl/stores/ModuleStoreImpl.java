@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2012 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.intellij.openapi.components.impl.stores;
 
 import com.intellij.openapi.application.ApplicationManager;
@@ -30,6 +29,7 @@ import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.ArrayUtil;
 import com.intellij.util.PathUtilRt;
+import com.intellij.util.messages.MessageBus;
 import gnu.trove.THashMap;
 import org.jdom.Attribute;
 import org.jdom.Element;
@@ -44,7 +44,7 @@ import java.util.Map;
 import java.util.Set;
 
 public class ModuleStoreImpl extends BaseFileConfigurableStoreImpl implements IModuleStore {
-  private static final Logger LOG = Logger.getInstance("#com.intellij.openapi.components.impl.stores.ModuleStoreImpl");
+  private static final Logger LOG = Logger.getInstance(ModuleStoreImpl.class);
 
   private final ModuleImpl myModule;
 
@@ -126,14 +126,9 @@ public class ModuleStoreImpl extends BaseFileConfigurableStoreImpl implements IM
     }
 
     @Override
-    public boolean isEmpty() {
-      return super.isEmpty() && myOptions.isEmpty();
-    }
-
-    @Override
     @NotNull
-    protected Element save() {
-      Element root = super.save();
+    protected Element save(@NotNull Map<String, Element> newLiveStates) {
+      Element root = super.save(newLiveStates);
       myOptions.put(VERSION_OPTION, Integer.toString(myVersion));
       String[] options = ArrayUtil.toStringArray(myOptions.keySet());
       Arrays.sort(options);
@@ -153,26 +148,21 @@ public class ModuleStoreImpl extends BaseFileConfigurableStoreImpl implements IM
       return new ModuleFileData(this);
     }
 
-    @Override
-    protected int computeHash() {
-      return super.computeHash() * 31 + myOptions.hashCode();
-    }
-
-    @Override
     @Nullable
-    public Set<String> getDifference(final StorageData storageData, PathMacroSubstitutor substitutor) {
-      final ModuleFileData data = (ModuleFileData)storageData;
-      if (!myOptions.equals(data.myOptions)) return null;
-      return super.getDifference(storageData, substitutor);
+    @Override
+    public Set<String> getChangedComponentNames(@NotNull StorageData newStorageData, @Nullable PathMacroSubstitutor substitutor) {
+      final ModuleFileData data = (ModuleFileData)newStorageData;
+      if (!myOptions.equals(data.myOptions)) {
+        return null;
+      }
+      return super.getChangedComponentNames(newStorageData, substitutor);
     }
 
     public void setOption(final String optionName, final String optionValue) {
-      clearHash();
       myOptions.put(optionName, optionValue);
     }
 
     public void clearOption(final String optionName) {
-      clearHash();
       myOptions.remove(optionName);
     }
 
@@ -182,7 +172,7 @@ public class ModuleStoreImpl extends BaseFileConfigurableStoreImpl implements IM
   }
 
   @Override
-  public void setModuleFilePath(@NotNull final String filePath) {
+  public void setModuleFilePath(@NotNull String filePath) {
     final String path = filePath.replace(File.separatorChar, '/');
     LocalFileSystem.getInstance().refreshAndFindFileByPath(path);
     final StateStorageManager storageManager = getStateStorageManager();
@@ -242,6 +232,12 @@ public class ModuleStoreImpl extends BaseFileConfigurableStoreImpl implements IM
   @Override
   protected boolean optimizeTestLoading() {
     return ((ProjectEx)myModule.getProject()).isOptimiseTestLoadSpeed();
+  }
+
+  @NotNull
+  @Override
+  protected MessageBus getMessageBus() {
+    return myModule.getMessageBus();
   }
 
   @NotNull

@@ -71,7 +71,7 @@ class SomeBeanUnitTest {
   }
 }
 class Outer {
-  class A { // may not be static
+  class <warning descr="Inner class 'A' may be 'static'">A</warning> { // may be static
     B b;
   }
   class B extends  A {} // may not be static
@@ -92,6 +92,65 @@ class Outer {
     J.I b;
     class J {
       class I extends  H {}
+    }
+  }
+}
+class Complex {
+  class C {
+    void m() {
+      Complex.super.toString();
+    }
+  }
+  int i;
+  static void n() {
+  }
+
+  private class <warning descr="Inner class 'A' may be 'static'">A</warning> {
+    private A() {
+    }
+  }
+
+  class <warning descr="Inner class 'B' may be 'static'">B</warning> {
+  }
+
+  class <warning descr="Inner class 'F' may be 'static'">F</warning> extends Complex {
+    class G {
+    }
+
+    {
+      A a = (A) null;
+      G g = (G) null;
+      new A() {};
+      new B();
+
+      i = 10;
+      new E().m();
+      Complex.n();
+    }
+
+    void m(A a) {
+      a.toString();
+    }
+
+    class E {
+      private void m() {
+      }
+    }
+  }
+}
+class Test1<T> {
+  class Inner {
+    private final T test;
+    public Inner(T test) {
+      this.test = test;
+    }
+  }
+}
+class Test2 {
+  class <warning descr="Inner class 'Inner' may be 'static'">Inner</warning><T> {
+    private final T test;
+    public Inner(T test) {
+      this.test = test;
     }
   }
 }

@@ -83,9 +83,10 @@ class PyDBFrame:
                         flag = False
                 else:
                     try:
-                        result = mainDebugger.plugin_exception_break(self, frame, self._args, arg)
-                        if result:
-                            (flag, frame) = result
+                        if mainDebugger.plugin is not None:
+                            result = mainDebugger.plugin.exception_break(mainDebugger, self, frame, self._args, arg)
+                            if result:
+                                (flag, frame) = result
 
                     except:
                         flag = False
@@ -226,10 +227,11 @@ class PyDBFrame:
 
             if event == 'call' and main_debugger.signature_factory:
                 sendSignatureCallTrace(main_debugger, frame, filename)
+                
+            plugin_manager = main_debugger.plugin
 
             is_exception_event = event == 'exception'
-            has_exception_breakpoints = main_debugger.break_on_caught_exceptions \
-                                        or main_debugger.plugin_has_exception_breaks()
+            has_exception_breakpoints = main_debugger.break_on_caught_exceptions or main_debugger.has_plugin_exception_breaks
 
             if is_exception_event:
                 if has_exception_breakpoints:
@@ -269,8 +271,8 @@ class PyDBFrame:
                     can_skip = (step_cmd is None and stop_frame is None)\
                         or (step_cmd in (CMD_STEP_RETURN, CMD_STEP_OVER) and stop_frame is not frame)
 
-                if can_skip:
-                    can_skip = not main_debugger.plugin_can_not_skip(self, frame)
+                if can_skip and plugin_manager is not None and main_debugger.has_plugin_line_breaks:
+                    can_skip = not plugin_manager.can_not_skip(main_debugger, self, frame)
 
                 # Let's check to see if we are in a function that has a breakpoint. If we don't have a breakpoint,
                 # we will return nothing for the next trace
@@ -316,24 +318,25 @@ class PyDBFrame:
                 stop_info = {}
                 breakpoint = None
                 exist_result = False
-                stop_info['stop'] = False
+                stop = False
+                bp_type = None
                 if not flag and event != 'return' and info.pydev_state != STATE_SUSPEND and breakpoints_for_file is not None \
                         and DictContains(breakpoints_for_file, line):
                     breakpoint = breakpoints_for_file[line]
                     new_frame = frame
-                    stop_info['stop'] = True
+                    stop = True
                     if step_cmd == CMD_STEP_OVER and stop_frame is frame and event in ('line', 'return'):
-                        stop_info['stop'] = False #we don't stop on breakpoint if we have to stop by step-over (it will be processed later)
-                else:
-                    result = main_debugger.plugin_get_breakpoint(self, frame, event, self._args)
+                        stop = False #we don't stop on breakpoint if we have to stop by step-over (it will be processed later)
+                elif plugin_manager is not None and main_debugger.has_plugin_line_breaks:
+                    result = plugin_manager.get_breakpoint(main_debugger, self, frame, event, self._args)
                     if result:
                         exist_result = True
-                        (flag, breakpoint, new_frame) = result
+                        (flag, breakpoint, new_frame, bp_type) = result
 
                 if breakpoint:
                     #ok, hit breakpoint, now, we have to discover if it is a conditional breakpoint
                     # lets do the conditional stuff here
-                    if stop_info['stop'] or exist_result:
+                    if stop or exist_result:
                         condition = breakpoint.condition
                         if condition is not None:
                             try:
@@ -352,7 +355,7 @@ class PyDBFrame:
                                 if not main_debugger.suspend_on_breakpoint_exception:
                                     return self.trace_dispatch
                                 else:
-                                    stop_info['stop'] = True
+                                    stop = True
                                     try:
                                         additional_info = None
                                         try:
@@ -385,10 +388,10 @@ class PyDBFrame:
                             finally:
                                 if val is not None:
                                     thread.additionalInfo.message = val
-                if stop_info['stop']:
+                if stop:
                     self.setSuspend(thread, CMD_SET_BREAK)
-                elif flag:
-                    result = main_debugger.plugin_suspend(thread, frame)
+                elif flag and plugin_manager is not None:
+                    result = plugin_manager.suspend(main_debugger, thread, frame, bp_type)
                     if result:
                         frame = result
 
@@ -413,19 +416,26 @@ class PyDBFrame:
                     else:
                         should_skip = self.should_skip
 
+                plugin_stop = False
                 if should_skip:
-                    stop_info['stop'] = False
+                    stop = False
 
                 elif step_cmd == CMD_STEP_INTO:
-                    stop_info['stop'] = event in ('line', 'return')
-                    main_debugger.plugin_cmd_step_into(frame, event, self._args, stop_info)
+                    stop = event in ('line', 'return')
+                    if plugin_manager is not None:
+                        result = plugin_manager.cmd_step_into(main_debugger, frame, event, self._args, stop_info, stop)
+                        if result:
+                            stop, plugin_stop = result
 
                 elif step_cmd == CMD_STEP_OVER:
-                    stop_info['stop'] = stop_frame is frame and event in ('line', 'return')
-                    main_debugger.plugin_cmd_step_over(frame, event, self._args, stop_info)
+                    stop = stop_frame is frame and event in ('line', 'return')
+                    if plugin_manager is not None:
+                        result = plugin_manager.cmd_step_over(main_debugger, frame, event, self._args, stop_info, stop)
+                        if result:
+                            stop, plugin_stop = result
 
                 elif step_cmd == CMD_SMART_STEP_INTO:
-                    stop_info['stop'] = False
+                    stop = False
                     if info.pydev_smart_step_stop is frame:
                         info.pydev_func_name = None
                         info.pydev_smart_step_stop = None
@@ -438,13 +448,13 @@ class PyDBFrame:
                             curr_func_name = ''
 
                         if curr_func_name == info.pydev_func_name:
-                            stop_info['stop'] = True
+                            stop = True
 
                 elif step_cmd == CMD_STEP_RETURN:
-                    stop_info['stop'] = event == 'return' and stop_frame is frame
+                    stop = event == 'return' and stop_frame is frame
 
                 elif step_cmd == CMD_RUN_TO_LINE or step_cmd == CMD_SET_NEXT_STATEMENT:
-                    stop_info['stop'] = False
+                    stop = False
 
                     if event == 'line' or event == 'exception':
                         #Yes, we can only act on line events (weird hum?)
@@ -459,52 +469,54 @@ class PyDBFrame:
                         if curr_func_name == info.pydev_func_name:
                             line = info.pydev_next_line
                             if frame.f_lineno == line:
-                                stop_info['stop'] = True
+                                stop = True
                             else:
                                 if frame.f_trace is None:
                                     frame.f_trace = self.trace_dispatch
                                 frame.f_lineno = line
                                 frame.f_trace = None
-                                stop_info['stop'] = True
+                                stop = True
 
                 else:
-                    stop_info['stop'] = False
+                    stop = False
 
-                if True in stop_info.values():
-                    stopped_on_plugin = main_debugger.plugin_stop(frame, event, self._args, stop_info, arg, step_cmd)
-                    if DictContains(stop_info, 'stop') and stop_info['stop'] and not stopped_on_plugin:
-                        if event == 'line':
-                            self.setSuspend(thread, step_cmd)
-                            self.doWaitSuspend(thread, frame, event, arg)
-                        else: #return event
-                            back = frame.f_back
-                            if back is not None:
-                                #When we get to the pydevd run function, the debugging has actually finished for the main thread
-                                #(note that it can still go on for other threads, but for this one, we just make it finish)
-                                #So, just setting it to None should be OK
-                                base = basename(back.f_code.co_filename)
-                                if base == 'pydevd.py' and back.f_code.co_name == 'run':
-                                    back = None
+                if plugin_stop:
+                    stopped_on_plugin = plugin_manager.stop(main_debugger, frame, event, self._args, stop_info, arg, step_cmd)
+                elif stop:
+                    if event == 'line':
+                        self.setSuspend(thread, step_cmd)
+                        self.doWaitSuspend(thread, frame, event, arg)
+                    else: #return event
+                        back = frame.f_back
+                        if back is not None:
+                            #When we get to the pydevd run function, the debugging has actually finished for the main thread
+                            #(note that it can still go on for other threads, but for this one, we just make it finish)
+                            #So, just setting it to None should be OK
+                            base = basename(back.f_code.co_filename)
+                            if base == 'pydevd.py' and back.f_code.co_name == 'run':
+                                back = None
 
-                                elif base == 'pydevd_traceproperty.py':
-                                    # We dont want to trace the return event of pydevd_traceproperty (custom property for debugging)
-                                    #if we're in a return, we want it to appear to the user in the previous frame!
-                                    return None
-
-                            if back is not None:
+                            elif base == 'pydevd_traceproperty.py':
+                                # We dont want to trace the return event of pydevd_traceproperty (custom property for debugging)
                                 #if we're in a return, we want it to appear to the user in the previous frame!
-                                self.setSuspend(thread, step_cmd)
-                                self.doWaitSuspend(thread, back, event, arg)
-                            else:
-                                #in jython we may not have a back frame
-                                info.pydev_step_stop = None
-                                info.pydev_step_cmd = None
-                                info.pydev_state = STATE_RUN
+                                return None
 
+                        if back is not None:
+                            #if we're in a return, we want it to appear to the user in the previous frame!
+                            self.setSuspend(thread, step_cmd)
+                            self.doWaitSuspend(thread, back, event, arg)
+                        else:
+                            #in jython we may not have a back frame
+                            info.pydev_step_stop = None
+                            info.pydev_step_cmd = None
+                            info.pydev_state = STATE_RUN
 
             except:
-                traceback.print_exc()
-                info.pydev_step_cmd = None
+                try:
+                    traceback.print_exc()
+                    info.pydev_step_cmd = None
+                except:
+                    return None
 
             #if we are quitting, let's stop the tracing
             retVal = None

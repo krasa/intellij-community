@@ -41,6 +41,9 @@ public class CCShowPreview extends DumbAwareAction {
 
   @Override
   public void update(@NotNull AnActionEvent e) {
+    if (!CCProjectService.setCCActionAvailable(e)) {
+      return;
+    }
     Presentation presentation = e.getPresentation();
     presentation.setEnabled(false);
     presentation.setVisible(false);
@@ -82,7 +85,7 @@ public class CCShowPreview extends DumbAwareAction {
         ApplicationManager.getApplication().runWriteAction(new Runnable() {
           @Override
           public void run() {
-            CreateCourseArchive.createUserFile(project, taskFilesCopy, taskDir.getVirtualFile(), taskDir.getVirtualFile(), entry);
+            CCCreateCourseArchive.createUserFile(project, taskFilesCopy, taskDir.getVirtualFile(), taskDir.getVirtualFile(), entry);
           }
         });
       }
@@ -98,7 +101,7 @@ public class CCShowPreview extends DumbAwareAction {
       for (TaskWindow taskWindow : taskFile.getTaskWindows()) {
         taskWindow.drawHighlighter(editor, true);
       }
-      CreateCourseArchive.resetTaskFiles(taskFilesCopy);
+      CCCreateCourseArchive.resetTaskFiles(taskFilesCopy);
     }
   }
 }

@@ -17,6 +17,7 @@ package com.intellij.application.options.codeStyle.arrangement.action;
 
 import com.intellij.application.options.codeStyle.arrangement.match.ArrangementMatchingRulesControl;
 import com.intellij.application.options.codeStyle.arrangement.match.ArrangementSectionRuleManager;
+import com.intellij.application.options.codeStyle.arrangement.match.ArrangementSectionRulesControl;
 import com.intellij.icons.AllIcons;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.application.ApplicationBundle;
@@ -31,29 +32,29 @@ public class AddArrangementSectionRuleAction extends AddArrangementRuleAction {
   public AddArrangementSectionRuleAction() {
     getTemplatePresentation().setText(ApplicationBundle.message("arrangement.action.section.rule.add.text"));
     getTemplatePresentation().setDescription(ApplicationBundle.message("arrangement.action.section.rule.add.description"));
+    getTemplatePresentation().setIcon(SystemInfoRt.isMac ? AllIcons.CodeStyle.Mac.AddNewSectionRule : AllIcons.CodeStyle.AddNewSectionRule);
   }
 
   @Override
   public void update(AnActionEvent e) {
-    e.getPresentation().setIcon(SystemInfoRt.isMac ? AllIcons.CodeStyle.Mac.AddNewSectionRule : AllIcons.CodeStyle.AddNewSectionRule);
-    final ArrangementMatchingRulesControl control = ArrangementMatchingRulesControl.KEY.getData(e.getDataContext());
-    if (control == null) {
+    final ArrangementMatchingRulesControl control = getRulesControl(e);
+    if (control == null || !(control instanceof ArrangementSectionRulesControl)) {
       return;
     }
-    e.getPresentation().setEnabledAndVisible(control.getSectionRuleManager() != null);
+    e.getPresentation().setEnabledAndVisible(((ArrangementSectionRulesControl)control).getSectionRuleManager() != null);
   }
 
   @NotNull
   @Override
   protected Object createNewRule(@NotNull ArrangementMatchingRulesControl control) {
-    final ArrangementSectionRuleManager manager = control.getSectionRuleManager();
+    final ArrangementSectionRuleManager manager = ((ArrangementSectionRulesControl)control).getSectionRuleManager();
     assert manager != null;
     return manager.createDefaultSectionRule();
   }
 
   @Override
   protected void showEditor(@NotNull ArrangementMatchingRulesControl control, int rowToEdit) {
-    final ArrangementSectionRuleManager manager = control.getSectionRuleManager();
+    final ArrangementSectionRuleManager manager = ((ArrangementSectionRulesControl)control).getSectionRuleManager();
     if (manager != null) {
       manager.showEditor(rowToEdit);
     }

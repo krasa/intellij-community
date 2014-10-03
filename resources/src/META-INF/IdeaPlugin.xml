@@ -21,6 +21,9 @@
   <xi:include href="/META-INF/TypeMigration.xml" xpointer="xpointer(/idea-plugin/*)">
     <xi:fallback/>
   </xi:include>
+  <xi:include href="/META-INF/libraryJarUsage.xml" xpointer="xpointer(/idea-plugin/*)">
+    <xi:fallback/>
+  </xi:include>
 
   <application-components>
     <component>
@@ -970,7 +973,7 @@
 
     <lang.commenter language="JAVA" implementationClass="com.intellij.lang.java.JavaCommenter"/>
 
-    <lang.braceMatcher language="JAVA" implementationClass="com.intellij.codeInsight.highlighting.JavaBraceMatcher"/>
+    <lang.braceMatcher language="JAVA" implementationClass="com.intellij.codeInsight.highlighting.JavaPairedBraceMatcher"/>
 
     <lang.foldingBuilder language="JAVA" implementationClass="com.intellij.codeInsight.folding.impl.JavaFoldingBuilder"/>
 

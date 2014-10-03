@@ -17,6 +17,7 @@ package com.jetbrains.python.configuration;
 
 import com.google.common.collect.Lists;
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer;
+import com.intellij.execution.ExecutionException;
 import com.intellij.facet.impl.ui.FacetErrorPanel;
 import com.intellij.facet.ui.FacetConfigurationQuickFix;
 import com.intellij.facet.ui.FacetEditorValidator;
@@ -156,12 +157,12 @@ public class PyIntegratedToolsConfigurable implements SearchableConfigurable, No
     return new FacetConfigurationQuickFix() {
       @Override
       public void run(JComponent place) {
-        final PyPackageManagerImpl.UI ui = new PyPackageManagerImpl.UI(myProject, sdk, new PyPackageManagerImpl.UI.Listener() {
+        final PyPackageManagerUI ui = new PyPackageManagerUI(myProject, sdk, new PyPackageManagerUI.Listener() {
           @Override
           public void started() {}
 
           @Override
-          public void finished(List<PyExternalProcessException> exceptions) {
+          public void finished(List<ExecutionException> exceptions) {
             if (exceptions.isEmpty()) {
               VFSTestFrameworkListener.getInstance().testInstalled(true, sdk.getHomePath(), name);
               facetErrorPanel.getValidatorsManager().validate();

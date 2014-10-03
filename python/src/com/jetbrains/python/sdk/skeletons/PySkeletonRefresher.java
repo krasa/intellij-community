@@ -42,9 +42,7 @@ import com.intellij.util.io.ZipUtil;
 import com.jetbrains.python.PyBundle;
 import com.jetbrains.python.PyNames;
 import com.jetbrains.python.codeInsight.userSkeletons.PyUserSkeletonsUtil;
-import com.jetbrains.python.packaging.PyExternalProcessException;
 import com.jetbrains.python.packaging.PyPackageManager;
-import com.jetbrains.python.packaging.PyPackageManagerImpl;
 import com.jetbrains.python.psi.resolve.PythonSdkPathCache;
 import com.jetbrains.python.remote.PythonRemoteInterpreterManager;
 import com.jetbrains.python.sdk.InvalidSdkException;
@@ -349,9 +347,10 @@ public class PySkeletonRefresher {
     }
     if (PySdkUtil.isRemote(mySdk)) {
       try {
-        ((PyPackageManagerImpl)PyPackageManager.getInstance(mySdk)).loadPackages();
+        // Force loading packages
+        PyPackageManager.getInstance(mySdk).getPackages(false);
       }
-      catch (PyExternalProcessException e) {
+      catch (ExecutionException e) {
         // ignore - already logged
       }
     }

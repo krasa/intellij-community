@@ -23,6 +23,7 @@ import com.intellij.openapi.util.DefaultJDOMExternalizer;
 import com.intellij.openapi.util.InvalidDataException;
 import com.intellij.openapi.util.JDOMExternalizableStringList;
 import com.intellij.openapi.util.WriteExternalException;
+import com.intellij.util.containers.ContainerUtil;
 import org.jdom.Element;
 import org.jetbrains.annotations.NotNull;
 
@@ -35,9 +36,10 @@ import java.util.List;
 @State(
   name = "UpdatesConfigurable",
   storages = {
-    @Storage(
-      file = StoragePathMacros.APP_CONFIG + "/other.xml"
-    )}
+    @Storage(file = StoragePathMacros.APP_CONFIG + "/other.xml"),
+    @Storage(file = StoragePathMacros.APP_CONFIG + "/updates.xml", roamingType = RoamingType.DISABLED)
+  },
+  storageChooser = LastStorageChooserForWrite.class
 )
 public class UpdateSettings implements PersistentStateComponent<Element>, UserUpdateSettings {
   private static final Logger LOG = Logger.getInstance("#com.intellij.openapi.updateSettings.impl.UpdateSettings"); 
@@ -132,5 +134,14 @@ public class UpdateSettings implements PersistentStateComponent<Element>, UserUp
 
   public void forceCheckForUpdateAfterRestart() {
     LAST_TIME_CHECKED = 0;
+  }
+
+  public List<String> getPluginHosts() {
+    ArrayList<String> hosts = new ArrayList<String>(myPluginHosts);
+    final String pluginHosts = System.getProperty("idea.plugin.hosts");
+    if (pluginHosts != null) {
+      ContainerUtil.addAll(hosts, pluginHosts.split(";"));
+    }
+    return hosts;
   }
 }

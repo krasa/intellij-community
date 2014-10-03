@@ -72,7 +72,7 @@ public class XDebuggerEditorLinePainter extends EditorLinePainter {
     Set<XValueNodeImpl> values = map.get(Pair.create(file, lineNumber));
     if (values != null && !values.isEmpty()) {
       final int bpLine = getCurrentBreakPointLine(values);
-      ArrayList<LineExtensionInfo> result = new ArrayList<LineExtensionInfo>();
+      ArrayList<VariableText> result = new ArrayList<VariableText>();
       for (XValueNodeImpl value : values) {
         SimpleColoredText text = new SimpleColoredText();
         XValueTextRendererImpl renderer = new XValueTextRendererImpl(text);
@@ -81,7 +81,8 @@ public class XDebuggerEditorLinePainter extends EditorLinePainter {
         try {
           if (presentation instanceof XValueCompactPresentation) {
             ((XValueCompactPresentation)presentation).renderValue(renderer, value);
-          } else {
+          }
+          else {
             presentation.renderValue(renderer);
           }
           if (StringUtil.isEmpty(text.toString())) {
@@ -90,7 +91,8 @@ public class XDebuggerEditorLinePainter extends EditorLinePainter {
               text.append(type, SimpleTextAttributes.REGULAR_ATTRIBUTES);
             }
           }
-        } catch (Exception e) {
+        }
+        catch (Exception e) {
           continue;
         }
         final Color color = bpLine == lineNumber ? new JBColor(Gray._180, new Color(147, 217, 186)) : getForeground();
@@ -99,7 +101,9 @@ public class XDebuggerEditorLinePainter extends EditorLinePainter {
         if (StringUtil.isEmpty(text.toString())) {
           continue;
         }
-        result.add(new LineExtensionInfo("  " + name + ": ", color, null, null, Font.PLAIN));
+        final VariableText res = new VariableText();
+        result.add(res);
+        res.add(new LineExtensionInfo("  " + name + ": ", color, null, null, Font.ITALIC));
 
         Variable var = new Variable(name, lineNumber);
         VariableValue variableValue = oldValues.get(var);
@@ -115,15 +119,25 @@ public class XDebuggerEditorLinePainter extends EditorLinePainter {
 
         if (!variableValue.isChanged()) {
           for (String s : text.getTexts()) {
-            result.add(new LineExtensionInfo(s, color, null, null, Font.PLAIN));
+            res.add(new LineExtensionInfo(s, color, null, null, Font.ITALIC));
           }
-        } else {
-          variableValue.produceChangedParts(result);
+        }
+        else {
+          variableValue.produceChangedParts(res.infos);
         }
       }
-      return result;
+      Collections.sort(result, new Comparator<VariableText>() {
+        @Override
+        public int compare(VariableText o1, VariableText o2) {
+          return o1.length - o2.length;
+        }
+      });
+      final List<LineExtensionInfo> infos = new ArrayList<LineExtensionInfo>();
+      for (VariableText text : result) {
+        infos.addAll(text.infos);
+      }
+      return infos;
     }
-
     return null;
   }
 
@@ -219,22 +233,22 @@ public class XDebuggerEditorLinePainter extends EditorLinePainter {
       if (isArray(actual) && isArray(old)) {
         List<String> actualParts = getArrayParts(actual);
         List<String> oldParts = getArrayParts(old);
-        result.add(new LineExtensionInfo("{", getForeground(), null, null, Font.PLAIN));
+        result.add(new LineExtensionInfo("{", getForeground(), null, null, Font.ITALIC));
         for (int i = 0; i < actualParts.size(); i++) {
           if (i < oldParts.size() && StringUtil.equals(actualParts.get(i), oldParts.get(i))) {
-            result.add(new LineExtensionInfo(actualParts.get(i), getForeground(), null, null, Font.PLAIN));
+            result.add(new LineExtensionInfo(actualParts.get(i), getForeground(), null, null, Font.ITALIC));
           } else {
-            result.add(new LineExtensionInfo(actualParts.get(i), getChangedForeground(), null, null, Font.BOLD));
+            result.add(new LineExtensionInfo(actualParts.get(i), getChangedForeground(), null, null, Font.ITALIC));
           }
           if (i != actualParts.size() - 1) {
-            result.add(new LineExtensionInfo(", ", getForeground(), null, null, Font.PLAIN));
+            result.add(new LineExtensionInfo(", ", getForeground(), null, null, Font.ITALIC));
           }
         }
-        result.add(new LineExtensionInfo("}", getForeground(), null, null, Font.PLAIN));
+        result.add(new LineExtensionInfo("}", getForeground(), null, null, Font.ITALIC));
         return;
       }
 
-      result.add(new LineExtensionInfo(actual, getChangedForeground(), null, null, Font.BOLD));
+      result.add(new LineExtensionInfo(actual, getChangedForeground(), null, null, Font.ITALIC));
     }
 
     private static boolean isArray(String s) {
@@ -243,6 +257,16 @@ public class XDebuggerEditorLinePainter extends EditorLinePainter {
 
     private static List<String> getArrayParts(String array) {
       return StringUtil.split(array.substring(1, array.length() - 1), ", ");
+    }
+  }
+
+  private static class VariableText {
+    List<LineExtensionInfo> infos = new ArrayList<LineExtensionInfo>();
+    int length = 0;
+
+    void add(LineExtensionInfo info) {
+      infos.add(info);
+      length += info.getText().length();
     }
   }
 }

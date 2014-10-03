@@ -52,6 +52,7 @@ public interface IdeActions {
   @NonNls String ACTION_EDITOR_COMPLETE_STATEMENT = "EditorCompleteStatement";
   @NonNls String ACTION_EDITOR_USE_SOFT_WRAPS = "EditorToggleUseSoftWraps";
   @NonNls String ACTION_EDITOR_ADD_OR_REMOVE_CARET= "EditorAddOrRemoveCaret";
+  @NonNls String ACTION_EDITOR_CREATE_RECTANGULAR_SELECTION= "EditorCreateRectangularSelection";
   @NonNls String ACTION_EDITOR_CLONE_CARET_BELOW= "EditorCloneCaretBelow";
   @NonNls String ACTION_EDITOR_CLONE_CARET_ABOVE= "EditorCloneCaretAbove";
 
@@ -82,6 +83,7 @@ public interface IdeActions {
   @NonNls String ACTION_CHOOSE_LOOKUP_ITEM_COMPLETE_STATEMENT = "EditorChooseLookupItemCompleteStatement";
   @NonNls String ACTION_CHOOSE_LOOKUP_ITEM_DOT = "EditorChooseLookupItemDot";
   @NonNls String ACTION_EXPAND_LIVE_TEMPLATE_BY_TAB = "ExpandLiveTemplateByTab";
+  @NonNls String ACTION_EXPAND_LIVE_TEMPLATE_CUSTOM = "ExpandLiveTemplateCustom";
 
   @NonNls String ACTION_LOOKUP_UP = "EditorLookupUp";
   @NonNls String ACTION_LOOKUP_DOWN = "EditorLookupDown";
@@ -148,6 +150,13 @@ public interface IdeActions {
   @NonNls String ACTION_EXPAND_ALL = "ExpandAll";
   @NonNls String ACTION_COLLAPSE_ALL = "CollapseAll";
   @NonNls String ACTION_EXPORT_TO_TEXT_FILE = "ExportToTextFile";
+
+  @NonNls String ACTION_EXPAND_ALL_REGIONS = "ExpandAllRegions";
+  @NonNls String ACTION_COLLAPSE_ALL_REGIONS = "CollapseAllRegions";
+  @NonNls String ACTION_EXPAND_REGION_RECURSIVELY = "ExpandRegionRecursively";
+  @NonNls String ACTION_COLLAPSE_REGION_RECURSIVELY = "CollapseRegionRecursively";
+  @NonNls String ACTION_EXPAND_TO_LEVEL_1 = "ExpandToLevel1";
+  @NonNls String ACTION_EXPAND_ALL_TO_LEVEL_1 = "ExpandAllToLevel1";
 
   @NonNls String ACTION_NEW_HORIZONTAL_TAB_GROUP = "NewHorizontalTabGroup";
   @NonNls String ACTION_NEW_VERTICAL_TAB_GROUP = "NewVerticalTabGroup";
@@ -233,6 +242,9 @@ public interface IdeActions {
   @NonNls String GROUP_GUI_DESIGNER_COMPONENT_TREE_POPUP = "GuiDesigner.ComponentTreePopupMenu";
   @NonNls String GROUP_GUI_DESIGNER_PROPERTY_INSPECTOR_POPUP = "GuiDesigner.PropertyInspectorPopupMenu";
 
+  @NonNls String ACTION_GOTO_LAST_CHANGE    = "JumpToLastChange";
+  @NonNls String ACTION_GOTO_NEXT_CHANGE    = "JumpToNextChange";
+
   @NonNls String ACTION_GOTO_BACK    = "Back";
   @NonNls String ACTION_GOTO_FORWARD = "Forward";
   @NonNls String ACTION_GOTO_DECLARATION = "GotoDeclaration";
@@ -272,7 +284,7 @@ public interface IdeActions {
   String ACTION_REDO = "$Redo";
   String GROUP_REFACTOR = "RefactoringMenu";
   String SELECTED_CHANGES_ROLLBACK = "Vcs.RollbackChangedLines";
-  String CHANGES_VIEW_ROLLBACK = "ChangesView.Rollback";
+  String CHANGES_VIEW_ROLLBACK = "ChangesView.Revert";
 
   String CONSOLE_CLEAR_ALL = "ConsoleView.ClearAll";
   String MOVE_TO_ANOTHER_CHANGE_LIST = "ChangesView.Move";

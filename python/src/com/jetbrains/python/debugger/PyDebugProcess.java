@@ -309,7 +309,7 @@ public class PyDebugProcess extends XDebugProcess implements IPyDebugProcess, Pr
   }
 
   protected String getConnectionMessage() {
-    return "Connecting to debugger...";
+    return "Waiting for connection...";
   }
 
   protected String getConnectionTitle() {
@@ -571,9 +571,9 @@ public class PyDebugProcess extends XDebugProcess implements IPyDebugProcess, Pr
   }
 
   @Override
-  public boolean isVariable(String name) {
+  public boolean canSaveToTemp(String name) {
     final Project project = getSession().getProject();
-    return PyDebugSupportUtils.isVariable(project, name);
+    return PyDebugSupportUtils.canSaveToTemp(project, name);
   }
 
   private PyStackFrame currentFrame() throws PyDebuggerException {
@@ -730,7 +730,7 @@ public class PyDebugProcess extends XDebugProcess implements IPyDebugProcess, Pr
       return XDebuggerBundle.message("debugger.state.message.connected");
     }
     else {
-      return "Waiting for connection...";
+      return getConnectionMessage();
     }
   }
 

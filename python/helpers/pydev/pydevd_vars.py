@@ -212,7 +212,10 @@ def getVariable(thread_id, frame_id, scope, attrs):
             var = frame.f_globals
             del attrList[0]  # globals are special, and they get a single dummy unused attribute
         else:
-            var = frame.f_locals
+            # in a frame access both locals and globals as Python does
+            var = {}
+            var.update(frame.f_globals)
+            var.update(frame.f_locals)
 
         for k in attrList:
             _type, _typeName, resolver = getType(var)
@@ -349,7 +352,7 @@ def evaluateExpression(thread_id, frame_id, expression, doExec):
         del updated_globals
         del frame
 
-def changeAttrExpression(thread_id, frame_id, attr, expression):
+def changeAttrExpression(thread_id, frame_id, attr, expression, dbg):
     '''Changes some attribute in a given frame.
     '''
     frame = findFrame(thread_id, frame_id)
@@ -359,10 +362,10 @@ def changeAttrExpression(thread_id, frame_id, attr, expression):
     try:
         expression = expression.replace('@LINE@', '\n')
 
-        # if isinstance(frame, DjangoTemplateFrame): # TODO: implemente for plugins
-        #     result = eval(expression, frame.f_globals, frame.f_locals)
-        #     frame.changeVariable(attr, result)
-        #     return
+        if dbg.plugin:
+            result = dbg.plugin.change_variable(frame, attr, expression)
+            if result:
+                return result
 
         if attr[:7] == "Globals":
             attr = attr[8:]
@@ -373,7 +376,7 @@ def changeAttrExpression(thread_id, frame_id, attr, expression):
             if pydevd_save_locals.is_save_locals_available():
                 frame.f_locals[attr] = eval(expression, frame.f_globals, frame.f_locals)
                 pydevd_save_locals.save_locals(frame)
-                return
+                return frame.f_locals[attr]
 
             #default way (only works for changing it in the topmost frame)
             result = eval(expression, frame.f_globals, frame.f_locals)

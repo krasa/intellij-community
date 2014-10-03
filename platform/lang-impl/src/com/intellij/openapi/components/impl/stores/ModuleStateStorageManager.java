@@ -16,11 +16,13 @@
 
 package com.intellij.openapi.components.impl.stores;
 
+import com.intellij.openapi.application.PathManager;
+import com.intellij.openapi.components.StateStorage;
 import com.intellij.openapi.components.StateStorageOperation;
 import com.intellij.openapi.components.TrackingPathMacroSubstitutor;
 import com.intellij.openapi.module.Module;
-import com.intellij.openapi.application.PathManager;
 import org.jetbrains.annotations.NonNls;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 class ModuleStateStorageManager extends StateStorageManagerImpl {
@@ -33,13 +35,13 @@ class ModuleStateStorageManager extends StateStorageManagerImpl {
   }
 
   @Override
-  protected StorageData createStorageData(String storageSpec) {
+  protected StorageData createStorageData(@NotNull String storageSpec) {
     return new ModuleStoreImpl.ModuleFileData(ROOT_TAG_NAME, myModule);
   }
 
   @Nullable
   @Override
-  protected String getOldStorageSpec(Object component, final String componentName, final StateStorageOperation operation) {
+  protected String getOldStorageSpec(@NotNull Object component, @NotNull String componentName, @NotNull StateStorageOperation operation) {
     return ModuleStoreImpl.DEFAULT_STATE_STORAGE;
   }
 
@@ -52,4 +54,9 @@ class ModuleStateStorageManager extends StateStorageManagerImpl {
     return myModule.getName() + Integer.toHexString(myModule.getModuleFilePath().hashCode());    
   }
 
+  @NotNull
+  @Override
+  protected StateStorage.Listener createStorageTopicListener() {
+    return myModule.getProject().getMessageBus().syncPublisher(StateStorage.PROJECT_STORAGE_TOPIC);
+  }
 }

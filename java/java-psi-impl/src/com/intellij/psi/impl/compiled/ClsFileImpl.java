@@ -24,16 +24,18 @@ import com.intellij.lang.FileASTNode;
 import com.intellij.lang.java.JavaLanguage;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.extensions.Extensions;
 import com.intellij.openapi.extensions.PluginId;
+import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.fileTypes.FileType;
-import com.intellij.openapi.progress.NonCancelableSection;
-import com.intellij.openapi.progress.ProgressIndicatorProvider;
+import com.intellij.openapi.progress.ProgressManager;
 import com.intellij.openapi.project.DefaultProjectFactory;
 import com.intellij.openapi.roots.FileIndexFacade;
 import com.intellij.openapi.ui.Queryable;
 import com.intellij.openapi.util.Comparing;
 import com.intellij.openapi.util.Computable;
+import com.intellij.openapi.util.Key;
 import com.intellij.openapi.util.ModificationTracker;
 import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.pom.java.LanguageLevel;
@@ -78,6 +80,8 @@ public class ClsFileImpl extends ClsRepositoryPsiElement<PsiClassHolderFileStub>
                          implements PsiJavaFile, PsiFileWithStubSupport, PsiFileEx, Queryable, PsiClassOwnerEx, PsiCompiledFile {
   private static final Logger LOG = Logger.getInstance("#com.intellij.psi.impl.compiled.ClsFileImpl");
 
+  private static final Key<Document> CLS_DOCUMENT_LINK_KEY = Key.create("cls.document.link");
+
   /** NOTE: you absolutely MUST NOT hold PsiLock under the mirror lock */
   private final Object myMirrorLock = new Object();
   private final Object myStubLock = new Object();
@@ -105,6 +109,7 @@ public class ClsFileImpl extends ClsRepositoryPsiElement<PsiClassHolderFileStub>
     super(null);
     myViewProvider = viewProvider;
     myIsForDecompiling = forDecompiling;
+    //noinspection ResultOfMethodCallIgnored
     JavaElementType.CLASS.getIndex();  // initialize Java stubs
   }
 
@@ -324,26 +329,14 @@ public class ClsFileImpl extends ClsRepositoryPsiElement<PsiClassHolderFileStub>
         mirrorTreeElement = myMirrorFileElement;
         if (mirrorTreeElement == null) {
           VirtualFile file = getVirtualFile();
-          CharSequence mirrorText = ClassFileDecompiler.decompileText(file);
-
-          String ext = JavaFileType.INSTANCE.getDefaultExtension();
           PsiClass[] classes = getClasses();
-          String fileName = (classes.length > 0 ? classes[0].getName() : file.getNameWithoutExtension()) + "." + ext;
-          PsiFileFactory factory = PsiFileFactory.getInstance(getManager().getProject());
-          PsiFile mirror = factory.createFileFromText(fileName, JavaLanguage.INSTANCE, mirrorText, false, false);
-          mirror.putUserData(PsiUtil.FILE_LANGUAGE_LEVEL_KEY, getLanguageLevel());
-          mirrorTreeElement = SourceTreeToPsiMap.psiToTreeNotNull(mirror);
+          String fileName = (classes.length > 0 ? classes[0].getName() : file.getNameWithoutExtension()) + JavaFileType.DOT_DEFAULT_EXTENSION;
 
-          // IMPORTANT: do not take lock too early - FileDocumentManager.saveToString() can run write action
-          NonCancelableSection section = ProgressIndicatorProvider.startNonCancelableSectionIfSupported();
-          try {
-            setMirror(mirrorTreeElement);
+          if (ClassFileDecompilers.find(file) instanceof ClassFileDecompilers.Light) {
+            mirrorTreeElement = trySetMirror(file, fileName, true);
           }
-          catch (InvalidMirrorException e) {
-            LOG.error(file.getPath(), wrapException(e, file));
-          }
-          finally {
-            section.done();
+          if (mirrorTreeElement == null) {
+            mirrorTreeElement = trySetMirror(file, fileName, false);
           }
 
           myMirrorFileElement = mirrorTreeElement;
@@ -351,6 +344,40 @@ public class ClsFileImpl extends ClsRepositoryPsiElement<PsiClassHolderFileStub>
       }
     }
     return mirrorTreeElement.getPsi();
+  }
+
+  private TreeElement trySetMirror(VirtualFile file, String fileName, boolean usePlugin) {
+    final Document document = FileDocumentManager.getInstance().getDocument(file);
+    assert document != null : file.getUrl();
+
+    CharSequence mirrorText = document.getImmutableCharSequence();
+    PsiFileFactory factory = PsiFileFactory.getInstance(getManager().getProject());
+    PsiFile mirror = factory.createFileFromText(fileName, JavaLanguage.INSTANCE, mirrorText, false, false);
+    mirror.putUserData(PsiUtil.FILE_LANGUAGE_LEVEL_KEY, getLanguageLevel());
+
+    final TreeElement mirrorTreeElement = SourceTreeToPsiMap.psiToTreeNotNull(mirror);
+    try {
+      ProgressManager.getInstance().executeNonCancelableSection(new Runnable() {
+        @Override
+        public void run() {
+          setMirror(mirrorTreeElement);
+          putUserData(CLS_DOCUMENT_LINK_KEY, document);
+        }
+      });
+    }
+    catch (InvalidMirrorException e) {
+      if (usePlugin && !ApplicationManager.getApplication().isUnitTestMode()) {
+        LOG.warn(file.getUrl(), wrapException(e, file));
+        return null;
+      }
+      else {
+        LOG.error(file.getUrl(), e);
+      }
+    }
+
+    ((PsiFileImpl)mirror).setOriginalFile(this);
+
+    return mirrorTreeElement;
   }
 
   private static Exception wrapException(InvalidMirrorException e, VirtualFile file) {
@@ -499,6 +526,7 @@ public class ClsFileImpl extends ClsRepositoryPsiElement<PsiClassHolderFileStub>
 
     ClsPackageStatementImpl packageStatement = new ClsPackageStatementImpl(this);
     synchronized (myMirrorLock) {
+      putUserData(CLS_DOCUMENT_LINK_KEY, null);
       myMirrorFileElement = null;
       myPackageStatement = packageStatement;
     }

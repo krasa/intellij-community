@@ -15,9 +15,9 @@
  */
 package com.jetbrains.python.templateLanguages;
 
+import com.intellij.execution.ExecutionException;
 import com.intellij.facet.ui.ValidationResult;
 import com.intellij.openapi.projectRoots.Sdk;
-import com.jetbrains.python.packaging.PyExternalProcessException;
 import com.jetbrains.python.packaging.PyPackage;
 import com.jetbrains.python.packaging.PyPackageManager;
 import org.jetbrains.annotations.NonNls;
@@ -40,22 +40,22 @@ public class PyTemplatesUtil {
     if (templateBinding != null) {
       if (TemplatesService.ALL_TEMPLATE_BINDINGS.contains(templateBinding)) {
         try {
-          final PyPackage installedPackage = packageManager.findInstalledPackage(templateBinding);
+          final PyPackage installedPackage = packageManager.findPackage(templateBinding, false);
           if (installedPackage == null)
             return new ValidationResult(templateBinding + " will be installed on selected interpreter");
         }
-        catch (PyExternalProcessException ignored) {
+        catch (ExecutionException ignored) {
         }
       }
     }
     if (language != null) {
       try {
-        final PyPackage installedPackage = packageManager.findInstalledPackage(language);
+        final PyPackage installedPackage = packageManager.findPackage(language, false);
         if (installedPackage == null) {
           return new ValidationResult(language + " will be installed on selected interpreter");
         }
       }
-      catch (PyExternalProcessException ignored) {
+      catch (ExecutionException ignored) {
       }
     }
     return null;

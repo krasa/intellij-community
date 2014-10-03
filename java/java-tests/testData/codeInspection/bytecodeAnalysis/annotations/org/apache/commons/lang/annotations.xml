@@ -1,3 +1,18 @@
+<!--
+  ~ Copyright 2000-2014 JetBrains s.r.o.
+  ~
+  ~ Licensed under the Apache License, Version 2.0 (the "License");
+  ~ you may not use this file except in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~ http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
 <root>
   <item name="org.apache.commons.lang.ArrayUtils boolean contains(byte[], byte) 0">
     <annotation name="org.jetbrains.annotations.Nullable"/>
@@ -3100,11 +3115,15 @@
   <item name="org.apache.commons.lang.Validate void notEmpty(java.util.Map, java.lang.String) 0">
     <annotation name="org.jetbrains.annotations.NotNull"/>
   </item>
-  <item name="org.apache.commons.lang.Validate void notNull(java.lang.Object) 0">
-    <annotation name="org.jetbrains.annotations.NotNull"/>
+  <item name="org.apache.commons.lang.Validate void notNull(java.lang.Object)">
+    <annotation name="org.jetbrains.annotations.Contract">
+      <val val="&quot;null -&gt; fail&quot;"/>
+    </annotation>
   </item>
-  <item name="org.apache.commons.lang.Validate void notNull(java.lang.Object, java.lang.String) 0">
-    <annotation name="org.jetbrains.annotations.NotNull"/>
+  <item name="org.apache.commons.lang.Validate void notNull(java.lang.Object, java.lang.String)">
+    <annotation name="org.jetbrains.annotations.Contract">
+      <val val="&quot;null, _ -&gt; fail&quot;"/>
+    </annotation>
   </item>
   <item name="org.apache.commons.lang.WordUtils boolean isDelimiter(char, char[]) 1">
     <annotation name="org.jetbrains.annotations.Nullable"/>

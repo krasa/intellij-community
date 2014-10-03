@@ -39,6 +39,7 @@ import com.intellij.ui.awt.RelativePoint;
 import com.intellij.util.IconUtil;
 import org.intellij.lang.annotations.JdkConstants;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.awt.*;
@@ -173,6 +174,7 @@ public abstract class AbstractValueHint {
     return myProject;
   }
 
+  @NotNull
   protected Editor getEditor() {
     return myEditor;
   }
@@ -192,6 +194,7 @@ public abstract class AbstractValueHint {
         if (myHideRunnable != null) {
           myHideRunnable.run();
         }
+        onHintHidden();
       }
     });
 
@@ -207,6 +210,10 @@ public abstract class AbstractValueHint {
                                                      HintManager.HIDE_BY_SCROLLING, 0, false,
                                                      HintManagerImpl.createHintHint(myEditor, p, myCurrentHint, HintManager.UNDER, true));
     return true;
+  }
+
+  protected void onHintHidden() {
+
   }
 
   protected boolean isHintHidden() {
@@ -238,6 +245,7 @@ public abstract class AbstractValueHint {
     }
   }
 
+  @Nullable
   protected TextRange getCurrentRange() {
     return myCurrentRange;
   }

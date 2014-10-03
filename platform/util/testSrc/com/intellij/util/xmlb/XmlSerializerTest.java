@@ -19,7 +19,6 @@ package com.intellij.util.xmlb;
 import com.intellij.openapi.util.JDOMUtil;
 import com.intellij.openapi.util.Ref;
 import com.intellij.openapi.util.text.StringUtil;
-import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.xmlb.annotations.*;
 import junit.framework.AssertionFailedError;
 import junit.framework.TestCase;
@@ -51,7 +50,6 @@ public class XmlSerializerTest extends TestCase {
   public void testEmptyBeanSerializationWithCustomName() {
     doSerializerTest("<Bean />", new EmptyBeanWithCustomName());
   }
-
 
   public static class BeanWithPublicFields implements Comparable<BeanWithPublicFields> {
     public int INT_V = 1;
@@ -254,7 +252,7 @@ public class XmlSerializerTest extends TestCase {
   }
 
   public static class BeanWithMap {
-    public Map<String, String> VALUES = new HashMap<String, String>();
+    public Map<String, String> VALUES = new LinkedHashMap<String, String>();
 
     {
       VALUES.put("a", "1");
@@ -302,7 +300,7 @@ public class XmlSerializerTest extends TestCase {
       keyAttributeName = "name",
       valueAttributeName = "value"
     )
-    public Map<String, String> VALUES = new HashMap<String, String>();
+    public Map<String, String> VALUES = new LinkedHashMap<String, String>();
 
     {
       VALUES.put("a", "1");
@@ -336,7 +334,7 @@ public class XmlSerializerTest extends TestCase {
 
 
   public static class BeanWithMapWithBeanValue {
-    public Map<String, BeanWithProperty> VALUES = new HashMap<String, BeanWithProperty>();
+    public Map<String, BeanWithProperty> VALUES = new LinkedHashMap<String, BeanWithProperty>();
 
   }
   public void testMapWithBeanValue() {
@@ -519,7 +517,7 @@ public class XmlSerializerTest extends TestCase {
 
     Element element = serialize(bean, null);
 
-    Element node = (Element)element.getChildren().get(0);
+    Element node = element.getChildren().get(0);
     element.removeContent(node);
     element.addContent(node);
 
@@ -1007,15 +1005,15 @@ public class XmlSerializerTest extends TestCase {
   }
 
   public static class BeanWithSetKeysInMap {
-    public Map<Collection<String>, String> myMap = new HashMap<Collection<String>, String>();
+    public Map<Collection<String>, String> myMap = new LinkedHashMap<Collection<String>, String>();
   }
 
   public void testSetKeysInMap() {
     final BeanWithSetKeysInMap bean = new BeanWithSetKeysInMap();
-    bean.myMap.put(new HashSet<String>(Arrays.asList("1", "2", "3")), "numbers");
-    bean.myMap.put(new HashSet<String>(Arrays.asList("a", "b", "c")), "letters");
+    bean.myMap.put(new LinkedHashSet<String>(Arrays.asList("a", "b", "c")), "letters");
+    bean.myMap.put(new LinkedHashSet<String>(Arrays.asList("1", "2", "3")), "numbers");
 
-    BeanWithSetKeysInMap bb = (BeanWithSetKeysInMap)doSerializerTest(
+    BeanWithSetKeysInMap bb = doSerializerTest(
       "<BeanWithSetKeysInMap>\n" +
       "  <option name=\"myMap\">\n" +
       "    <map>\n" +
@@ -1087,7 +1085,7 @@ public class XmlSerializerTest extends TestCase {
   public static class BeanWithMapWithoutSurround {
     @Tag("map")
     @MapAnnotation(surroundWithTag = false, entryTagName = "pair", surroundKeyWithTag = false, surroundValueWithTag = false)
-    public Map<BeanWithPublicFields, BeanWithTextAnnotation> MAP = new HashMap<BeanWithPublicFields, BeanWithTextAnnotation>();
+    public Map<BeanWithPublicFields, BeanWithTextAnnotation> MAP = new LinkedHashMap<BeanWithPublicFields, BeanWithTextAnnotation>();
   }
 
   public void testMapWithNotSurroundingKeyAndValue() {
@@ -1137,7 +1135,7 @@ public class XmlSerializerTest extends TestCase {
   public static class BeanWithMapAtTopLevel {
     @Property(surroundWithTag = false)
     @MapAnnotation(surroundWithTag = false, surroundKeyWithTag = false, surroundValueWithTag = false)
-    public Map<String, String> map = new HashMap<String, String>();
+    public Map<String, String> map = new LinkedHashMap<String, String>();
 
     public String option;
   }
@@ -1192,6 +1190,20 @@ public class XmlSerializerTest extends TestCase {
                      "</BeanWithConverter>", bean);
   }
 
+  public void testConverterUsingSkipDefaultsFilters() {
+    BeanWithConverter bean = new BeanWithConverter();
+    doSerializerTest("<BeanWithConverter />", bean, new SkipDefaultValuesSerializationFilters());
+
+    bean.foo = Ref.create("testValue");
+    doSerializerTest("<BeanWithConverter foo=\"testValue\" />", bean, new SkipDefaultValuesSerializationFilters());
+
+    bean.foo = Ref.create();
+    bean.bar = Ref.create("testValue2");
+    doSerializerTest("<BeanWithConverter foo=\"\">\n" +
+                     "  <option name=\"bar\" value=\"testValue2\" />\n" +
+                     "</BeanWithConverter>", bean);
+  }
+
   private static class BeanWithDefaultAttributeName {
     @Attribute
     public String getFoo() {
@@ -1212,49 +1224,41 @@ public class XmlSerializerTest extends TestCase {
     return assertSerializer(bean, expected, "Serialization failure", filter);
   }
 
-  private static Object doSerializerTest(@Language("XML") String expectedText, Object bean) {
-    try {
-      Element element = assertSerializer(bean, expectedText, null);
+  private static <T> T doSerializerTest(@Language("XML") String expectedText, T bean) {
+    return doSerializerTest(expectedText, bean, null);
+  }
 
-      //test deserializer
+  private static <T> T doSerializerTest(@Language("XML") String expectedText, T bean, @Nullable SerializationFilter filter) {
+    Element element = assertSerializer(bean, expectedText, filter);
 
-      Object o = XmlSerializer.deserialize(element, bean.getClass());
-      assertSerializer(o, expectedText, "Deserialization failure", null);
-      return o;
-    }
-    catch (XmlSerializationException e) {
-      throw e;
-    }
-    catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+    //test deserializer
+    Class<T> aClass = (Class<T>)bean.getClass();
+    T o = XmlSerializer.deserialize(element, aClass);
+    assertSerializer(o, expectedText, "Deserialization failure", filter);
+    return o;
   }
 
   private static Element assertSerializer(Object bean, String expectedText, String message, SerializationFilter filter) throws XmlSerializationException {
     Element element = serialize(bean, filter);
-
-
     String actualString = JDOMUtil.writeElement(element, "\n").trim();
-
     if (!expectedText.startsWith(XML_PREFIX)) {
       if (actualString.startsWith(XML_PREFIX)) actualString = actualString.substring(XML_PREFIX.length()).trim();
     }
 
     assertEquals(message, expectedText, actualString);
-
     return element;
   }
 
   public static class BeanWithMapWithSetValue {
     @MapAnnotation(entryTagName = "entry-tag", keyAttributeName = "key-attr", surroundWithTag = false)
-    public Map<String, Set<String>> myValues = new HashMap<String, Set<String>>();
+    public Map<String, Set<String>> myValues = new LinkedHashMap<String, Set<String>>();
   }
 
   public void testBeanWithMapWithSetValue() {
     BeanWithMapWithSetValue bean = new BeanWithMapWithSetValue();
 
-    bean.myValues.put("a", ContainerUtil.newHashSet("first1", "second1"));
-    bean.myValues.put("b", ContainerUtil.newHashSet("first2", "second2"));
+    bean.myValues.put("a", new LinkedHashSet<String>(Arrays.asList("first1", "second1")));
+    bean.myValues.put("b", new LinkedHashSet<String>(Arrays.asList("first2", "second2")));
 
     doSerializerTest(
       "<BeanWithMapWithSetValue>\n" +

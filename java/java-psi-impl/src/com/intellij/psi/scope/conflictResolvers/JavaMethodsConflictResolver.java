@@ -259,10 +259,16 @@ public class JavaMethodsConflictResolver implements PsiConflictResolver{
       }
       PsiMethod existingMethod = (PsiMethod)existing.getElement();
       PsiClass existingClass = existingMethod.getContainingClass();
-      if (class1 != null && existingClass != null && 
-          class1.isInterface() && CommonClassNames.JAVA_LANG_OBJECT.equals(existingClass.getQualifiedName())) { //prefer interface methods to methods from Object
-        signatures.put(signature, info);
-        continue;
+      if (class1 != null && existingClass != null) { //prefer interface methods to methods from Object
+        if (class1.isInterface() && CommonClassNames.JAVA_LANG_OBJECT.equals(existingClass.getQualifiedName())) {
+          signatures.put(signature, info);
+          continue;
+        } 
+        else if (existingClass.isInterface() && CommonClassNames.JAVA_LANG_OBJECT.equals(class1.getQualifiedName())) {
+          conflicts.remove(info);
+          i--;
+          continue;
+        }
       }
       if (method == existingMethod) {
         PsiElement scope1 = info.getCurrentFileResolveScope();
@@ -398,7 +404,7 @@ public class JavaMethodsConflictResolver implements PsiConflictResolver{
   }
 
   @MethodCandidateInfo.ApplicabilityLevelConstant
-  protected int checkApplicability(@NotNull List<CandidateInfo> conflicts) {
+  public int checkApplicability(@NotNull List<CandidateInfo> conflicts) {
     @MethodCandidateInfo.ApplicabilityLevelConstant int maxApplicabilityLevel = 0;
     boolean toFilter = false;
     for (CandidateInfo conflict : conflicts) {

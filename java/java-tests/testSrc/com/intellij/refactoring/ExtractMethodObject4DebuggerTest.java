@@ -21,15 +21,14 @@
 package com.intellij.refactoring;
 
 import com.intellij.JavaTestUtil;
-import com.intellij.idea.Bombed;
-import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.projectRoots.Sdk;
-import com.intellij.psi.*;
+import com.intellij.psi.JavaCodeFragment;
+import com.intellij.psi.JavaCodeFragmentFactory;
+import com.intellij.psi.PsiClass;
+import com.intellij.psi.PsiElement;
 import com.intellij.refactoring.extractMethodObject.ExtractLightMethodObjectHandler;
 import com.intellij.testFramework.IdeaTestUtil;
 import org.jetbrains.annotations.NotNull;
-
-import java.util.Calendar;
 
 public class ExtractMethodObject4DebuggerTest extends LightRefactoringTestCase {
   @NotNull
@@ -99,17 +98,86 @@ public class ExtractMethodObject4DebuggerTest extends LightRefactoringTestCase {
   }
 
   public void testAnonymousClassParams() throws Exception {
-    doTest("new I() {public void foo(int i) {i++;}};", "new Test().invoke();",
+    doTest("new I() {public void foo(int i) {i++;}};", "I result = new Test().invoke();",
 
            "public class Test {\n" +
-           "        public void invoke() {\n" +
-           "            new I() {\n" +
+           "        public I invoke() {\n" +
+           "            return new I() {\n" +
            "                public void foo(int i) {\n" +
            "                    i++;\n" +
            "                }\n" +
            "            };\n" +
            "        }\n" +
            "    }");
+  }
+
+  public void testInnerClass() throws Exception {
+    doTest("   new I(2).foo()", "new Test().invoke();",
+
+           "public class Test {\n" +
+           "        public void invoke() {\n" +
+           "            new Sample.I(2).foo();\n" +
+           "        }\n" +
+           "    }");
+  }
+
+  public void testResultExpr() throws Exception {
+    doTest("   foo()", "int result = new Test().invoke();",
+
+           "public class Test {\n" +
+           "        public int invoke() {\n" +
+           "            return foo();\n" +
+           "        }\n" +
+           "    }");
+  }
+
+  public void testResultStatements() throws Exception {
+    doTest("int i = 0;\nfoo()", "Test test = new Test().invoke();int i = test.getI();int result = test.getResult();",
+
+           "public class Test {\n" +
+           "        private int i;\n" +
+           "        private int result;\n" +
+           "\n" +
+           "        public int getI() {\n" +
+           "            return i;\n" +
+           "        }\n" +
+           "\n" +
+           "        public int getResult() {\n" +
+           "            return result;\n" +
+           "        }\n" +
+           "\n" +
+           "        public Test invoke() {\n" +
+           "            i = 0;\n" +
+           "            result = foo();\n" +
+           "            return this;\n" +
+           "        }\n" +
+           "    }");
+  }
+
+
+  public void testOffsetsAtCallSite() throws Exception {
+    doTest("map.entrySet().stream().filter((a) -> (a.getKey()>0));",
+           "java.util.stream.Stream<Map.Entry<Integer,Integer>> result = new Test(map).invoke();",
+           "public class Test {\n" +
+           "        private Map<Integer, Integer> map;\n" +
+           "\n" +
+           "        public Test(Map<Integer, Integer> map) {\n" +
+           "            this.map = map;\n" +
+           "        }\n" +
+           "\n" +
+           "        public Stream<Map.Entry<Integer, Integer>> invoke() {\n" +
+           "            return map.entrySet().stream().filter((a) -> (a.getKey() > 0));\n" +
+           "        }\n" +
+           "    }");
+  }
+
+  public void testHangingFunctionalExpressions() throws Exception {
+    doTest("() -> {}", "new Test().invoke();", "public class Test {\n" +
+                                               "        public void invoke() {\n" +
+                                               "            () -> {\n" +
+                                               "            };\n" +
+                                               "        }\n" +
+                                               "    }");
   }
 
   @Override

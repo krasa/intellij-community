@@ -57,13 +57,17 @@ public class DataFlowRunner {
   public static final int MAX_STATES_PER_BRANCH = 300;
 
   protected DataFlowRunner(PsiElement block) {
+    this(block, false);
+  }
+
+  protected DataFlowRunner(PsiElement block, boolean unknownMembersAreNullable) {
     PsiElement parentConstructor = PsiTreeUtil.findFirstParent(block, new Condition<PsiElement>() {
       @Override
       public boolean value(PsiElement psiElement) {
         return psiElement instanceof PsiMethod && ((PsiMethod)psiElement).isConstructor();
       }
     });
-    myValueFactory = new DfaValueFactory(parentConstructor == null);
+    myValueFactory = new DfaValueFactory(parentConstructor == null, unknownMembersAreNullable);
   }
 
   public DfaValueFactory getFactory() {
@@ -120,7 +124,7 @@ public class DataFlowRunner {
           joinInstructions.add(myInstructions[((GotoInstruction)instruction).getOffset()]);
         } else if (instruction instanceof ConditionalGotoInstruction) {
           joinInstructions.add(myInstructions[((ConditionalGotoInstruction)instruction).getOffset()]);
-        } else if (instruction instanceof MethodCallInstruction) {
+        } else if (instruction instanceof MethodCallInstruction && !((MethodCallInstruction)instruction).getContracts().isEmpty()) {
           joinInstructions.add(myInstructions[index + 1]);
         }
       }

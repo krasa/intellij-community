@@ -15,15 +15,17 @@
  */
 package com.intellij.dvcs.push;
 
-import org.jetbrains.annotations.NotNull;
-
-
 /**
  * Destination for push action. (Remote  for git or push-path for mercurial).
  */
 public interface PushTarget {
 
-  @NotNull
-    //todo rename - > getName or smth
-  String getPresentation();
+  /**
+   * Returns true if pushing to this target is guaranteed to introduce something new: e.g. new branch or tag.
+   * <p/>
+   * Returning false doesn't mean that this target has nothing to push (e.g. commits to push are calculated separately),
+   * it means rather that "we don't know".
+   */
+  boolean hasSomethingToPush();
+
 }

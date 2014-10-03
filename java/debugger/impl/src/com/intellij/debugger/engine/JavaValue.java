@@ -24,7 +24,6 @@ import com.intellij.debugger.engine.evaluation.EvaluateException;
 import com.intellij.debugger.engine.evaluation.EvaluationContextImpl;
 import com.intellij.debugger.engine.evaluation.TextWithImportsImpl;
 import com.intellij.debugger.engine.events.DebuggerCommandImpl;
-import com.intellij.debugger.engine.events.DebuggerContextCommandImpl;
 import com.intellij.debugger.engine.events.SuspendContextCommandImpl;
 import com.intellij.debugger.impl.DebuggerContextImpl;
 import com.intellij.debugger.impl.DebuggerUtilsEx;
@@ -85,7 +84,7 @@ public class JavaValue extends XNamedValue implements NodeDescriptorProvider, XV
 
   static JavaValue create(JavaValue parent,
                           @NotNull ValueDescriptorImpl valueDescriptor,
-                          EvaluationContextImpl evaluationContext,
+                          @NotNull EvaluationContextImpl evaluationContext,
                           NodeManagerImpl nodeManager,
                           boolean contextSet) {
     DebuggerManagerThreadImpl.assertIsManagerThread();
@@ -93,7 +92,7 @@ public class JavaValue extends XNamedValue implements NodeDescriptorProvider, XV
   }
 
   static JavaValue create(@NotNull ValueDescriptorImpl valueDescriptor,
-                          EvaluationContextImpl evaluationContext,
+                          @NotNull EvaluationContextImpl evaluationContext,
                           NodeManagerImpl nodeManager) {
     return create(null, valueDescriptor, evaluationContext, nodeManager, false);
   }
@@ -114,15 +113,16 @@ public class JavaValue extends XNamedValue implements NodeDescriptorProvider, XV
 
   @Override
   public void computePresentation(@NotNull final XValueNode node, @NotNull XValuePlace place) {
-    if (myEvaluationContext.getSuspendContext().isResumed()) return;
-    myEvaluationContext.getDebugProcess().getManagerThread().schedule(new DebuggerContextCommandImpl(getDebuggerContext()) {
+    final SuspendContextImpl suspendContext = myEvaluationContext.getSuspendContext();
+    if (suspendContext.isResumed()) return;
+    myEvaluationContext.getDebugProcess().getManagerThread().schedule(new SuspendContextCommandImpl(suspendContext) {
       @Override
       public Priority getPriority() {
         return Priority.NORMAL;
       }
 
       @Override
-      public void threadAction() {
+      public void contextAction() throws Exception {
         if (!myContextSet) {
           myValueDescriptor.setContext(myEvaluationContext);
         }
@@ -150,15 +150,15 @@ public class JavaValue extends XNamedValue implements NodeDescriptorProvider, XV
               node.setFullValueEvaluator(new XFullValueEvaluator() {
                 @Override
                 public void startEvaluation(@NotNull final XFullValueEvaluationCallback callback) {
-                  myEvaluationContext.getDebugProcess().getManagerThread().schedule(new DebuggerContextCommandImpl(getDebuggerContext()) {
+                  myEvaluationContext.getDebugProcess().getManagerThread().schedule(new SuspendContextCommandImpl(suspendContext) {
                     @Override
                     public Priority getPriority() {
                       return Priority.NORMAL;
                     }
 
                     @Override
-                    public void threadAction() {
-                      final String valueAsString = DebuggerUtilsEx.getValueOrErrorAsString(myEvaluationContext, myValueDescriptor.getValue());
+                    public void contextAction() throws Exception {
+                      final String valueAsString = myValueDescriptor.getValueText();
                       DebuggerInvocationUtil.invokeLater(getProject(), new Runnable() {
                         @Override
                         public void run() {
@@ -347,8 +347,9 @@ public class JavaValue extends XNamedValue implements NodeDescriptorProvider, XV
 
   @Override
   public void computeSourcePosition(@NotNull final XNavigatable navigatable) {
-    if (myEvaluationContext.getSuspendContext().isResumed()) return;
-    myEvaluationContext.getDebugProcess().getManagerThread().schedule(new SuspendContextCommandImpl(myEvaluationContext.getSuspendContext()) {
+    final SuspendContextImpl suspendContext = myEvaluationContext.getSuspendContext();
+    if (suspendContext.isResumed()) return;
+    myEvaluationContext.getDebugProcess().getManagerThread().schedule(new SuspendContextCommandImpl(suspendContext) {
       @Override
       public Priority getPriority() {
         return Priority.NORMAL;

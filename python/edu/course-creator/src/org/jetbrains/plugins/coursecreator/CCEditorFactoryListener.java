@@ -1,7 +1,12 @@
 package org.jetbrains.plugins.coursecreator;
 
+import com.intellij.codeInsight.hint.HintManager;
 import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.editor.Editor;
+import com.intellij.openapi.editor.ReadOnlyFragmentModificationException;
+import com.intellij.openapi.editor.actionSystem.EditorActionManager;
+import com.intellij.openapi.editor.actionSystem.ReadonlyFragmentModificationHandler;
+import com.intellij.openapi.editor.colors.EditorColors;
 import com.intellij.openapi.editor.event.EditorFactoryEvent;
 import com.intellij.openapi.editor.event.EditorFactoryListener;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
@@ -41,14 +46,18 @@ public class CCEditorFactoryListener implements EditorFactoryListener {
     TaskFileModificationListener listener = new TaskFileModificationListener(taskFile);
     CCProjectService.addDocumentListener(editor.getDocument(), listener);
     editor.getDocument().addDocumentListener(listener);
+    EditorActionManager.getInstance()
+      .setReadonlyFragmentModificationHandler(editor.getDocument(), new TaskWindowDeleteHandler(editor));
     CCProjectService.drawTaskWindows(virtualFile, editor, course);
+    editor.getColorsScheme().setColor(EditorColors.READONLY_FRAGMENT_BACKGROUND_COLOR, null);
+    taskFile.createGuardedBlocks(editor);
   }
 
   @Override
   public void editorReleased(@NotNull EditorFactoryEvent event) {
     Editor editor = event.getEditor();
     Document document = editor.getDocument();
-    StudyDocumentListener listener = CCProjectService.getListener(document);
+    CCDocumentListener listener = CCProjectService.getListener(document);
     if (listener != null) {
       document.removeDocumentListener(listener);
       CCProjectService.removeListener(document);
@@ -57,7 +66,7 @@ public class CCEditorFactoryListener implements EditorFactoryListener {
     editor.getSelectionModel().removeSelection();
   }
 
-  private static class TaskFileModificationListener extends StudyDocumentListener {
+  private static class TaskFileModificationListener extends CCDocumentListener {
 
     public TaskFileModificationListener(TaskFile taskFile) {
       super(taskFile);
@@ -67,9 +76,25 @@ public class CCEditorFactoryListener implements EditorFactoryListener {
     protected void updateTaskWindowLength(CharSequence fragment, TaskWindow taskWindow, int change) {
         int newLength = taskWindow.getReplacementLength() + change;
         taskWindow.setReplacementLength(newLength <= 0 ? 0 : newLength);
-        if (fragment.equals("\n")) {
-          taskWindow.setReplacementLength(taskWindow.getLength() + 1);
-        }
+    }
+
+    @Override
+    protected boolean useLength() {
+      return false;
+    }
+  }
+
+  private static class TaskWindowDeleteHandler implements ReadonlyFragmentModificationHandler {
+
+    private final Editor myEditor;
+
+    public TaskWindowDeleteHandler(@NotNull final Editor editor) {
+      myEditor = editor;
+    }
+
+    @Override
+    public void handle(ReadOnlyFragmentModificationException e) {
+      HintManager.getInstance().showErrorHint(myEditor, "Delete task window before editing its borders");
     }
   }
 }

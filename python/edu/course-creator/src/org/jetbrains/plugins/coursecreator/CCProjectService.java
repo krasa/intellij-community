@@ -16,6 +16,8 @@
 package org.jetbrains.plugins.coursecreator;
 
 import com.intellij.ide.projectView.ProjectView;
+import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.actionSystem.Presentation;
 import com.intellij.openapi.components.PersistentStateComponent;
 import com.intellij.openapi.components.ServiceManager;
 import com.intellij.openapi.components.State;
@@ -47,7 +49,7 @@ public class CCProjectService implements PersistentStateComponent<Element> {
   private static final Logger LOG = Logger.getInstance(CCProjectService.class.getName());
   public Course myCourse;
   public static final String COURSE_ELEMENT = "course";
-  private static final Map<Document, StudyDocumentListener> myDocumentListeners = new HashMap<Document, StudyDocumentListener>();
+  private static final Map<Document, CCDocumentListener> myDocumentListeners = new HashMap<Document, CCDocumentListener>();
 
   public void setCourse(@NotNull final Course course) {
     myCourse = course;
@@ -123,11 +125,11 @@ public class CCProjectService implements PersistentStateComponent<Element> {
     }
   }
 
-  public static void addDocumentListener(Document document, StudyDocumentListener listener) {
+  public static void addDocumentListener(Document document, CCDocumentListener listener) {
     myDocumentListeners.put(document, listener);
   }
 
-  public static StudyDocumentListener getListener(Document document) {
+  public static CCDocumentListener getListener(Document document) {
     return myDocumentListeners.get(document);
   }
 
@@ -182,5 +184,21 @@ public class CCProjectService implements PersistentStateComponent<Element> {
     }
     int nameEnd = name.indexOf(".answer");
     return name.substring(0, nameEnd) + ".py";
+  }
+
+  public static boolean setCCActionAvailable(@NotNull AnActionEvent e) {
+    final Presentation presentation = e.getPresentation();
+    final Project project = e.getProject();
+    if (project == null) {
+      return false;
+    }
+    if (getInstance(project).getCourse() == null) {
+      presentation.setVisible(false);
+      presentation.setEnabled(false);
+      return false;
+    }
+    presentation.setEnabled(true);
+    presentation.setVisible(true);
+    return true;
   }
 }

@@ -15,6 +15,7 @@
  */
 package com.intellij.util;
 
+import com.intellij.ide.ui.UISettings;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.wm.ex.WindowManagerEx;
@@ -22,6 +23,7 @@ import com.intellij.ui.EditorTextField;
 import com.intellij.ui.components.OrphanGuardian;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.containers.FilteringIterator;
+import com.intellij.util.ui.JBSwingUtilities;
 import com.intellij.util.ui.UIUtil;
 import gnu.trove.TIntStack;
 import org.jetbrains.annotations.NotNull;
@@ -34,7 +36,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Iterator;
 
-public class IJSwingUtilities {
+public class IJSwingUtilities extends JBSwingUtilities {
   public static void invoke(Runnable runnable) {
     if (ApplicationManager.getApplication().isDispatchThread()) {
       runnable.run();
@@ -265,6 +267,23 @@ public class IJSwingUtilities {
       JPopupMenu jpm = jc.getComponentPopupMenu();
       if (jpm != null && jpm.isVisible() && jpm.getInvoker() == jc) {
         updateComponentTreeUI(jpm);
+      }
+    }
+  }
+
+  public static void moveMousePointerOn(Component component) {
+    if (component != null && component.isShowing()) {
+      UISettings settings = ApplicationManager.getApplication() == null ? null : UISettings.getInstance();
+      if (settings != null && settings.MOVE_MOUSE_ON_DEFAULT_BUTTON) {
+        Point point = component.getLocationOnScreen();
+        int dx = component.getWidth() / 2;
+        int dy = component.getHeight() / 2;
+        try {
+          new Robot().mouseMove(point.x + dx, point.y + dy);
+        }
+        catch (AWTException ignored) {
+          // robot is not available
+        }
       }
     }
   }

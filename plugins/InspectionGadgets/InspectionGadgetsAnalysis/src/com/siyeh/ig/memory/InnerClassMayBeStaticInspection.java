@@ -1,5 +1,5 @@
 /*
- * Copyright 2003-2013 Dave Griffith, Bas Leijdekkers
+ * Copyright 2003-2014 Dave Griffith, Bas Leijdekkers
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,6 @@ import com.siyeh.InspectionGadgetsBundle;
 import com.siyeh.ig.BaseInspection;
 import com.siyeh.ig.BaseInspectionVisitor;
 import com.siyeh.ig.InspectionGadgetsFix;
-import com.siyeh.ig.memory.InnerClassReferenceVisitor;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -87,7 +86,7 @@ public class InnerClassMayBeStaticInspection extends BaseInspection {
       final SearchScope useScope = innerClass.getUseScope();
       final Query<PsiReference> query = ReferencesSearch.search(innerClass, useScope);
       final Collection<PsiReference> references = query.findAll();
-      final List<PsiElement> elements = new ArrayList(references);
+      final List<PsiElement> elements = new ArrayList<PsiElement>(references.size() + 1);
       for (PsiReference reference : references) {
         elements.add(reference.getElement());
       }

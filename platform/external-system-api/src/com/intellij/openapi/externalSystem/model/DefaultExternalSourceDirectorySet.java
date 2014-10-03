@@ -27,7 +27,7 @@ import java.util.Set;
  * @author Vladislav.Soroka
  * @since 7/14/2014
  */
-public class DefaultExternalSourceDirectorySet implements ExternalSourceDirectorySet {
+public class DefaultExternalSourceDirectorySet implements ModifiableExternalSourceDirectorySet {
   private static final long serialVersionUID = 1L;
 
   @NotNull
@@ -42,6 +42,8 @@ public class DefaultExternalSourceDirectorySet implements ExternalSourceDirector
   private Set<String> myIncludes;
   @NotNull
   private List<ExternalFilter> myFilters;
+
+  private boolean myInheritedCompilerOutput;
 
   public DefaultExternalSourceDirectorySet() {
     mySrcDirs = new HashSet<File>();
@@ -86,6 +88,15 @@ public class DefaultExternalSourceDirectorySet implements ExternalSourceDirector
   @Override
   public File getOutputDir() {
     return myOutputDir;
+  }
+
+  @Override
+  public boolean isCompilerOutputPathInherited() {
+    return myInheritedCompilerOutput;
+  }
+
+  public void setInheritedCompilerOutput(boolean inheritedCompilerOutput) {
+    myInheritedCompilerOutput = inheritedCompilerOutput;
   }
 
   @NotNull

@@ -1,8 +1,11 @@
-<idea-plugin version="2" xmlns:xi="http://www.w3.org/2001/XInclude">
-  <!-- Components and extensions declared in this file work ONLY in PyCharm, not in Python plugin. -->
+<idea-plugin xmlns:xi="http://www.w3.org/2001/XInclude" version="2">
+  <!-- Components and extensions declared in this file work ONLY in PyCharm, not in Python plugin.
+       Both Community and Professional editions. -->
+
   <xi:include href="/META-INF/IdeTipsAndTricks.xml" xpointer="xpointer(/idea-plugin/*)"/>
   <xi:include href="/META-INF/PlatformLangPlugin.xml" xpointer="xpointer(/idea-plugin/*)"/>
   <xi:include href="/META-INF/XmlPlugin.xml" xpointer="xpointer(/idea-plugin/*)"/>
+  <xi:include href="/META-INF/JsonPlugin.xml" xpointer="xpointer(/idea-plugin/*)"/>
   <xi:include href="/META-INF/ImagesPlugin.xml" xpointer="xpointer(/idea-plugin/*)">
     <xi:fallback/>
   </xi:include>
@@ -12,12 +15,6 @@
     <xi:fallback/>
   </xi:include>
 
-  <application-components>
-    <component>
-      <implementation-class>com.jetbrains.python.PyCharmInitialConfigurator</implementation-class>
-      <headless-implementation-class/>
-    </component>
-  </application-components>
   <project-components>
     <component>
       <implementation-class>com.intellij.internal.statistic.updater.SendStatisticsProjectComponent</implementation-class>
@@ -40,10 +37,10 @@
 
     <projectAttachProcessor implementation="com.intellij.platform.ModuleAttachProcessor"/>
 
-    <projectConfigurable instance="com.jetbrains.python.configuration.PythonContentEntriesConfigurable"/>
-    <projectConfigurable instance="com.jetbrains.python.buildout.BuildoutModulesConfigurable"/>
+    <projectConfigurable groupId="project" instance="com.jetbrains.python.configuration.PythonContentEntriesConfigurable"/>
+    <projectConfigurable groupId="build" instance="com.jetbrains.python.buildout.BuildoutModulesConfigurable"/>
     <projectConfigurable groupId="project" instance="com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable"/>
-    <projectConfigurable instance="com.jetbrains.python.configuration.PyDependenciesConfigurable"/>
+    <projectConfigurable groupId="project" instance="com.jetbrains.python.configuration.PyDependenciesConfigurable"/>
 
     <directoryProjectConfigurator implementation="com.jetbrains.python.PythonSdkConfigurator" id="sdk"
                                   order="after PlatformProjectConfigurator"/>
