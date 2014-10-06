@@ -21,6 +21,7 @@ import com.intellij.openapi.editor.RangeMarker;
 import com.intellij.openapi.editor.SelectionModel;
 import com.intellij.openapi.editor.colors.EditorColors;
 import com.intellij.openapi.editor.colors.EditorColorsScheme;
+import com.intellij.openapi.editor.colors.EditorFontType;
 import com.intellij.openapi.editor.colors.impl.DelegateColorScheme;
 import com.intellij.openapi.editor.event.DocumentListener;
 import com.intellij.openapi.editor.ex.*;
@@ -28,13 +29,12 @@ import com.intellij.openapi.editor.impl.EditorImpl;
 import com.intellij.openapi.editor.impl.LineSet;
 import com.intellij.openapi.editor.impl.RangeMarkerTree;
 import com.intellij.openapi.fileTypes.FileTypes;
-import com.intellij.openapi.util.Disposer;
-import com.intellij.openapi.util.TextRange;
-import com.intellij.openapi.util.UserDataHolderBase;
+import com.intellij.openapi.util.*;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.util.ArrayUtil;
 import com.intellij.util.ObjectUtils;
 import com.intellij.util.Processor;
+import com.intellij.util.ui.UIUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -50,7 +50,7 @@ import java.util.List;
  */
 public abstract class EditorTextFieldCellRenderer implements TableCellRenderer, Disposable {
 
-  private static final String MY_PANEL_PROPERTY = "EditorTextFieldCellRenderer.MyEditorPanel";
+  private static final Key<MyPanel> MY_PANEL_PROPERTY = Key.create("EditorTextFieldCellRenderer.MyEditorPanel");
 
   public EditorTextFieldCellRenderer(Disposable parent) {
     Disposer.register(parent, this);
@@ -67,9 +67,10 @@ public abstract class EditorTextFieldCellRenderer implements TableCellRenderer, 
   public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
     MyPanel panel = getEditorPanel(table);
     EditorEx editor = panel.myEditor;
-    int tableFontSize = table.getFont().getSize();
-    if (editor.getColorsScheme().getEditorFontSize() != tableFontSize) {
-      editor.getColorsScheme().setEditorFontSize(tableFontSize);
+    Font font = table.getFont();
+    Font editorFont = editor.getColorsScheme().getFont(EditorFontType.PLAIN);
+    if (!Comparing.equal(font, editorFont)) {
+      editor.getColorsScheme().setEditorFontSize(font.getSize());
     }
     panel.setText(getText(((EditorImpl)editor).getFontMetrics(Font.PLAIN), table, value, row, column));
 
@@ -93,7 +94,7 @@ public abstract class EditorTextFieldCellRenderer implements TableCellRenderer, 
 
   @NotNull
   private MyPanel getEditorPanel(JTable table) {
-    MyPanel panel = (MyPanel)table.getClientProperty(MY_PANEL_PROPERTY);
+    MyPanel panel = UIUtil.getClientProperty(table, MY_PANEL_PROPERTY);
     if (panel != null) {
       EditorColorsScheme scheme = panel.myEditor.getColorsScheme();
       if (scheme instanceof DelegateColorScheme) {
@@ -154,7 +155,9 @@ public abstract class EditorTextFieldCellRenderer implements TableCellRenderer, 
       Color oldColor = g.getColor();
       Rectangle clip = g.getClipBounds();
       g.setColor(myEditor.getBackgroundColor());
-      g.fillRect(clip.x, clip.y, clip.width, clip.height);
+      Insets insets = getInsets();
+      g.fillRect(0, 0, insets.left, clip.height);
+      g.fillRect(clip.width - insets.left - insets.right, 0, clip.width, clip.height);
       g.setColor(oldColor);
     }
 
