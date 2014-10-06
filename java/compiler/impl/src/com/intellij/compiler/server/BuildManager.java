@@ -565,16 +565,11 @@ public class BuildManager implements ApplicationComponent{
       @Override
       public void sessionTerminated(UUID sessionId) {
         try {
+          super.handleFailure(sessionId, CmdlineProtoUtil.createFailure("Session was terminated", null));
           super.sessionTerminated(sessionId);
         }
-        finally {
-          try {
-            //todo AssertionError: Already disposed
-            ApplicationManager.getApplication().getMessageBus().syncPublisher(BuildManagerListener.TOPIC).buildFinished(project, sessionId, isAutomake);
-          }
-          catch (Throwable e) {
-            LOG.error(e);
-          }
+        catch (Throwable e) {
+          LOG.error(e);
         }
       }
     };
@@ -611,50 +606,50 @@ public class BuildManager implements ApplicationComponent{
             future.setDone();
             return;
           }
-
-          final CmdlineRemoteProto.Message.ControllerMessage.GlobalSettings globals =
-            CmdlineRemoteProto.Message.ControllerMessage.GlobalSettings.newBuilder()
-              .setGlobalOptionsPath(PathManager.getOptionsPath())
-              .build();
-          CmdlineRemoteProto.Message.ControllerMessage.FSEvent currentFSChanges;
-          final SequentialTaskExecutor projectTaskQueue;
-          synchronized (myProjectDataMap) {
-            ProjectData data = myProjectDataMap.get(projectPath);
-            if (data == null) {
-              data = new ProjectData(new SequentialTaskExecutor(PooledThreadExecutor.INSTANCE));
-              myProjectDataMap.put(projectPath, data);
-            }
-            if (isRebuild || (isAutomake && Registry.is("compiler.automake.force.fs.rescan"))) {
-              data.dropChanges();
-            }
-            if (IS_UNIT_TEST_MODE) {
-              LOG.info("Scheduling build for " +
-                       projectPath +
-                       "; CHANGED: " +
-                       new HashSet<String>(convertToStringPaths(data.myChanged)) +
-                       "; DELETED: " +
-                       new HashSet<String>(convertToStringPaths(data.myDeleted)));
-            }
-            currentFSChanges = data.getAndResetRescanFlag() ? null : data.createNextEvent();
-            projectTaskQueue = data.taskQueue;
-          }
-
-          final CmdlineRemoteProto.Message.ControllerMessage params;
-          if (isRebuild) {
-            params = CmdlineProtoUtil.createBuildRequest(projectPath, scopes, Collections.<String>emptyList(), userData, globals, null);
-          }
-          else if (onlyCheckUpToDate) {
-            params = CmdlineProtoUtil.createUpToDateCheckRequest(projectPath, scopes, paths, userData, globals, currentFSChanges);
-          }
-          else {
-            params = CmdlineProtoUtil.createBuildRequest(projectPath, scopes, isMake ? Collections.<String>emptyList() : paths,
-                                                         userData, globals, currentFSChanges);
-          }
-
-          final BuildMessageDispatcher.SessionData sessionData =
-            myMessageDispatcher.registerBuildMessageHandler(project, sessionId, new BuildDoneMonitor(handler, future), params);
           try {
-              projectTaskQueue.submit(new Runnable() {
+
+            final CmdlineRemoteProto.Message.ControllerMessage.GlobalSettings globals =
+              CmdlineRemoteProto.Message.ControllerMessage.GlobalSettings.newBuilder().setGlobalOptionsPath(PathManager.getOptionsPath())
+                .build();
+            CmdlineRemoteProto.Message.ControllerMessage.FSEvent currentFSChanges;
+            final SequentialTaskExecutor projectTaskQueue;
+            synchronized (myProjectDataMap) {
+              ProjectData data = myProjectDataMap.get(projectPath);
+              if (data == null) {
+                data = new ProjectData(new SequentialTaskExecutor(PooledThreadExecutor.INSTANCE));
+                myProjectDataMap.put(projectPath, data);
+              }
+              if (isRebuild || (isAutomake && Registry.is("compiler.automake.force.fs.rescan"))) {
+                data.dropChanges();
+              }
+              if (IS_UNIT_TEST_MODE) {
+                LOG.info("Scheduling build for " +
+                         projectPath +
+                         "; CHANGED: " +
+                         new HashSet<String>(convertToStringPaths(data.myChanged)) +
+                         "; DELETED: " +
+                         new HashSet<String>(convertToStringPaths(data.myDeleted)));
+              }
+              currentFSChanges = data.getAndResetRescanFlag() ? null : data.createNextEvent();
+              projectTaskQueue = data.taskQueue;
+            }
+
+            final CmdlineRemoteProto.Message.ControllerMessage params;
+            if (isRebuild) {
+              params = CmdlineProtoUtil.createBuildRequest(projectPath, scopes, Collections.<String>emptyList(), userData, globals, null);
+            }
+            else if (onlyCheckUpToDate) {
+              params = CmdlineProtoUtil.createUpToDateCheckRequest(projectPath, scopes, paths, userData, globals, currentFSChanges);
+            }
+            else {
+              params = CmdlineProtoUtil
+                .createBuildRequest(projectPath, scopes, isMake ? Collections.<String>emptyList() : paths, userData, globals,
+                                    currentFSChanges);
+            }
+
+            final BuildMessageDispatcher.SessionData sessionData =
+              myMessageDispatcher.registerBuildMessageHandler(project, sessionId, new BuildDoneMonitor(handler, future), params);
+            projectTaskQueue.submit(new Runnable() {
               @Override
               public void run() {
                 Throwable execFailure = null;
@@ -695,11 +690,13 @@ public class BuildManager implements ApplicationComponent{
             });
           }
           catch (Throwable e) {
+            LOG.info(e.getMessage(), e);
             final BuilderMessageHandler unregistered = myMessageDispatcher.unregisterBuildMessageHandler(sessionId);
             if (unregistered != null) {
               unregistered.handleFailure(sessionId, CmdlineProtoUtil.createFailure(e.getMessage(), e));
               unregistered.sessionTerminated(sessionId);
             }
+            future.setDone();
           }
         }
       });
@@ -1086,7 +1083,7 @@ public class BuildManager implements ApplicationComponent{
   }
 
   private static class BuildDoneMonitor extends MessageHandlerWrapper {
-    private static final Logger LOG = Logger.getInstance("#com.intellij.compiler.server.BuildManager.BuildDoneMonitorWrapper");
+    private static final Logger LOG = Logger.getInstance("#com.intellij.compiler.server.BuildManager.BuildDoneMonitor");
 
     private final RequestFuture<BuilderMessageHandler> myFuture;
 
@@ -1095,9 +1092,11 @@ public class BuildManager implements ApplicationComponent{
       myFuture = future;
     }
 
-    private void done(String message) {
-      LOG.info(message);
-      myFuture.setDone();
+    private void done(String message, UUID sessionId) {
+      if (!myFuture.isDone()) {
+        LOG.info(message + " for " + myFuture + " sessionId=" + sessionId);
+        myFuture.setDone();
+      }
     }
 
     @Override
@@ -1106,13 +1105,13 @@ public class BuildManager implements ApplicationComponent{
         super.sessionTerminated(sessionId);
       }
       finally {
-        done("build was terminated");
+        done("build was terminated",sessionId);
       }
     }
 
     @Override
     public void buildStarted(UUID sessionId) {
-      LOG.info("buildStarted");
+      LOG.info("buildStarted sessionId="+sessionId);
       super.buildStarted(sessionId);
     }
 
@@ -1128,7 +1127,7 @@ public class BuildManager implements ApplicationComponent{
             final CmdlineRemoteProto.Message.BuilderMessage.BuildEvent event = msg.getBuildEvent();
             switch (event.getEventType()) {
               case BUILD_COMPLETED: {
-                done("build was completed");
+                done("build was completed", sessionId);
               }
             }
         }
@@ -1141,7 +1140,7 @@ public class BuildManager implements ApplicationComponent{
         super.handleFailure(sessionId, failure);
       }
       finally {
-        done("build failed");
+        done("build failed", sessionId);
       }
     }
   }

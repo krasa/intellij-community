@@ -56,20 +56,26 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
     return value;
   }
 
-  public void reuseChannel(@NotNull SessionData value) {
+  /**
+   * todo multiple parallel builds for one project are for some reason possible (probably bug)
+   */
+  public synchronized void reuseChannel(@NotNull SessionData value) {
     SessionData sessionData = getPreviousSessionByProject(value);
     if (sessionData != null) {
       if (sessionData.state == ProcessState.IDLE) {
-        LOG.info("Reusing channel");
+        LOG.info("Reusing channel for sessionId=" + value.sessionId);
         value.channel = sessionData.channel;
         value.setState(ProcessState.WORKING);
         sessionData.channel.attr(SESSION_DATA).set(value);
         myMessageHandlers.remove(sessionData.sessionId);
       }
       else {
-        throw new IllegalStateException("SessionData is in a strange state: " + sessionData.state);
+        throw new IllegalStateException("cannot reuse channel for sessionId=" + value.sessionId+"existing session: state=" + sessionData.state + " sessionId="+sessionData.sessionId );
       }
     }
+    else {
+      LOG.info("no active channel, sessionId="+value.sessionId);
+    } 
   }
 
   @Nullable
@@ -139,9 +145,11 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
   }
 
   public void cancelSession(UUID sessionId) {
+    LOG.info("cancelSession, sessionId="+sessionId);
     if (myCanceledSessions.add(sessionId)) {
       final Channel channel = getConnectedChannel(sessionId);
       if (channel != null) {
+        LOG.info("sending cancel command");
         channel.writeAndFlush(CmdlineProtoUtil.toMessage(sessionId, CmdlineProtoUtil.createCancelCommand()));
       }
     }
@@ -275,7 +283,7 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
     }
 
     public void setState(ProcessState state) {
-      LOG.info("updating state to " + state);
+      LOG.info("updating state to " + state +", sessionId="+sessionId);
       this.state = state;
       if (state == ProcessState.IDLE) {
         idleFrom = new Date();
