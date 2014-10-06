@@ -146,12 +146,17 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
     final SessionData data = myMessageHandlers.remove(sessionId);
     if (data != null) {
       LOG.info("session removed for " + data.myProjectFilePath);
+      Channel channel = data.channel;
+      if (channel != null && channel.isOpen()) {
+        LOG.error("closing channel (it should never happen)");
+        channel.close();
+      }
     }
     return data != null ? data.handler : null;
   }
 
   public void cancelSession(UUID sessionId) {
-    LOG.info("cancelSession, sessionId="+sessionId);
+    LOG.info("cancelSession, sessionId=" + sessionId);
     if (myCanceledSessions.add(sessionId)) {
       final Channel channel = getConnectedChannel(sessionId);
       if (channel != null) {

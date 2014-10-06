@@ -672,11 +672,14 @@ public class BuildManager implements ApplicationComponent{
                 }
                 catch (Throwable e) {
                     futureHandler.handleFailure(sessionId, CmdlineProtoUtil.createFailure(e.getMessage(), e));
-                    futureHandler.sessionTerminated(sessionId);
                 }
                 finally {
                   myBuildsInProgress.remove(projectPath);
-                  myMessageDispatcher.unregisterBuildMessageHandler(sessionId);
+                  if (myMessageDispatcher.getAssociatedChannel(sessionId) == null) {
+                    // either the connection has never been established (process not started or execution failed), or no messages were sent from the launched process.
+                    // in this case the session cannot be unregistered by the message dispatcher
+                    myMessageDispatcher.unregisterBuildMessageHandler(sessionId);
+                  }
                 }
               }
             });
