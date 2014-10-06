@@ -57,9 +57,9 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
   }
 
   /**
-   * todo multiple parallel builds for one project are for some reason possible (probably bug)
+   * synchronized just to be sure
    */
-  public synchronized void reuseChannel(@NotNull SessionData value) {
+  private synchronized void reuseChannel(@NotNull SessionData value) {
     SessionData sessionData = getPreviousSessionByProject(value);
     if (sessionData != null) {
       if (sessionData.state == ProcessState.IDLE) {
@@ -70,12 +70,18 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
         myMessageHandlers.remove(sessionData.sessionId);
       }
       else {
-        throw new IllegalStateException("cannot reuse channel for sessionId=" + value.sessionId+"existing session: state=" + sessionData.state + " sessionId="+sessionData.sessionId );
+        String s = "cannot reuse channel for sessionId=" +
+                   value.sessionId +
+                   "existing session: state=" +
+                   sessionData.state +
+                   " sessionId=" +
+                   sessionData.sessionId;
+        throw new IllegalStateException(s);
       }
     }
     else {
-      LOG.info("no active channel, sessionId="+value.sessionId);
-    } 
+      LOG.info("no active channel, sessionId=" + value.sessionId);
+    }
   }
 
   @Nullable
