@@ -590,20 +590,22 @@ public class BuildManager implements ApplicationComponent{
     }
 
     try {
-      final RequestFuture<BuilderMessageHandler> future = new RequestFuture<BuilderMessageHandler>(handler, sessionId, new RequestFuture.CancelAction<BuilderMessageHandler>() {
-        @Override
-        public void cancel(RequestFuture<BuilderMessageHandler> future) throws Exception {
-          myMessageDispatcher.cancelSession(future.getRequestID());
-        }
-      });
+      final RequestFuture<BuilderMessageHandler> future =
+        new RequestFuture<BuilderMessageHandler>(handler, sessionId, new RequestFuture.CancelAction<BuilderMessageHandler>() {
+          @Override
+          public void cancel(RequestFuture<BuilderMessageHandler> future) throws Exception {
+            myMessageDispatcher.cancelSession(future.getRequestID());
+          }
+        });
+      final FutureMessageHandlerWrapper futureHandler = new FutureMessageHandlerWrapper(handler, future);
+
       // by using the same queue that processes events we ensure that
       // the build will be aware of all events that have happened before this request
       runCommand(new Runnable() {
         @Override
         public void run() {
           if (future.isCancelled() || project.isDisposed()) {
-            handler.sessionTerminated(sessionId);
-            future.setDone();
+            futureHandler.sessionTerminated(sessionId);
             return;
           }
           try {
@@ -647,17 +649,17 @@ public class BuildManager implements ApplicationComponent{
                                     currentFSChanges);
             }
 
-            final BuildMessageDispatcher.SessionData sessionData =
-              myMessageDispatcher.registerBuildMessageHandler(project, sessionId, new BuildDoneMonitor(handler, future), params);
             projectTaskQueue.submit(new Runnable() {
               @Override
               public void run() {
-                Throwable execFailure = null;
                 try {
                   if (project.isDisposed()) {
                     return;
                   }
+                  BuildMessageDispatcher.SessionData sessionData =
+                    myMessageDispatcher.registerBuildMessageHandler(project, sessionId, futureHandler, params);
                   myBuildsInProgress.put(projectPath, future);
+                  
                   if (sessionData.getState() == BuildMessageDispatcher.ProcessState.INIT) {
                     startProcess(project, sessionId);
                     sessionData.setState(BuildMessageDispatcher.ProcessState.WORKING);
@@ -669,34 +671,20 @@ public class BuildManager implements ApplicationComponent{
                   future.get();
                 }
                 catch (Throwable e) {
-                  handler.handleFailure(sessionId, CmdlineProtoUtil.createFailure(e.toString(), e)); //todo  not tested
-                  execFailure = e;
+                    futureHandler.handleFailure(sessionId, CmdlineProtoUtil.createFailure(e.getMessage(), e));
+                    futureHandler.sessionTerminated(sessionId);
                 }
                 finally {
                   myBuildsInProgress.remove(projectPath);
-                  if (myMessageDispatcher.getAssociatedChannel(sessionId) == null) {
-                    // either the connection has never been established (process not started or execution failed), or no messages were sent from the launched process.
-                    // in this case the session cannot be unregistered by the message dispatcher
-                    final BuilderMessageHandler unregistered = myMessageDispatcher.unregisterBuildMessageHandler(sessionId);
-                    if (unregistered != null) {
-                      if (execFailure != null) {
-                        unregistered.handleFailure(sessionId, CmdlineProtoUtil.createFailure(execFailure.getMessage(), execFailure));
-                      }
-                      unregistered.sessionTerminated(sessionId);
-                    }
-                  }
+                  myMessageDispatcher.unregisterBuildMessageHandler(sessionId);
                 }
               }
             });
           }
           catch (Throwable e) {
-            LOG.info(e.getMessage(), e);
-            final BuilderMessageHandler unregistered = myMessageDispatcher.unregisterBuildMessageHandler(sessionId);
-            if (unregistered != null) {
-              unregistered.handleFailure(sessionId, CmdlineProtoUtil.createFailure(e.getMessage(), e));
-              unregistered.sessionTerminated(sessionId);
-            }
-            future.setDone();
+            myMessageDispatcher.unregisterBuildMessageHandler(sessionId);
+            futureHandler.handleFailure(sessionId, CmdlineProtoUtil.createFailure(e.getMessage(), e));
+            futureHandler.sessionTerminated(sessionId);
           }
         }
       });
@@ -1082,12 +1070,12 @@ public class BuildManager implements ApplicationComponent{
     }
   }
 
-  private static class BuildDoneMonitor extends MessageHandlerWrapper {
-    private static final Logger LOG = Logger.getInstance("#com.intellij.compiler.server.BuildManager.BuildDoneMonitor");
+  private static class FutureMessageHandlerWrapper extends MessageHandlerWrapper {
+    private static final Logger LOG = Logger.getInstance("#com.intellij.compiler.server.BuildManager.FutureMessageHandlerWrapper");
 
     private final RequestFuture<BuilderMessageHandler> myFuture;
 
-    public BuildDoneMonitor(BuilderMessageHandler handler, RequestFuture<BuilderMessageHandler> future) {
+    public FutureMessageHandlerWrapper(BuilderMessageHandler handler, RequestFuture<BuilderMessageHandler> future) {
       super(handler);
       myFuture = future;
     }
@@ -1141,67 +1129,6 @@ public class BuildManager implements ApplicationComponent{
       }
       finally {
         done("build failed", sessionId);
-      }
-    }
-  }
-
-  private static class BuildDoneMonitorWrapper extends MessageHandlerWrapper {
-    private static final Logger LOG = Logger.getInstance("#com.intellij.compiler.server.BuildManager.BuildDoneMonitorWrapper");
-
-    private final RequestFuture<BuilderMessageHandler> myFuture;
-
-    public BuildDoneMonitorWrapper(BuilderMessageHandler handler, RequestFuture<BuilderMessageHandler> future) {
-      super(handler);
-      myFuture = future;
-    }
-
-    private void done(String message) {
-      LOG.info(message);
-      myFuture.setDone();
-    }
-
-    @Override
-    public void sessionTerminated(UUID sessionId) {
-      try {
-        super.sessionTerminated(sessionId);
-      }
-      finally {
-        done("build was terminated");
-      }
-    }
-
-    @Override
-    public void buildStarted(UUID sessionId) {
-      LOG.info("buildStarted");
-      super.buildStarted(sessionId);
-    }
-
-    @SuppressWarnings("EnumSwitchStatementWhichMissesCases")
-    @Override
-    public void handleBuildMessage(Channel channel, UUID sessionId, CmdlineRemoteProto.Message.BuilderMessage msg) {
-      try {
-        super.handleBuildMessage(channel, sessionId, msg);
-      }
-      finally {
-        switch (msg.getType()) {
-          case BUILD_EVENT:
-            final CmdlineRemoteProto.Message.BuilderMessage.BuildEvent event = msg.getBuildEvent();
-            switch (event.getEventType()) {
-              case BUILD_COMPLETED: {
-                done("build was completed");
-              }
-            }
-        }
-      }
-    }
-
-    @Override
-    public void handleFailure(UUID sessionId, CmdlineRemoteProto.Message.Failure failure) {
-      try {
-        super.handleFailure(sessionId, failure);
-      }
-      finally {
-        done("build failed");
       }
     }
   }
