@@ -56,6 +56,20 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
     return value;
   }
 
+  @Nullable
+  public SessionData getSession(UUID sessionId) {
+    return myMessageHandlers.get(sessionId);
+  }
+  
+  @Nullable
+  public SessionData getWorkingSession(Project project) {
+    for (SessionData sessionData : myMessageHandlers.values()) {
+      if (sessionData.isWorking() && sessionData.myProjectFilePath.equals(project.getProjectFilePath())) {
+        return sessionData;
+      }
+    }
+    return null;
+  }
   /**
    * synchronized just to be sure
    */
@@ -163,6 +177,18 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
         LOG.info("sending cancel command");
         channel.writeAndFlush(CmdlineProtoUtil.toMessage(sessionId, CmdlineProtoUtil.createCancelCommand()));
       }
+      else {
+        //manual cancel must always release the lock 
+        //this should probably never happen as there is also processListener in BuildManager, but I implemented this first :)
+        SessionData sessionData = myMessageHandlers.get(sessionId);
+        if (sessionData != null) {
+          BuilderMessageHandler handler = sessionData.handler;
+          if (handler != null) {
+            LOG.error("registered handler without connected channel found, calling #sessionTerminated");
+            handler.sessionTerminated(sessionId);
+          }
+        }
+      } 
     }
   }
 
@@ -258,6 +284,10 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
       if (sessionData != null) {
         final BuilderMessageHandler handler = unregisterBuildMessageHandler(sessionData.sessionId);
         if (handler != null) {
+          //show error to the user only if the process died during the build
+          if (sessionData.isWorking()) {
+             handler.handleFailure(sessionData.sessionId, CmdlineProtoUtil.createFailure("Build process was terminated", null));
+           }
           // notify the handler only if it has not been notified yet
           handler.sessionTerminated(sessionData.sessionId);
         }
@@ -303,6 +333,10 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
 
     public ProcessState getState() {
       return state;
+    }
+
+    public boolean isWorking() {
+      return state == ProcessState.WORKING;
     }
   }
 
