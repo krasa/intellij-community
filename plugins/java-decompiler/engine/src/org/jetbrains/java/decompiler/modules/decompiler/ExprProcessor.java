@@ -20,6 +20,7 @@ import org.jetbrains.java.decompiler.code.Instruction;
 import org.jetbrains.java.decompiler.code.InstructionSequence;
 import org.jetbrains.java.decompiler.code.cfg.BasicBlock;
 import org.jetbrains.java.decompiler.main.DecompilerContext;
+import org.jetbrains.java.decompiler.main.TextBuffer;
 import org.jetbrains.java.decompiler.main.collectors.BytecodeMappingTracer;
 import org.jetbrains.java.decompiler.modules.decompiler.exps.*;
 import org.jetbrains.java.decompiler.modules.decompiler.sforms.DirectGraph;
@@ -778,13 +779,13 @@ public class ExprProcessor implements CodeConstants {
           buf.append(" label").append(edge.closure.id);
         }
         buf.append(";").append(new_line_separator);
-        tracer.incrementSourceLine();
+        tracer.incrementCurrentSourceLine();
       }
     }
 
     if (buf.length() == 0 && semicolon) {
       buf.append(InterpreterUtil.getIndentString(indent)).append(";").append(new_line_separator);
-      tracer.incrementSourceLine();
+      tracer.incrementCurrentSourceLine();
     }
 
     return buf.toString();
@@ -828,7 +829,7 @@ public class ExprProcessor implements CodeConstants {
           buf.append(";");
         }
         buf.append(new_line_separator);
-        tracer.incrementSourceLine();
+        tracer.incrementCurrentSourceLine();
       }
     }
 
@@ -857,14 +858,14 @@ public class ExprProcessor implements CodeConstants {
     return defaultval;
   }
 
-  public static boolean getCastedExprent(Exprent exprent, VarType leftType, StringBuilder buffer, int indent,
+  public static boolean getCastedExprent(Exprent exprent, VarType leftType, TextBuffer buffer, int indent,
                                                                boolean castNull, BytecodeMappingTracer tracer) {
     return getCastedExprent(exprent, leftType, buffer, indent, castNull, false, tracer);
   }
 
   public static boolean getCastedExprent(Exprent exprent,
                                          VarType leftType,
-                                         StringBuilder buffer,
+                                         TextBuffer buffer,
                                          int indent,
                                          boolean castNull,
                                          boolean castAlways, BytecodeMappingTracer tracer) {

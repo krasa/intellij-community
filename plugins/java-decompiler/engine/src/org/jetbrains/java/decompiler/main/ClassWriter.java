@@ -76,7 +76,7 @@ public class ClassWriter {
     }
   }
 
-  public void classLambdaToJava(ClassNode node, StringBuilder buffer, Exprent method_object, int indent) {
+  public void classLambdaToJava(ClassNode node, TextBuffer buffer, Exprent method_object, int indent) {
     // get the class node with the content method
     ClassNode classNode = node;
     while (classNode != null && classNode.type == ClassNode.CLASS_LAMBDA) {
@@ -149,8 +149,7 @@ public class ClassWriter {
 
         methodLambdaToJava(node, classNode, mt, buffer, indent + 1, !lambdaToAnonymous, tracer);
 
-        InterpreterUtil.appendIndent(buffer, indent);
-        buffer.append("}");
+        buffer.appendIndent(indent).append("}");
       }
     }
     finally {
@@ -160,7 +159,7 @@ public class ClassWriter {
     DecompilerContext.getLogger().endWriteClass();
   }
 
-  public void classToJava(ClassNode node, StringBuilder buffer, int indent) {
+  public void classToJava(ClassNode node, TextBuffer buffer, int indent) {
     ClassNode outerNode = (ClassNode)DecompilerContext.getProperty(DecompilerContext.CURRENT_CLASS_NODE);
     DecompilerContext.setProperty(DecompilerContext.CURRENT_CLASS_NODE, node);
 
@@ -182,8 +181,8 @@ public class ClassWriter {
       int start_class_def = buffer.length();
       writeClassDefinition(node, buffer, indent);
 
-      // count lines in class definition the easiest way
-      total_offset_lines = buffer.substring(start_class_def).toString().split(lineSeparator, -1).length - 1;
+//      // count lines in class definition the easiest way
+//      total_offset_lines = buffer.substring(start_class_def).toString().split(lineSeparator, -1).length - 1;
 
       boolean hasContent = false;
 
@@ -220,6 +219,9 @@ public class ClassWriter {
         buffer.append(lineSeparator);
       }
 
+      // FIXME: fields don't matter at the moment
+      total_offset_lines = buffer.count(lineSeparator, start_class_def);
+
       // methods
       for (StructMethod mt : cl.getMethods()) {
         boolean hide = mt.isSynthetic() && DecompilerContext.getOption(IFernflowerPreferences.REMOVE_SYNTHETIC) ||
@@ -237,7 +239,7 @@ public class ClassWriter {
           hasContent = true;
           DecompilerContext.getBytecodeSourceMapper().addTracer(cl.qualifiedName,
                                   InterpreterUtil.makeUniqueKey(mt.getName(), mt.getDescriptor()), method_tracer);
-          total_offset_lines = method_tracer.getCurrentSourceline();
+          total_offset_lines = (method_tracer.getCurrentSourceLine() + 1); // zero-based line index
         }
         else {
           buffer.setLength(position);
@@ -262,8 +264,7 @@ public class ClassWriter {
         }
       }
 
-      InterpreterUtil.appendIndent(buffer, indent);
-      buffer.append('}');
+      buffer.appendIndent(indent).append('}');
 
       if (node.type != ClassNode.CLASS_ANONYMOUS) {
         buffer.append(lineSeparator);
@@ -276,9 +277,8 @@ public class ClassWriter {
     DecompilerContext.getLogger().endWriteClass();
   }
 
-  private void writeClassDefinition(ClassNode node, StringBuilder buffer, int indent) {
+  private void writeClassDefinition(ClassNode node, TextBuffer buffer, int indent) {
     String lineSeparator = DecompilerContext.getNewLineSeparator();
-    String indentString = InterpreterUtil.getIndentString(indent);
 
     if (node.type == ClassNode.CLASS_ANONYMOUS) {
       buffer.append(" {");
@@ -297,7 +297,7 @@ public class ClassWriter {
     boolean isAnnotation = (flags & CodeConstants.ACC_ANNOTATION) != 0;
 
     if (isDeprecated) {
-      appendDeprecation(buffer, indentString, lineSeparator);
+      appendDeprecation(buffer, indent, lineSeparator);
     }
 
     if (interceptor != null) {
@@ -306,12 +306,12 @@ public class ClassWriter {
     }
 
     if (isSynthetic) {
-      appendComment(buffer, "synthetic class", indentString, lineSeparator);
+      appendComment(buffer, "synthetic class", indent, lineSeparator);
     }
 
     appendAnnotations(buffer, cl, indent, lineSeparator);
 
-    buffer.append(indentString);
+    buffer.appendIndent(indent);
 
     if (isEnum) {
       // remove abstract and final flags (JLS 8.9 Enums)
@@ -387,8 +387,7 @@ public class ClassWriter {
     buffer.append(lineSeparator);
   }
 
-  private void fieldToJava(ClassWrapper wrapper, StructClass cl, StructField fd, StringBuilder buffer, int indent, BytecodeMappingTracer tracer) {
-    String indentString = InterpreterUtil.getIndentString(indent);
+  private void fieldToJava(ClassWrapper wrapper, StructClass cl, StructField fd, TextBuffer buffer, int indent, BytecodeMappingTracer tracer) {
     String lineSeparator = DecompilerContext.getNewLineSeparator();
 
     boolean isInterface = cl.hasModifier(CodeConstants.ACC_INTERFACE);
@@ -396,7 +395,7 @@ public class ClassWriter {
     boolean isEnum = fd.hasModifier(CodeConstants.ACC_ENUM) && DecompilerContext.getOption(IFernflowerPreferences.DECOMPILE_ENUM);
 
     if (isDeprecated) {
-      appendDeprecation(buffer, indentString, lineSeparator);
+      appendDeprecation(buffer, indent, lineSeparator);
     }
 
     if (interceptor != null) {
@@ -405,12 +404,12 @@ public class ClassWriter {
     }
 
     if (fd.isSynthetic()) {
-      appendComment(buffer, "synthetic field", indentString, lineSeparator);
+      appendComment(buffer, "synthetic field", indent, lineSeparator);
     }
 
     appendAnnotations(buffer, fd, indent, lineSeparator);
 
-    buffer.append(indentString);
+    buffer.appendIndent(indent);
 
     if (!isEnum) {
       appendModifiers(buffer, fd.getAccessFlags(), FIELD_ALLOWED, isInterface, FIELD_EXCLUDED);
@@ -476,7 +475,7 @@ public class ClassWriter {
   private static void methodLambdaToJava(ClassNode lambdaNode,
                                          ClassNode classNode,
                                          StructMethod mt,
-                                         StringBuilder buffer,
+                                         TextBuffer buffer,
                                          int indent,
                                          boolean codeOnly, BytecodeMappingTracer tracer) {
     ClassWrapper classWrapper = classNode.wrapper;
@@ -491,7 +490,7 @@ public class ClassWriter {
       MethodDescriptor md_lambda = MethodDescriptor.parseDescriptor(lambdaNode.lambda_information.method_descriptor);
 
       if (!codeOnly) {
-        InterpreterUtil.appendIndent(buffer, indent);
+        buffer.appendIndent(indent);
         buffer.append("public ");
         buffer.append(method_name);
         buffer.append("(");
@@ -544,7 +543,7 @@ public class ClassWriter {
       }
 
       if (methodWrapper.decompiledWithErrors) {
-        InterpreterUtil.appendIndent(buffer, indent);
+        buffer.appendIndent(indent);
         buffer.append("// $FF: Couldn't be decompiled");
         buffer.append(DecompilerContext.getNewLineSeparator());
       }
@@ -552,7 +551,7 @@ public class ClassWriter {
       if (!codeOnly) {
         indent -= 1;
 
-        InterpreterUtil.appendIndent(buffer, indent);
+        buffer.appendIndent(indent);
         buffer.append('}');
         buffer.append(DecompilerContext.getNewLineSeparator());
       }
@@ -562,7 +561,7 @@ public class ClassWriter {
     }
   }
 
-  private boolean methodToJava(ClassNode node, StructMethod mt, StringBuilder buffer, int indent, BytecodeMappingTracer tracer) {
+  private boolean methodToJava(ClassNode node, StructMethod mt, TextBuffer buffer, int indent, BytecodeMappingTracer tracer) {
     ClassWrapper wrapper = node.wrapper;
     StructClass cl = wrapper.getClassStruct();
     MethodWrapper methodWrapper = wrapper.getMethodWrapper(mt.getName(), mt.getDescriptor());
@@ -570,7 +569,6 @@ public class ClassWriter {
     boolean hideMethod = false;
     int start_index_method = buffer.length();
 
-    String indentString = InterpreterUtil.getIndentString(indent);
     String lineSeparator = DecompilerContext.getNewLineSeparator();
 
     MethodWrapper outerWrapper = (MethodWrapper)DecompilerContext.getProperty(DecompilerContext.CURRENT_METHOD_WRAPPER);
@@ -583,6 +581,15 @@ public class ClassWriter {
       boolean isDeprecated = mt.getAttributes().containsKey("Deprecated");
       boolean clinit = false, init = false, dinit = false;
 
+      int startLine = -1;
+      if (DecompilerContext.getOption(IFernflowerPreferences.USE_DEBUG_LINE_NUMBERS)) {
+        StructLineNumberTableAttribute lineNumberTable =
+          (StructLineNumberTableAttribute)mt.getAttributes().getWithKey(StructGeneralAttribute.ATTRIBUTE_LINE_NUMBER_TABLE);
+        if (lineNumberTable != null) {
+          startLine = lineNumberTable.getFirstLine();
+        }
+      }
+
       MethodDescriptor md = MethodDescriptor.parseDescriptor(mt.getDescriptor());
 
       int flags = mt.getAccessFlags();
@@ -594,7 +601,7 @@ public class ClassWriter {
       }
 
       if (isDeprecated) {
-        appendDeprecation(buffer, indentString, lineSeparator);
+        appendDeprecation(buffer, indent, lineSeparator);
       }
 
       if (interceptor != null) {
@@ -605,15 +612,15 @@ public class ClassWriter {
       boolean isSynthetic = (flags & CodeConstants.ACC_SYNTHETIC) != 0 || mt.getAttributes().containsKey("Synthetic");
       boolean isBridge = (flags & CodeConstants.ACC_BRIDGE) != 0;
       if (isSynthetic) {
-        appendComment(buffer, "synthetic method", indentString, lineSeparator);
+        appendComment(buffer, "synthetic method", indent, lineSeparator);
       }
       if (isBridge) {
-        appendComment(buffer, "bridge method", indentString, lineSeparator);
+        appendComment(buffer, "bridge method", indent, lineSeparator);
       }
 
       appendAnnotations(buffer, mt, indent, lineSeparator);
 
-      buffer.append(indentString);
+      buffer.appendIndent(indent);
 
       appendModifiers(buffer, flags, METHOD_ALLOWED, isInterface, METHOD_EXCLUDED);
 
@@ -797,15 +804,15 @@ public class ClassWriter {
           buffer.append(' ');
         }
 
-        buffer.append('{');
-        buffer.append(lineSeparator);
+        //TODO: for now only start line set
+        buffer.setCurrentLine(startLine);
+        buffer.append('{').appendLineSeparator();
 
         RootStatement root = wrapper.getMethodWrapper(mt.getName(), mt.getDescriptor()).root;
 
         if (root != null && !methodWrapper.decompiledWithErrors) { // check for existence
           try {
-
-            tracer.setCurrentSourceline(buffer.substring(start_index_method).split(lineSeparator, -1).length - 1);
+            tracer.incrementCurrentSourceLine(buffer.count(lineSeparator, start_index_method));
 
             String code = root.toJava(indent + 1, tracer);
 
@@ -820,14 +827,12 @@ public class ClassWriter {
         }
 
         if (methodWrapper.decompiledWithErrors) {
-          buffer.append(InterpreterUtil.getIndentString(indent + 1));
+          buffer.appendIndent(indent + 1);
           buffer.append("// $FF: Couldn't be decompiled");
           buffer.append(lineSeparator);
         }
 
-        buffer.append(indentString);
-        buffer.append('}');
-        buffer.append(lineSeparator);
+        buffer.appendIndent(indent).append('}').appendLineSeparator();
       }
     }
     finally {
@@ -836,7 +841,7 @@ public class ClassWriter {
 
     // save total lines
     // TODO: optimize
-    tracer.setCurrentSourceline(buffer.substring(start_index_method).split(lineSeparator, -1).length - 1);
+    tracer.setCurrentSourceLine(buffer.count(lineSeparator, start_index_method));
 
     return !hideMethod;
   }
@@ -858,16 +863,16 @@ public class ClassWriter {
     return true;
   }
 
-  private static void appendDeprecation(StringBuilder buffer, String indentString, String lineSeparator) {
-    buffer.append(indentString).append("/** @deprecated */").append(lineSeparator);
+  private static void appendDeprecation(TextBuffer buffer, int indent, String lineSeparator) {
+    buffer.appendIndent(indent).append("/** @deprecated */").append(lineSeparator);
   }
 
   private enum MType {CLASS, FIELD, METHOD}
 
-  private static void appendRenameComment(StringBuilder buffer, String oldName, MType type, int indent, String lineSeparator) {
+  private static void appendRenameComment(TextBuffer buffer, String oldName, MType type, int indent, String lineSeparator) {
     if (oldName == null) return;
 
-    InterpreterUtil.appendIndent(buffer, indent);
+    buffer.appendIndent(indent);
     buffer.append("// $FF: renamed from: ");
 
     switch (type) {
@@ -912,14 +917,14 @@ public class ClassWriter {
     return typeText;
   }
 
-  private static void appendComment(StringBuilder buffer, String comment, String indentString, String lineSeparator) {
-    buffer.append(indentString).append("// $FF: ").append(comment).append(lineSeparator);
+  private static void appendComment(TextBuffer buffer, String comment, int indent, String lineSeparator) {
+    buffer.appendIndent(indent).append("// $FF: ").append(comment).append(lineSeparator);
   }
 
   private static final String[] ANNOTATION_ATTRIBUTES = {
     StructGeneralAttribute.ATTRIBUTE_RUNTIME_VISIBLE_ANNOTATIONS, StructGeneralAttribute.ATTRIBUTE_RUNTIME_INVISIBLE_ANNOTATIONS};
 
-  private static void appendAnnotations(StringBuilder buffer, StructMember mb, int indent, String lineSeparator) {
+  private static void appendAnnotations(TextBuffer buffer, StructMember mb, int indent, String lineSeparator) {
 
     BytecodeMappingTracer tracer_dummy = new BytecodeMappingTracer(); // FIXME: replace with a real one
 
@@ -936,7 +941,7 @@ public class ClassWriter {
   private static final String[] PARAMETER_ANNOTATION_ATTRIBUTES = {
     StructGeneralAttribute.ATTRIBUTE_RUNTIME_VISIBLE_PARAMETER_ANNOTATIONS, StructGeneralAttribute.ATTRIBUTE_RUNTIME_INVISIBLE_PARAMETER_ANNOTATIONS};
 
-  private static void appendParameterAnnotations(StringBuilder buffer, StructMethod mt, int param) {
+  private static void appendParameterAnnotations(TextBuffer buffer, StructMethod mt, int param) {
 
     BytecodeMappingTracer tracer_dummy = new BytecodeMappingTracer(); // FIXME: replace with a real one
 
@@ -981,7 +986,7 @@ public class ClassWriter {
   private static final int FIELD_EXCLUDED = CodeConstants.ACC_PUBLIC | CodeConstants.ACC_STATIC | CodeConstants.ACC_FINAL;
   private static final int METHOD_EXCLUDED = CodeConstants.ACC_PUBLIC | CodeConstants.ACC_ABSTRACT;
 
-  private static void appendModifiers(StringBuilder buffer, int flags, int allowed, boolean isInterface, int excluded) {
+  private static void appendModifiers(TextBuffer buffer, int flags, int allowed, boolean isInterface, int excluded) {
     flags &= allowed;
     if (!isInterface) excluded = 0;
     for (int modifier : MODIFIERS.keySet()) {
@@ -991,7 +996,7 @@ public class ClassWriter {
     }
   }
 
-  private static void appendTypeParameters(StringBuilder buffer, List<String> parameters, List<List<GenericType>> bounds) {
+  private static void appendTypeParameters(TextBuffer buffer, List<String> parameters, List<List<GenericType>> bounds) {
     buffer.append('<');
 
     for (int i = 0; i < parameters.size(); i++) {
