@@ -34,9 +34,7 @@ import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.application.PathManager;
-import com.intellij.openapi.compiler.CompilationStatusListener;
-import com.intellij.openapi.compiler.CompileContext;
-import com.intellij.openapi.compiler.CompilerTopics;
+import com.intellij.openapi.compiler.*;
 import com.intellij.openapi.components.ApplicationComponent;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.EditorFactory;
@@ -561,17 +559,6 @@ public class BuildManager implements ApplicationComponent{
           LOG.error(e);
         }
       }
-
-      @Override
-      public void sessionTerminated(UUID sessionId) {
-        try {
-          super.handleFailure(sessionId, CmdlineProtoUtil.createFailure("Session was terminated", null));
-          super.sessionTerminated(sessionId);
-        }
-        catch (Throwable e) {
-          LOG.error(e);
-        }
-      }
     };
     // ensure server is listening
     if (myListenPort < 0) {
@@ -661,8 +648,8 @@ public class BuildManager implements ApplicationComponent{
                   myBuildsInProgress.put(projectPath, future);
                   
                   if (sessionData.getState() == BuildMessageDispatcher.ProcessState.INIT) {
-                    startProcess(project, sessionId);
                     sessionData.setState(BuildMessageDispatcher.ProcessState.WORKING);
+                    startProcess(project, sessionId);
                   }
                   else {
                     requestNewBuild(sessionData);
@@ -702,7 +689,7 @@ public class BuildManager implements ApplicationComponent{
     return null;
   }
 
-  private void startProcess(Project project, UUID sessionId) throws ExecutionException {
+  private void startProcess(final Project project,  UUID sessionId) throws ExecutionException {
     LOG.info("Launching new build process");
     OSProcessHandler process = launchBuildProcess(project, myListenPort, sessionId);
     process.addProcessListener(new ProcessAdapter() {
@@ -712,6 +699,20 @@ public class BuildManager implements ApplicationComponent{
         final String text = event.getText();
         if (!StringUtil.isEmptyOrSpaces(text)) {
           LOG.info("BUILDER_PROCESS [" + outputType.toString() + "]: " + text.trim());
+        }
+      }
+
+      @Override
+      public void processTerminated(ProcessEvent event) {
+        int exitValue = event.getExitCode();
+        LOG.info("Process terminated, exit code: " + exitValue);
+        if (exitValue != 0) {
+          BuildMessageDispatcher.SessionData workingSession = myMessageDispatcher.getWorkingSession(project);
+          if (workingSession != null) {
+            //process could not be started or failed before opening of the channel
+            workingSession.handler.handleFailure(workingSession.sessionId, CmdlineProtoUtil
+              .createFailure("Abnormal build process termination, exit code: " + exitValue, null));
+          }
         }
       }
     });
