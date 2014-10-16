@@ -2115,7 +2115,7 @@ public final class ToolWindowManagerImpl extends ToolWindowManagerEx implements 
      */
     private AddWindowedDecoratorCmd(final InternalDecorator decorator, final WindowInfoImpl info) {
       super(myWindowManager.getCommandProcessor());
-      myWindowedDecorator = new WindowedDecorator(myFrame, info.copy(), decorator);
+      myWindowedDecorator = new WindowedDecorator(myFrame.getProject(), info.copy(), decorator);
       myWindowedDecorator.setComponent(decorator);
       myId2WindowedDecorator.put(info.getId(), myWindowedDecorator);
       myWindowedDecorator.addDisposable(new Disposable() {

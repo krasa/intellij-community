@@ -18,16 +18,18 @@ package com.intellij.openapi.wm.impl;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.FrameWrapper;
+import org.jetbrains.annotations.NotNull;
 
 public final class WindowedDecorator extends FrameWrapper {
   private static final Logger LOG = Logger.getInstance("#com.intellij.openapi.wm.impl.WindowedDecorator");
 
   private final Project myProject;
 
-  WindowedDecorator(final IdeFrameImpl owner, final WindowInfoImpl info, final InternalDecorator internalDecorator) {
-    super(owner.getProject(), "WindowedDecorator-" + internalDecorator.getToolWindow().getId());
-    myProject = owner.getProject();
-    setTitle(myProject.getName() + " - " + info.getId());
+  WindowedDecorator(@NotNull Project project, @NotNull WindowInfoImpl info, @NotNull InternalDecorator internalDecorator) {
+    super(project, "WindowedDecorator-" + internalDecorator.getToolWindow().getId());
+    myProject = project;
+    setTitle(info.getId() + " - " + myProject.getName());
+    setProject(project);
   }
 
   public Project getProject() {
