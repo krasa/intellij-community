@@ -65,6 +65,7 @@ class AutoMakeMessageHandler extends DefaultMessageHandler {
       case BUILD_COMPLETED:
         if (event.hasCompletionStatus()) {
           myBuildStatus = event.getCompletionStatus();
+          updateProblemsView(sessionId);
         }
         return;
 
@@ -120,10 +121,14 @@ class AutoMakeMessageHandler extends DefaultMessageHandler {
     final String msg = "Auto make failure: " + descr;
     CompilerManager.NOTIFICATION_GROUP.createNotification(msg, MessageType.INFO);
     ProblemsView.SERVICE.getInstance(myProject).addMessage(new CompilerMessageImpl(myProject, CompilerMessageCategory.ERROR, msg), sessionId);
+    updateProblemsView(sessionId); 
   }
-
+  
   @Override
   public void sessionTerminated(UUID sessionId) {
+  }
+
+  private void updateProblemsView(UUID sessionId) {
     String statusMessage = null/*"Auto make completed"*/;
     switch (myBuildStatus) {
       case SUCCESS:

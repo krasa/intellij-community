@@ -248,11 +248,6 @@ public class CompileDriver {
 
       @Override
       public void sessionTerminated(final UUID sessionId) {
-        if (compileContext.shouldUpdateProblemsView()) {
-          final ProblemsView view = ProblemsView.SERVICE.getInstance(myProject);
-          view.clearProgress();
-          view.clearOldMessages(compileContext.getCompileScope(), compileContext.getSessionId());
-        }
       }
 
       @Override
@@ -263,8 +258,9 @@ public class CompileDriver {
           LOG.info(trace);
         }
         compileContext.putUserData(COMPILE_SERVER_BUILD_STATUS, ExitStatus.ERRORS);
+        updateProblemsView(); 
       }
-
+      
       @Override
       protected void handleCompileMessage(UUID sessionId, CmdlineRemoteProto.Message.BuilderMessage.CompileMessage message) {
         final CmdlineRemoteProto.Message.BuilderMessage.CompileMessage.Kind kind = message.getKind();
@@ -336,9 +332,18 @@ public class CompileDriver {
                   status = ExitStatus.UP_TO_DATE;
                   break;
               }
+              updateProblemsView(); 
             }
             compileContext.putUserDataIfAbsent(COMPILE_SERVER_BUILD_STATUS, status);
             break;
+        }
+      }
+      
+      private void updateProblemsView() {
+        if (compileContext.shouldUpdateProblemsView()) {
+          final ProblemsView view = ProblemsView.SERVICE.getInstance(myProject);
+          view.clearProgress();
+          view.clearOldMessages(compileContext.getCompileScope(), compileContext.getSessionId());
         }
       }
     });

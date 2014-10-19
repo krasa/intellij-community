@@ -27,9 +27,19 @@ import java.util.UUID;
 public interface BuilderMessageHandler {
   void buildStarted(UUID sessionId);
   
+  /**
+   * release lock on {@link org.jetbrains.jps.api.CmdlineRemoteProto.Message.BuilderMessage.BuildEvent.Type#BUILD_COMPLETED}
+   */
   void handleBuildMessage(Channel channel, UUID sessionId, CmdlineRemoteProto.Message.BuilderMessage msg);
 
+  /**
+   * something failed, show error to the user and release lock
+   */
   void handleFailure(UUID sessionId, CmdlineRemoteProto.Message.Failure failure);
 
+  /**
+   * silently release lock (eg build was cancelled before building)
+   * todo rename, or delete?
+   */
   void sessionTerminated(UUID sessionId);
 }
