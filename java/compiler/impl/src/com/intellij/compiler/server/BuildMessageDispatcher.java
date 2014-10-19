@@ -15,6 +15,7 @@
  */
 package com.intellij.compiler.server;
 
+import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
 import com.intellij.util.containers.ConcurrentHashSet;
@@ -48,9 +49,10 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
   public SessionData registerBuildMessageHandler(Project project,
                                                  UUID sessionId,
                                                  BuilderMessageHandler handler,
-                                                 CmdlineRemoteProto.Message.ControllerMessage params) {
-    SessionData value = new SessionData(sessionId, handler, params, project.getProjectFilePath());
-    reuseChannel(value);
+                                                 CmdlineRemoteProto.Message.ControllerMessage params,
+                                                 GeneralCommandLine commandLine) {
+    SessionData value = new SessionData(sessionId, handler, params, project.getProjectFilePath(), commandLine);
+    tryReusingChannel(value);
     myMessageHandlers.put(sessionId, value);
     closeOldChannels(value);
     return value;
@@ -70,31 +72,37 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
     }
     return null;
   }
-  /**
-   * synchronized just to be sure
-   */
-  private synchronized void reuseChannel(@NotNull SessionData value) {
-    SessionData sessionData = getPreviousSessionByProject(value);
-    if (sessionData != null) {
-      if (sessionData.state == ProcessState.IDLE) {
-        LOG.info("Reusing channel for sessionId=" + value.sessionId);
-        value.channel = sessionData.channel;
-        value.setState(ProcessState.WORKING);
-        sessionData.channel.attr(SESSION_DATA).set(value);
-        myMessageHandlers.remove(sessionData.sessionId);
+
+
+  private void tryReusingChannel(@NotNull SessionData newSession) {
+    SessionData oldSession = getPreviousSessionByProject(newSession);
+    if (oldSession != null && oldSession.state == ProcessState.IDLE) {
+      LOG.info("Found channel from sessionId=" + oldSession.sessionId);
+      if (oldSession.isCommandLineChanged(newSession)) {
+        LOG.info("Command line changed");
+        LOG.info("oldCmd: " + oldSession.myProcessCommandLine);
+        LOG.info("newCmd: " + newSession.myProcessCommandLine);
+        closeChannel(oldSession);
       }
       else {
-        String s = "cannot reuse channel for sessionId=" +
-                   value.sessionId +
-                   "existing session: state=" +
-                   sessionData.state +
-                   " sessionId=" +
-                   sessionData.sessionId;
-        throw new IllegalStateException(s);
+        LOG.info("Reusing channel");
+        newSession.channel = oldSession.channel;
+        newSession.setState(ProcessState.WORKING);
+        oldSession.channel.attr(SESSION_DATA).set(newSession);
+        myMessageHandlers.remove(oldSession.sessionId);
       }
     }
+    else if (oldSession != null) {
+      String s = "cannot reuse channel for sessionId=" +
+                 newSession.sessionId +
+                 "existing session: state=" +
+                 oldSession.state +
+                 " sessionId=" +
+                 oldSession.sessionId;
+      throw new IllegalStateException(s);
+    }
     else {
-      LOG.info("no active channel, sessionId=" + value.sessionId);
+      LOG.info("no active channel, sessionId=" + newSession.sessionId);
     }
   }
 
@@ -149,8 +157,8 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
     }
   }
 
-  private void closeChannel(@NotNull SessionData sessionData) {
-    LOG.info("Closing channel for " + sessionData.myProjectFilePath);
+  public void closeChannel(@NotNull SessionData sessionData) {
+    LOG.info("Closing channel for sessionId=" + sessionData.sessionId + " project=" + sessionData.myProjectFilePath);
     sessionData.channel.close();
   }
 
@@ -159,7 +167,7 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
     myCanceledSessions.remove(sessionId);
     final SessionData data = myMessageHandlers.remove(sessionId);
     if (data != null) {
-      LOG.info("session removed for " + data.myProjectFilePath);
+      LOG.info("session " + sessionId + " removed for " + data.myProjectFilePath);
       Channel channel = data.channel;
       if (channel != null && channel.isOpen()) {
         LOG.error("closing channel (it should never happen)");
@@ -308,23 +316,26 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
     final UUID sessionId;
     final BuilderMessageHandler handler;
     final String myProjectFilePath;
+    final String myProcessCommandLine;
     volatile CmdlineRemoteProto.Message.ControllerMessage params;
     volatile Channel channel;
-    private volatile ProcessState state = ProcessState.INIT;
-    private volatile Date idleFrom;
+    volatile ProcessState state = ProcessState.INIT;
+    volatile Date idleFrom;
 
     private SessionData(UUID sessionId,
                         BuilderMessageHandler handler,
                         CmdlineRemoteProto.Message.ControllerMessage params,
-                        String projectFilePath) {
+                        String projectFilePath,
+                        GeneralCommandLine processCommandLine) {
       this.sessionId = sessionId;
       this.handler = handler;
       this.params = params;
       myProjectFilePath = projectFilePath;
+      myProcessCommandLine = processCommandLine.getCommandLineString().replace(sessionId.toString(), "#sessionId");
     }
 
     public void setState(ProcessState state) {
-      LOG.info("updating state to " + state +", sessionId="+sessionId);
+      LOG.info("updating state to " + state + ", sessionId=" + sessionId);
       this.state = state;
       if (state == ProcessState.IDLE) {
         idleFrom = new Date();
@@ -337,6 +348,10 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
 
     public boolean isWorking() {
       return state == ProcessState.WORKING;
+    }
+
+    public boolean isCommandLineChanged(SessionData newSession) {
+      return !this.myProcessCommandLine.equals(newSession.myProcessCommandLine);
     }
   }
 

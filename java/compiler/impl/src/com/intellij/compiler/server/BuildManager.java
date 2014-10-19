@@ -644,16 +644,18 @@ public class BuildManager implements ApplicationComponent{
                   if (project.isDisposed()) {
                     return;
                   }
-                  BuildMessageDispatcher.SessionData sessionData =
-                    myMessageDispatcher.registerBuildMessageHandler(project, sessionId, futureHandler, params);
+                  GeneralCommandLine buildProcessCommandLine = getBuildProcessCommandLine(project, myListenPort, sessionId);
+
+                  BuildMessageDispatcher.SessionData session =
+                    myMessageDispatcher.registerBuildMessageHandler(project, sessionId, futureHandler, params, buildProcessCommandLine);
                   myBuildsInProgress.put(projectPath, future);
-                  
-                  if (sessionData.getState() == BuildMessageDispatcher.ProcessState.INIT) {
-                    sessionData.setState(BuildMessageDispatcher.ProcessState.WORKING);
-                    startProcess(project, sessionId);
+
+                  if (session.getState() == BuildMessageDispatcher.ProcessState.INIT) {
+                    session.setState(BuildMessageDispatcher.ProcessState.WORKING);
+                    launchBuildProcess(project, buildProcessCommandLine);
                   }
                   else {
-                    requestNewBuild(sessionData);
+                    requestNewBuild(session);
                   }
 
                   future.get();
@@ -690,9 +692,15 @@ public class BuildManager implements ApplicationComponent{
     return null;
   }
 
-  private void startProcess(final Project project,  UUID sessionId) throws ExecutionException {
+  private void launchBuildProcess(final Project project, final GeneralCommandLine cmdLine) throws ExecutionException {
     LOG.info("Launching new build process");
-    OSProcessHandler process = launchBuildProcess(project, myListenPort, sessionId);
+
+    OSProcessHandler process = new OSProcessHandler(cmdLine.createProcess(), null, mySystemCharset) {
+      @Override
+      protected boolean shouldDestroyProcessRecursively() {
+        return true;
+      }
+    };
     process.addProcessListener(new ProcessAdapter() {
       @Override
       public void onTextAvailable(ProcessEvent event, Key outputType) {
@@ -751,7 +759,7 @@ public class BuildManager implements ApplicationComponent{
     return "com.intellij.compiler.server.BuildManager";
   }
 
-  private OSProcessHandler launchBuildProcess(Project project, final int port, final UUID sessionId) throws ExecutionException {
+  private GeneralCommandLine getBuildProcessCommandLine(Project project, int port, UUID sessionId) throws ExecutionException {
     final String compilerPath;
     final String vmExecutablePath;
     JavaSdkVersion sdkVersion = null;
@@ -875,11 +883,11 @@ public class BuildManager implements ApplicationComponent{
         cmdLine.addParameter(option);
       }
     }
-    
+
     if (isProfilingMode) {
       cmdLine.addParameter("-agentlib:yjpagent=disablej2ee,disablealloc,delay=10000,sessionname=ExternalBuild");
     }
-    
+
     // debugging
     final int debugPort = Registry.intValue("compiler.process.debug.port");
     if (debugPort > 0) {
@@ -907,7 +915,8 @@ public class BuildManager implements ApplicationComponent{
     cmdLine.addParameter("-D" + PathManager.PROPERTY_CONFIG_PATH + "=" + PathManager.getConfigPath());
     cmdLine.addParameter("-D" + PathManager.PROPERTY_PLUGINS_PATH + "=" + PathManager.getPluginsPath());
 
-    cmdLine.addParameter("-D" + GlobalOptions.LOG_DIR_OPTION + "=" + FileUtil.toSystemIndependentName(getBuildLogDirectory().getAbsolutePath()));
+    cmdLine.addParameter("-D" + GlobalOptions.LOG_DIR_OPTION + "=" + FileUtil
+      .toSystemIndependentName(getBuildLogDirectory().getAbsolutePath()));
 
     final File workDirectory = getBuildSystemDirectory();
     //noinspection ResultOfMethodCallIgnored
@@ -918,10 +927,10 @@ public class BuildManager implements ApplicationComponent{
       final List<String> args = provider.getVMArguments();
       cmdLine.addParameters(args);
     }
-    
+
     @SuppressWarnings("UnnecessaryFullyQualifiedName") 
     final Class<?> launcherClass = org.jetbrains.jps.cmdline.Launcher.class;
-    
+
     final List<String> launcherCp = new ArrayList<String>();
     launcherCp.add(ClasspathBootstrap.getResourcePath(launcherClass));
     launcherCp.add(compilerPath);
@@ -929,7 +938,7 @@ public class BuildManager implements ApplicationComponent{
     launcherCp.addAll(BuildProcessClasspathManager.getLauncherClasspath(project));
     cmdLine.addParameter("-classpath");
     cmdLine.addParameter(classpathToString(launcherCp));
-    
+
     cmdLine.addParameter(launcherClass.getName());
 
     final List<String> cp = ClasspathBootstrap.getBuildProcessApplicationClasspath(true);
@@ -947,15 +956,7 @@ public class BuildManager implements ApplicationComponent{
     cmdLine.addParameter(FileUtil.toSystemIndependentName(workDirectory.getPath()));
 
     cmdLine.setWorkDirectory(workDirectory);
-
-    final Process process = cmdLine.createProcess();
-
-    return new OSProcessHandler(process, null, mySystemCharset) {
-      @Override
-      protected boolean shouldDestroyProcessRecursively() {
-        return true;
-      }
-    };
+    return cmdLine;
   }
 
   public File getBuildSystemDirectory() {
@@ -1087,7 +1088,7 @@ public class BuildManager implements ApplicationComponent{
 
     private void done(String message, UUID sessionId) {
       if (!myFuture.isDone()) {
-        LOG.info(message + " for " + myFuture + " sessionId=" + sessionId);
+        LOG.info(message + ", sessionId=" + sessionId);
         myFuture.setDone();
       }
     }
@@ -1098,13 +1099,13 @@ public class BuildManager implements ApplicationComponent{
         super.sessionTerminated(sessionId);
       }
       finally {
-        done("build was terminated",sessionId);
+        done("build was terminated", sessionId);
       }
     }
 
     @Override
     public void buildStarted(UUID sessionId) {
-      LOG.info("buildStarted sessionId="+sessionId);
+      LOG.info("build started, sessionId=" + sessionId);
       super.buildStarted(sessionId);
     }
 
