@@ -18,6 +18,7 @@ package com.intellij.compiler.server;
 import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.util.registry.Registry;
 import com.intellij.util.containers.ConcurrentHashSet;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
@@ -41,7 +42,6 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
   private static final Logger LOG = Logger.getInstance("#com.intellij.compiler.server.BuildMessageDispatcher");
 
   private static final AttributeKey<SessionData> SESSION_DATA = AttributeKey.valueOf("BuildMessageDispatcher.sessionData");
-  public static final int MAX_IDLE_CHANNELS = 3;
 
   private final Map<UUID, SessionData> myMessageHandlers = new ConcurrentHashMap<UUID, SessionData>(16, 0.75f, 1);
   private final Set<UUID> myCanceledSessions = new ConcurrentHashSet<UUID>();
@@ -135,9 +135,11 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
         return o2.idleFrom.compareTo(o1.idleFrom);
       }
     });
+    
+    int maxIdleProcesses = Registry.intValue("compiler.max.idle.processes");
     for (int i = 0; i < idleSessions.size(); i++) {
       SessionData sessionData = idleSessions.get(i);
-      if (i + 1 >= MAX_IDLE_CHANNELS) {
+      if (i + 1 >= maxIdleProcesses) {
         closeChannel(sessionData);
       }
     }

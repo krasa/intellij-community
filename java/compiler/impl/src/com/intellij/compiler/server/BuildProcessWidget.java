@@ -61,7 +61,7 @@ public class BuildProcessWidget implements StatusBarWidget, ProjectComponent {
 
   public BuildProcessWidget(Project project, BuildManager buildManager) {
     myBuildManager = buildManager;
-    this.id = "BuildProcessWidget-" + project.getBasePath();
+    this.id = "Java Build Process";
     this.myProject = project;
   }
 
@@ -188,7 +188,7 @@ public class BuildProcessWidget implements StatusBarWidget, ProjectComponent {
 
   private class Stop extends DumbAwareAction {
     public Stop() {
-      super("&Stop", "Shutdown compile server", AllIcons.Actions.Suspend);
+      super("&Stop", "Shutdown Java Build Process", AllIcons.Actions.Suspend);
     }
 
     @Override
