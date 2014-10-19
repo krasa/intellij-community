@@ -51,11 +51,11 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
                                                  BuilderMessageHandler handler,
                                                  CmdlineRemoteProto.Message.ControllerMessage params,
                                                  GeneralCommandLine commandLine) {
-    SessionData value = new SessionData(sessionId, handler, params, project.getProjectFilePath(), commandLine);
-    tryReusingChannel(value);
-    myMessageHandlers.put(sessionId, value);
-    closeOldChannels(value);
-    return value;
+    SessionData newSession = new SessionData(sessionId, handler, params, project.getProjectFilePath(), commandLine);
+    tryReusingChannel(newSession,project);
+    myMessageHandlers.put(sessionId, newSession);
+    closeOldChannels(newSession);
+    return newSession;
   }
 
   @Nullable
@@ -74,8 +74,8 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
   }
 
 
-  private void tryReusingChannel(@NotNull SessionData newSession) {
-    SessionData oldSession = getPreviousSessionByProject(newSession);
+  private void tryReusingChannel(@NotNull SessionData newSession, @NotNull Project project) {
+    SessionData oldSession = getSessionByProject(project);
     if (oldSession != null && oldSession.state == ProcessState.IDLE) {
       LOG.info("Found channel from sessionId=" + oldSession.sessionId);
       if (oldSession.isCommandLineChanged(newSession)) {
@@ -107,8 +107,8 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
   }
 
   @Nullable
-  private SessionData getPreviousSessionByProject(@NotNull SessionData project) {
-    String projectFilePath = project.myProjectFilePath;
+  public SessionData getSessionByProject(@NotNull Project project) {
+    String projectFilePath = project.getProjectFilePath();
     SessionData result = null;
     for (SessionData sessionData : myMessageHandlers.values()) {
       if (sessionData.myProjectFilePath.equals(projectFilePath)) {

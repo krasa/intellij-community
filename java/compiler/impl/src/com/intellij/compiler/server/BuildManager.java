@@ -1381,4 +1381,17 @@ public class BuildManager implements ApplicationComponent{
     }
   }
 
+  @Nullable
+  public boolean hasRunningBuildProcess(Project project) {
+    BuildMessageDispatcher.SessionData session = myMessageDispatcher.getSessionByProject(project);
+    return session != null && session.channel !=null && session.channel.isActive();
+  }
+
+  public void stopBuildProcess(Project project) {
+    BuildMessageDispatcher.SessionData session = myMessageDispatcher.getSessionByProject(project);
+    if (session != null) {
+      myMessageDispatcher.closeChannel(session);
+    }
+  }
+  
 }
