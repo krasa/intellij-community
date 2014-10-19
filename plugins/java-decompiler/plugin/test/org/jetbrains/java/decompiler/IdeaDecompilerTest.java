@@ -17,9 +17,12 @@ package org.jetbrains.java.decompiler;
 
 import com.intellij.codeInsight.daemon.impl.IdentifierHighlighterPassFactory;
 import com.intellij.codeInsight.navigation.actions.GotoDeclarationAction;
+import com.intellij.debugger.PositionManager;
 import com.intellij.openapi.application.PluginPathManager;
 import com.intellij.openapi.fileTypes.StdFileTypes;
 import com.intellij.openapi.util.SystemInfo;
+import com.intellij.openapi.util.registry.Registry;
+import com.intellij.openapi.util.registry.RegistryValue;
 import com.intellij.openapi.vfs.StandardFileSystems;
 import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -91,7 +94,7 @@ public class IdeaDecompilerTest extends LightCodeInsightFixtureTestCase {
   }
 
   public void testNavigation() {
-    VirtualFile file = getTestFile();
+    VirtualFile file = getTestFile("Navigation.class");
     myFixture.openFileInEditor(file);
 
     doTestNavigation(11, 14, 14, 10);  // to "m2()"
@@ -99,9 +102,27 @@ public class IdeaDecompilerTest extends LightCodeInsightFixtureTestCase {
     doTestNavigation(16, 28, 15, 13);  // to "int r"
   }
 
-  private VirtualFile getTestFile() {
-    String path = PluginPathManager.getPluginHomePath("java-decompiler") + "/plugin/testData/" + getTestName(false) + ".class";
-    VirtualFile file = StandardFileSystems.local().findFileByPath(path);
+  public void testHighlighting() {
+    VirtualFile file = getTestFile("Navigation.class");
+    myFixture.openFileInEditor(file);
+
+    IdentifierHighlighterPassFactory.doWithHighlightingEnabled(new Runnable() {
+      public void run() {
+        myFixture.getEditor().getCaretModel().moveToOffset(offset(11, 14));  // m2(): usage, declaration
+        assertEquals(2, myFixture.doHighlighting().size());
+        myFixture.getEditor().getCaretModel().moveToOffset(offset(15, 21));  // int i: usage, declaration
+        assertEquals(2, myFixture.doHighlighting().size());
+        myFixture.getEditor().getCaretModel().moveToOffset(offset(16, 28));  // int r: usage, declaration
+        assertEquals(2, myFixture.doHighlighting().size());
+        myFixture.getEditor().getCaretModel().moveToOffset(offset(19, 24));  // throws: declaration, m4() call
+        assertEquals(2, myFixture.doHighlighting().size());
+      }
+    });
+  }
+
+  private static VirtualFile getTestFile(String name) {
+    String path = PluginPathManager.getPluginHomePath("java-decompiler") + "/plugin/testData/" + name;
+    VirtualFile file = StandardFileSystems.local().refreshAndFindFileByPath(path);
     assertNotNull(path, file);
     return file;
   }
@@ -118,19 +139,23 @@ public class IdeaDecompilerTest extends LightCodeInsightFixtureTestCase {
     return myFixture.getEditor().getDocument().getLineStartOffset(line - 1) + column - 1;
   }
 
-  public void testHighlighting() {
-    VirtualFile file = getTestFile();
-    myFixture.openFileInEditor(file);
+  public void testLineNumberMapping() {
+    RegistryValue value = Registry.get("decompiler.use.line.mapping");
+    boolean old = value.asBoolean();
+    try {
+      value.setValue(true);
 
-    IdentifierHighlighterPassFactory.doWithHighlightingEnabled(new Runnable() {
-      public void run() {
-        myFixture.getEditor().getCaretModel().moveToOffset(offset(11, 14));  // m2(): usage, declaration
-        assertEquals(2, myFixture.doHighlighting().size());
-        myFixture.getEditor().getCaretModel().moveToOffset(offset(15, 21));  // int i: usage, declaration
-        assertEquals(2, myFixture.doHighlighting().size());
-        myFixture.getEditor().getCaretModel().moveToOffset(offset(16, 28));  // int r: usage, declaration
-        assertEquals(2, myFixture.doHighlighting().size());
-      }
-    });
+      VirtualFile file = getTestFile("LineNumbers.class");
+      assertNull(file.getUserData(PositionManager.LINE_NUMBERS_MAPPING_KEY));
+
+      new IdeaDecompiler().getText(file);
+
+      int[] mapping = file.getUserData(PositionManager.LINE_NUMBERS_MAPPING_KEY);
+      assertNotNull(mapping);
+      assertEquals(20, mapping.length);
+    }
+    finally {
+      value.setValue(old);
+    }
   }
 }

@@ -16,6 +16,7 @@
 package com.intellij.util.xmlb;
 
 import com.intellij.openapi.util.Pair;
+import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.util.ReflectionUtil;
 import org.jdom.*;
 import org.jetbrains.annotations.NotNull;
@@ -122,11 +123,15 @@ class XmlSerializerImpl {
     if (Date.class.isAssignableFrom(aClass)) return new DateBinding();
     if (aClass.isEnum()) return new PrimitiveValueBinding(aClass);
 
-    return new BeanBinding(aClass, accessor);
+    return new BeanBinding(aClass);
   }
 
   @Nullable
-  @SuppressWarnings({"unchecked"})
+  @Deprecated
+  @SuppressWarnings({"unchecked", "unused"})
+  /**
+   * @deprecated to remove in IDEA 15
+   */
   static <T> T findAnnotation(Annotation[] annotations, Class<T> aClass) {
     if (annotations == null) return null;
 
@@ -139,21 +144,38 @@ class XmlSerializerImpl {
   @Nullable
   @SuppressWarnings({"unchecked"})
   static <T> T convert(Object value, Class<T> type) {
-    if (value == null) return null;
-    if (type.isInstance(value)) return (T)value;
-    if (String.class.isAssignableFrom(type)) return (T)String.valueOf(value);
-    if (int.class.isAssignableFrom(type) || Integer.class.isAssignableFrom(type)) return (T)Integer.valueOf(String.valueOf(value));
-    if (double.class.isAssignableFrom(type) || Double.class.isAssignableFrom(type)) return (T)Double.valueOf(String.valueOf(value));
-    if (float.class.isAssignableFrom(type) || Float.class.isAssignableFrom(type)) return (T)Float.valueOf(String.valueOf(value));
-    if (long.class.isAssignableFrom(type) || Long.class.isAssignableFrom(type)) return (T)Long.valueOf(String.valueOf(value));
-    if (boolean.class.isAssignableFrom(type) || Boolean.class.isAssignableFrom(type)) return (T)Boolean.valueOf(String.valueOf(value));
-
+    if (value == null) {
+      return null;
+    }
+    if (type.isInstance(value)) {
+      return (T)value;
+    }
+    if (String.class.isAssignableFrom(type)) {
+      return (T)String.valueOf(value);
+    }
+    if (int.class.isAssignableFrom(type) || Integer.class.isAssignableFrom(type)) {
+      return (T)Integer.valueOf(String.valueOf(value));
+    }
+    if (double.class.isAssignableFrom(type) || Double.class.isAssignableFrom(type)) {
+      return (T)Double.valueOf(String.valueOf(value));
+    }
+    if (float.class.isAssignableFrom(type) || Float.class.isAssignableFrom(type)) {
+      return (T)Float.valueOf(String.valueOf(value));
+    }
+    if (long.class.isAssignableFrom(type) || Long.class.isAssignableFrom(type)) {
+      return (T)Long.valueOf(String.valueOf(value));
+    }
+    if (boolean.class.isAssignableFrom(type) || Boolean.class.isAssignableFrom(type)) {
+      return (T)Boolean.valueOf(String.valueOf(value));
+    }
+    if (char.class.isAssignableFrom(type) || Character.class.isAssignableFrom(type)) {
+      return (T)value;
+    }
     if (type.isEnum()) {
       final T[] enumConstants = type.getEnumConstants();
       for (T enumConstant : enumConstants) {
         if (enumConstant.toString().equals(value.toString())) return enumConstant;
       }
-
       return null;
     }
 
@@ -161,18 +183,17 @@ class XmlSerializerImpl {
   }
 
   public static boolean isIgnoredNode(final Object child) {
-    if (child instanceof Text && ((Text)child).getValue().trim().isEmpty()) {
+    if (child instanceof Text && StringUtil.isEmptyOrSpaces(((Text)child).getValue())) {
       return true;
     }
     if (child instanceof Comment) {
       return true;
     }
     if (child instanceof Attribute) {
-      Attribute attr = (Attribute)child;
-      final String namespaceURI = attr.getNamespaceURI();
-      if (namespaceURI != null && !namespaceURI.isEmpty()) return true;
+      if (!StringUtil.isEmpty(((Attribute)child).getNamespaceURI())) {
+        return true;
+      }
     }
-
     return false;
   }
 

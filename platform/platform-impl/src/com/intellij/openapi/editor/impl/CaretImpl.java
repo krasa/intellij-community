@@ -281,7 +281,7 @@ public class CaretImpl extends UserDataHolderBase implements Caret {
         if (!editorSettings.isVirtualSpace() && lineShift == 0 && columnShift == 1) {
           int lastLine = document.getLineCount() - 1;
           if (lastLine < 0) lastLine = 0;
-          if (EditorModificationUtil.calcAfterLineEnd(myEditor) >= 0 &&
+          if (newColumnNumber > EditorUtil.getLastVisualLineColumnNumber(myEditor, newLineNumber) &&
               newLineNumber < myEditor.logicalToVisualPosition(new LogicalPosition(lastLine, 0)).line) {
             newColumnNumber = 0;
             newLineNumber++;
@@ -922,12 +922,11 @@ public class CaretImpl extends UserDataHolderBase implements Caret {
     int offset = getOffset();
     if (offset == 0) return 0;
     int lineNumber = getLogicalPosition().line;
-    CharSequence text = document.getCharsSequence();
     int newOffset = offset - 1;
     int minOffset = lineNumber > 0 ? document.getLineEndOffset(lineNumber - 1) : 0;
     boolean camel = myEditor.getSettings().isCamelWords();
     for (; newOffset > minOffset; newOffset--) {
-      if (EditorActionUtil.isWordStart(text, newOffset, camel)) break;
+      if (EditorActionUtil.isWordOrLexemeStart(myEditor, newOffset, camel)) break;
     }
 
     return newOffset;
@@ -937,7 +936,6 @@ public class CaretImpl extends UserDataHolderBase implements Caret {
     Document document = myEditor.getDocument();
     int offset = getOffset();
 
-    CharSequence text = document.getCharsSequence();
     if (offset >= document.getTextLength() - 1 || document.getLineCount() == 0) return offset;
 
     int newOffset = offset + 1;
@@ -950,7 +948,7 @@ public class CaretImpl extends UserDataHolderBase implements Caret {
     }
     boolean camel = myEditor.getSettings().isCamelWords();
     for (; newOffset < maxOffset; newOffset++) {
-      if (EditorActionUtil.isWordEnd(text, newOffset, camel)) break;
+      if (EditorActionUtil.isWordOrLexemeEnd(myEditor, newOffset, camel)) break;
     }
 
     return newOffset;

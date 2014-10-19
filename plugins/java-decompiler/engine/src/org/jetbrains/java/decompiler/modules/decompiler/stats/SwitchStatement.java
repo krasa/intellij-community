@@ -18,6 +18,7 @@ package org.jetbrains.java.decompiler.modules.decompiler.stats;
 import org.jetbrains.java.decompiler.code.SwitchInstruction;
 import org.jetbrains.java.decompiler.code.cfg.BasicBlock;
 import org.jetbrains.java.decompiler.main.DecompilerContext;
+import org.jetbrains.java.decompiler.main.TextBuffer;
 import org.jetbrains.java.decompiler.main.collectors.BytecodeMappingTracer;
 import org.jetbrains.java.decompiler.main.collectors.CounterContainer;
 import org.jetbrains.java.decompiler.modules.decompiler.DecHelper;
@@ -107,23 +108,23 @@ public class SwitchStatement extends Statement {
     return null;
   }
 
-  public String toJava(int indent, BytecodeMappingTracer tracer) {
+  public TextBuffer toJava(int indent, BytecodeMappingTracer tracer) {
 
     String indstr = InterpreterUtil.getIndentString(indent);
 
     String new_line_separator = DecompilerContext.getNewLineSeparator();
 
-    StringBuilder buf = new StringBuilder();
+    TextBuffer buf = new TextBuffer();
     buf.append(ExprProcessor.listToJava(varDefinitions, indent, tracer));
     buf.append(first.toJava(indent, tracer));
 
     if (isLabeled()) {
-      buf.append(indstr).append("label").append(this.id).append(":").append(new_line_separator);
-      tracer.incrementSourceLine();
+      buf.append(indstr).append("label").append(this.id.toString()).append(":").append(new_line_separator);
+      tracer.incrementCurrentSourceLine();
     }
 
     buf.append(indstr).append(headexprent.get(0).toJava(indent, tracer)).append(" {").append(new_line_separator);
-    tracer.incrementSourceLine();
+    tracer.incrementCurrentSourceLine();
 
     VarType switch_type = headexprent.get(0).getExprType();
 
@@ -136,14 +137,14 @@ public class SwitchStatement extends Statement {
       for (int j = 0; j < edges.size(); j++) {
         if (edges.get(j) == default_edge) {
           buf.append(indstr).append("default:").append(new_line_separator);
-          tracer.incrementSourceLine();
+          tracer.incrementCurrentSourceLine();
         }
         else {
           ConstExprent value = (ConstExprent)values.get(j).copy();
           value.setConsttype(switch_type);
 
           buf.append(indstr).append("case ").append(value.toJava(indent, tracer)).append(":").append(new_line_separator);
-          tracer.incrementSourceLine();
+          tracer.incrementCurrentSourceLine();
         }
       }
 
@@ -151,9 +152,9 @@ public class SwitchStatement extends Statement {
     }
 
     buf.append(indstr).append("}").append(new_line_separator);
-    tracer.incrementSourceLine();
+    tracer.incrementCurrentSourceLine();
 
-    return buf.toString();
+    return buf;
   }
 
   public void initExprents() {
@@ -310,7 +311,7 @@ public class SwitchStatement extends Statement {
         int index = in == lstSuccs.size() ? 0 : in;
 
         lste.add(lstSuccs.get(index));
-        lstv.add(index == 0 ? null : new ConstExprent(values[index - 1], false));
+        lstv.add(index == 0 ? null : new ConstExprent(values[index - 1], false, null));
       }
       lstEdges.add(lste);
       lstValues.add(lstv);

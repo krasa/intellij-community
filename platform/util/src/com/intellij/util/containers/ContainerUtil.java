@@ -1227,6 +1227,14 @@ public class ContainerUtil extends ContainerUtilRt {
     if (list1.isEmpty() && list2.isEmpty()) {
       return Collections.emptyList();
     }
+    else if (list1.isEmpty()) {
+      //noinspection unchecked
+      return (List<T>)list2;
+    }
+    else if (list2.isEmpty()) {
+      //noinspection unchecked
+      return (List<T>)list1;
+    }
 
     final int size1 = list1.size();
     final int size = size1 + list2.size();
@@ -2220,7 +2228,7 @@ public class ContainerUtil extends ContainerUtilRt {
   @NotNull
   @Contract(pure=true)
   public static <V> ConcurrentIntObjectMap<V> createConcurrentIntObjectMap() {
-    return new StripedLockIntObjectConcurrentHashMap<V>();
+    return new ConcurrentIntObjectHashMap<V>();
   }
 
   @NotNull

@@ -40,6 +40,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.idea.svn.auth.SvnAuthenticationNotifier;
 import org.jetbrains.idea.svn.config.SvnConfigureProxiesDialog;
+import org.jetbrains.idea.svn.dialogs.SshSettingsPanel;
 import org.jetbrains.idea.svn.svnkit.SvnKitManager;
 
 import javax.swing.*;
@@ -50,6 +51,7 @@ import java.io.File;
 
 public class SvnConfigurable implements Configurable {
 
+  public static final String DISPLAY_NAME = SvnVcs.VCS_DISPLAY_NAME;
   private final Project myProject;
   private JCheckBox myUseDefaultCheckBox;
   private TextFieldWithBrowseButton myConfigurationDirectoryText;
@@ -76,6 +78,7 @@ public class SvnConfigurable implements Configurable {
   private JBRadioButton myTLSv1RadioButton;
   private JBRadioButton myAllRadioButton;
   private JLabel mySSLExplicitly;
+  private SshSettingsPanel mySshSettingsPanel;
 
   @NonNls private static final String HELP_ID = "project.propSubversion";
 
@@ -168,6 +171,8 @@ public class SvnConfigurable implements Configurable {
         mySSLExplicitly.setText("Setting 'All' value in this JDK version (" + version + ") is not recommended.");
       }
     }
+
+    mySshSettingsPanel.load(SvnConfiguration.getInstance(myProject));
   }
 
   public static void selectConfigurationDirectory(@NotNull String path,
@@ -197,7 +202,7 @@ public class SvnConfigurable implements Configurable {
   }
 
   public String getDisplayName() {
-    return SvnVcs.VCS_DISPLAY_NAME;
+    return DISPLAY_NAME;
   }
 
   public String getHelpTopic() {
@@ -258,7 +263,8 @@ public class SvnConfigurable implements Configurable {
     if (! getSelectedSSL().equals(configuration.getSslProtocols())) return true;
     final SvnApplicationSettings applicationSettings17 = SvnApplicationSettings.getInstance();
     if (! Comparing.equal(applicationSettings17.getCommandLinePath(), myCommandLineClient.getText().trim())) return true;
-    return !configuration.getConfigurationDirectory().equals(myConfigurationDirectoryText.getText().trim());
+    if (!configuration.getConfigurationDirectory().equals(myConfigurationDirectoryText.getText().trim())) return true;
+    return mySshSettingsPanel.isModified(configuration);
   }
 
   private SvnConfiguration.UseAcceleration acceleration() {
@@ -299,6 +305,8 @@ public class SvnConfigurable implements Configurable {
       VcsDirtyScopeManager.getInstance(myProject).markEverythingDirty();
     }
     configuration.setHttpTimeout(((SpinnerNumberModel) myHttpTimeout.getModel()).getNumber().longValue() * 1000);
+
+    mySshSettingsPanel.apply(configuration);
   }
 
   public void reset() {
@@ -345,6 +353,8 @@ public class SvnConfigurable implements Configurable {
     } else {
       myAllRadioButton.setSelected(true);
     }
+
+    mySshSettingsPanel.reset(configuration);
   }
 
   public void disposeUIResources() {

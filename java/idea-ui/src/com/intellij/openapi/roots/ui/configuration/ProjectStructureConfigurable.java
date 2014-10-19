@@ -64,7 +64,8 @@ import java.util.List;
 
 import static com.intellij.openapi.roots.ui.configuration.ProjectStructureConfigurableFilter.ConfigurableId;
 
-public class ProjectStructureConfigurable extends BaseConfigurable implements SearchableConfigurable, Place.Navigator {
+public class ProjectStructureConfigurable extends BaseConfigurable implements SearchableConfigurable, Place.Navigator,
+                                                                              Configurable.NoMargin, Configurable.NoScroll {
 
   public static final DataKey<ProjectStructureConfigurable> KEY = DataKey.create("ProjectStructureConfiguration");
 
@@ -351,7 +352,7 @@ public class ProjectStructureConfigurable extends BaseConfigurable implements Se
   public void reset() {
     // need this to ensure VFS operations will not block because of storage flushing
     // and other maintenance IO tasks run in background
-    HeavyProcessLatch.INSTANCE.processStarted();
+    HeavyProcessLatch.INSTANCE.processStarted("Resetting Project Structure");
 
     try {
       myWasUiDisposed = false;

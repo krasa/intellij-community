@@ -117,6 +117,7 @@ public class PushLog extends JPanel implements TypeSafeDataProvider {
       }
     };
     myTree.setEditable(true);
+    myTree.setShowsRootHandles(root.getChildCount() > 1);
     MyTreeCellEditor treeCellEditor = new MyTreeCellEditor();
     myTree.setCellEditor(treeCellEditor);
     treeCellEditor.addCellEditorListener(new CellEditorListener() {
@@ -355,6 +356,9 @@ public class PushLog extends JPanel implements TypeSafeDataProvider {
       if (!(value instanceof DefaultMutableTreeNode)) {
         return;
       }
+      myCheckbox.setBorder(null); //checkBox may have no border by default, but insets are not null,
+      // it depends on LaF, OS and isItRenderedPane, see com.intellij.ide.ui.laf.darcula.ui.DarculaCheckBoxBorder.
+      // null border works as expected always.
       if (value instanceof RepositoryNode) {
         //todo simplify, remove instance of
         myCheckbox.setVisible(((RepositoryNode)value).isCheckboxVisible());

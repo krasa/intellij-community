@@ -207,14 +207,17 @@ public class SearchingForTestsTask extends Task.Backgroundable {
           }
         }
       }
-      map.put(ApplicationManager.getApplication().runReadAction(
+      final String className = ApplicationManager.getApplication().runReadAction(
         new Computable<String>() {
           @Nullable
           public String compute() {
             return ClassUtil.getJVMClassName(entry.getKey());
           }
         }
-      ), methods);
+      );
+      if (className != null) {
+        map.put(className, methods);
+      }
     }
     // We have groups we wish to limit to.
     Collection<String> groupNames = null;
@@ -575,8 +578,13 @@ public class SearchingForTestsTask extends Task.Backgroundable {
     final PsiClass[] psiClasses;
     if (methods != null && methods.length > 0) {
       final Set<PsiClass> containingClasses = new LinkedHashSet<PsiClass>();
-      for (PsiMethod method : methods) {
-        containingClasses.add(method.getContainingClass());
+      for (final PsiMethod method : methods) {
+        containingClasses.add(ApplicationManager.getApplication().runReadAction(new Computable<PsiClass>() {
+          @Override
+          public PsiClass compute() {
+            return method.getContainingClass();
+          }
+        }));
       }
       psiClasses = containingClasses.toArray(new PsiClass[containingClasses.size()]);
     } else {

@@ -1237,10 +1237,12 @@ public abstract class ChooseByNameBase {
 
     private MyTextField() {
       super(40);
-      if (!(getUI() instanceof DarculaTextFieldUI)) {
-        setUI((DarculaTextFieldUI)DarculaTextFieldUI.createUI(this));
+      if (!UIUtil.isUnderGTKLookAndFeel()) {
+        if (!(getUI() instanceof DarculaTextFieldUI)) {
+          setUI(DarculaTextFieldUI.createUI(this));
+        }
+        setBorder(new DarculaTextBorder());
       }
-      setBorder(new DarculaTextBorder());
       enableEvents(AWTEvent.KEY_EVENT_MASK);
       myCompletionKeyStroke = getShortcut(IdeActions.ACTION_CODE_COMPLETION);
       forwardStroke = getShortcut(IdeActions.ACTION_GOTO_FORWARD);
@@ -1514,13 +1516,14 @@ public abstract class ChooseByNameBase {
               ApplicationManager.getApplication().runReadAction(new Runnable() {
                 @Override
                 public void run() {
-                  if (myProject.isDisposed()) return;
+                  if (myProject != null && myProject.isDisposed()) return;
 
                   ApplicationAdapter listener = new ApplicationAdapter() {
                     @Override
                     public void beforeWriteActionStart(Object action) {
-                      cancel();
-                      scheduleRestart();
+                      if (cancel()) {
+                        scheduleRestart(); //don't restart if already canceled explicitly
+                      }
                       ApplicationManager.getApplication().removeApplicationListener(this);
                     }
                   };

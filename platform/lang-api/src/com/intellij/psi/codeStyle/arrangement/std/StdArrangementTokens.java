@@ -17,6 +17,7 @@ package com.intellij.psi.codeStyle.arrangement.std;
 
 import com.intellij.openapi.application.ApplicationBundle;
 import com.intellij.openapi.util.NotNullLazyValue;
+import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.containers.ContainerUtilRt;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -25,6 +26,8 @@ import org.jetbrains.annotations.PropertyKey;
 import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.Set;
+
+import static com.intellij.psi.codeStyle.arrangement.std.StdArrangementTokens.EntryType.*;
 
 /**
  * Holds settings tokens used by built-in IJ arrangers.
@@ -99,6 +102,15 @@ public class StdArrangementTokens {
     return result;
   }
 
+  private static StdArrangementSettingsToken compositeToken(@NotNull String id,
+                                                            @NotNull StdArrangementTokenType type,
+                                                            @NotNull ArrangementSettingsToken... alternativeTokens)
+  {
+    StdArrangementSettingsToken result = CompositeArrangementToken.create(id, type, alternativeTokens);
+    TOKENS_BY_ID.put(id, result);
+    return result;
+  }
+
   private static StdArrangementSettingsToken token(@NotNull String id, @NotNull @PropertyKey(resourceBundle = ApplicationBundle.BUNDLE) String key,
                                                    @NotNull StdArrangementTokenType type) {
     StdArrangementSettingsToken result = StdArrangementSettingsToken.tokenByBundle(id, key, type);
@@ -110,6 +122,7 @@ public class StdArrangementTokens {
     @NotNull public static final ArrangementSettingsToken TYPE  = token("TYPE", "arrangement.settings.text.general.type", StdArrangementTokenType.GENERAL);
     @NotNull public static final ArrangementSettingsToken MODIFIER = token("MODIFIER", "arrangement.settings.text.general.modifier", StdArrangementTokenType.GENERAL);
     @NotNull public static final ArrangementSettingsToken ORDER = token("ORDER", "arrangement.settings.text.general.order", StdArrangementTokenType.GENERAL);
+    @NotNull public static final ArrangementSettingsToken ALIAS = token("ALIAS", "arrangement.settings.text.general.sequence", StdArrangementTokenType.GENERAL);
 
     private General() {
     }
@@ -182,8 +195,13 @@ public class StdArrangementTokens {
     @NotNull public static final ArrangementSettingsToken SYNCHRONIZED    = invertible("SYNCHRONIZED", StdArrangementTokenType.MODIFIER);
     @NotNull public static final ArrangementSettingsToken ABSTRACT        = invertible("ABSTRACT", StdArrangementTokenType.MODIFIER);
     @NotNull public static final ArrangementSettingsToken OVERRIDE        = invertible("OVERRIDE", StdArrangementTokenType.MODIFIER);
+    @NotNull public static final ArrangementSettingsToken GETTER          = compositeToken("GETTER", StdArrangementTokenType.MODIFIER, METHOD, PUBLIC);
+    @NotNull public static final ArrangementSettingsToken SETTER          = compositeToken("SETTER", StdArrangementTokenType.MODIFIER, METHOD, PUBLIC);
+    @NotNull public static final ArrangementSettingsToken OVERRIDDEN      = compositeToken("OVERRIDDEN", StdArrangementTokenType.MODIFIER, METHOD, PUBLIC, PROTECTED);
     private static final NotNullLazyValue<Set<ArrangementSettingsToken>> TOKENS = collectFields(Modifier.class);
 
+    public static final Set<ArrangementSettingsToken> MODIFIER_AS_TYPE = ContainerUtil.newHashSet(GETTER, SETTER, OVERRIDDEN);
+    
     private Modifier() {
     }
 

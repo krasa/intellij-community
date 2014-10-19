@@ -146,7 +146,7 @@ public class OptionsEditor extends JPanel implements DataProvider, Place.Navigat
       }
     };
     if (Registry.is("ide.new.settings.dialog")) {
-      mySearch.setBackground(UIUtil.getSidePanelColor());
+      mySearch.setBackground(SettingsTreeView.BACKGROUND);
       mySearch.setBorder(new EmptyBorder(5, 10, 2, 10));
     }
 
@@ -498,14 +498,7 @@ public class OptionsEditor extends JPanel implements DataProvider, Place.Navigat
   private ActionCallback initConfigurable(@NotNull final Configurable configurable) {
     final ActionCallback result = new ActionCallback();
 
-    final ConfigurableContent content;
-
-    if (configurable instanceof MasterDetails) {
-      content = new Details((MasterDetails)configurable);
-    }
-    else {
-      content = new Simple(configurable);
-    }
+    final ConfigurableContent content = new Simple(configurable);
 
     if (!myConfigurable2Content.containsKey(configurable)) {
       if (configurable instanceof Place.Navigator) {
@@ -954,7 +947,6 @@ public class OptionsEditor extends JPanel implements DataProvider, Place.Navigat
       final MouseEvent me = (MouseEvent)event;
       if (SwingUtilities.isDescendingFrom(me.getComponent(), SwingUtilities.getWindowAncestor(myContentWrapper)) || isPopupOverEditor(me.getComponent())) {
         queueModificationCheck();
-        myFilter.setHoldingFilter(false);
       }
     }
     else if (event.getID() == KeyEvent.KEY_PRESSED || event.getID() == KeyEvent.KEY_RELEASED) {
@@ -1025,7 +1017,7 @@ public class OptionsEditor extends JPanel implements DataProvider, Place.Navigat
             select(configurable, null);
           }
         };
-        label.setBorder(BorderFactory.createEmptyBorder(1, 17, 1, 1));
+        label.setBorder(BorderFactory.createEmptyBorder(1, 17, 3, 1));
         box.add(label);
       }
     }
@@ -1068,7 +1060,9 @@ public class OptionsEditor extends JPanel implements DataProvider, Place.Navigat
     @Override
     void set(final ContentWrapper wrapper) {
       myOwnDetails.setDetailsModeEnabled(true);
-      wrapper.setContent(myComponent, getContext().getErrors().get(myConfigurable), !ConfigurableWrapper.isNoScroll(myConfigurable));
+      boolean noScroll = ConfigurableWrapper.isNoScroll(myConfigurable) ||
+                         ConfigurableWrapper.cast(MasterDetails.class, myConfigurable) != null;
+      wrapper.setContent(myComponent, getContext().getErrors().get(myConfigurable), !noScroll);
     }
 
     @Override

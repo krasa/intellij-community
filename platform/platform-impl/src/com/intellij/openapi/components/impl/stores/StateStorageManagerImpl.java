@@ -15,7 +15,6 @@
  */
 package com.intellij.openapi.components.impl.stores;
 
-import com.intellij.codeInspection.SmartHashMap;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
@@ -266,7 +265,7 @@ public abstract class StateStorageManagerImpl implements StateStorageManager, Di
       throw new IllegalArgumentException("Extension is missing for storage file: " + expandedFile);
     }
 
-    if (roamingType != RoamingType.PER_USER && fileSpec.equals(StoragePathMacros.WORKSPACE_FILE)) {
+    if (roamingType == RoamingType.PER_USER && fileSpec.equals(StoragePathMacros.WORKSPACE_FILE)) {
       roamingType = RoamingType.DISABLED;
     }
 
@@ -410,23 +409,6 @@ public abstract class StateStorageManagerImpl implements StateStorageManager, Di
     return new StateStorageManagerExternalizationSession();
   }
 
-  @Nullable
-  @Override
-  public SaveSession startSave(@NotNull ExternalizationSession externalizationSession) {
-    StateStorageManagerExternalizationSession myExternalizationSession = (StateStorageManagerExternalizationSession)externalizationSession;
-    List<SaveSession> saveSessions = null;
-    for (StateStorage stateStorage : myExternalizationSession.mySessions.keySet()) {
-      SaveSession saveSession = stateStorage.startSave(myExternalizationSession.mySessions.get(stateStorage));
-      if (saveSession != null) {
-        if (saveSessions == null) {
-          saveSessions = new SmartList<SaveSession>();
-        }
-        saveSessions.add(saveSession);
-      }
-    }
-    return saveSessions == null ? null : new StateStorageSaveSession(saveSessions);
-  }
-
   @Override
   public void finishSave(@NotNull SaveSession saveSession) {
     if (!isDirty) {
@@ -448,7 +430,7 @@ public abstract class StateStorageManagerImpl implements StateStorageManager, Di
   }
 
   private final class StateStorageManagerExternalizationSession implements ExternalizationSession {
-    final Map<StateStorage, StateStorage.ExternalizationSession> mySessions = new SmartHashMap<StateStorage, StateStorage.ExternalizationSession>();
+    final Map<StateStorage, StateStorage.ExternalizationSession> mySessions = new LinkedHashMap<StateStorage, StateStorage.ExternalizationSession>();
 
     @Override
     public void setState(@NotNull Storage[] storageSpecs, @NotNull Object component, @NotNull String componentName, @NotNull Object state) {
@@ -487,6 +469,35 @@ public abstract class StateStorageManagerImpl implements StateStorageManager, Di
       }
       return session;
     }
+
+    @Nullable
+    @Override
+    public SaveSession createSaveSession() {
+      if (mySessions.isEmpty()) {
+        return null;
+      }
+
+      List<SaveSession> saveSessions = null;
+      for (StateStorage.ExternalizationSession session : mySessions.values()) {
+        SaveSession saveSession = session.createSaveSession();
+        if (saveSession != null) {
+          if (saveSessions == null) {
+            saveSessions = new SmartList<SaveSession>();
+          }
+          saveSessions.add(saveSession);
+        }
+      }
+
+      final List<SaveSession> list = saveSessions;
+      return saveSessions == null ? null : new SaveSession() {
+        @Override
+        public void save() {
+          for (SaveSession saveSession : list) {
+            saveSession.save();
+          }
+        }
+      };
+    }
   }
 
   @Override
@@ -499,21 +510,6 @@ public abstract class StateStorageManagerImpl implements StateStorageManager, Di
 
   @Nullable
   protected abstract String getOldStorageSpec(@NotNull Object component, @NotNull String componentName, @NotNull StateStorageOperation operation);
-
-  private final static class StateStorageSaveSession implements SaveSession {
-    private final List<SaveSession> mySaveSessions;
-
-    public StateStorageSaveSession(@NotNull List<SaveSession> saveSessions) {
-      mySaveSessions = saveSessions;
-    }
-
-    @Override
-    public void save() {
-      for (SaveSession saveSession : mySaveSessions) {
-        saveSession.save();
-      }
-    }
-  }
 
   @Override
   public void dispose() {

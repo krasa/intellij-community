@@ -150,6 +150,9 @@ public class CodeInsightTestFixtureImpl extends BaseFixture implements CodeInsig
   private boolean myAllowDirt;
   private boolean myCaresAboutInjection = true;
 
+  // this allows an inspection to be represented in profile, but to appear disabled
+  public final Set<String> myDisabledInspections = new HashSet<String>();
+
   @SuppressWarnings("JUnitTestCaseWithNonTrivialConstructors")
   public CodeInsightTestFixtureImpl(@NotNull IdeaProjectTestFixture projectFixture, @NotNull TempDirTestFixture tempDirTestFixture) {
     myProjectFixture = projectFixture;
@@ -457,7 +460,7 @@ public class CodeInsightTestFixtureImpl extends BaseFixture implements CodeInsig
     InspectionManagerEx inspectionManager = (InspectionManagerEx)InspectionManager.getInstance(getProject());
     GlobalInspectionContextImpl globalContext = createGlobalContextForTool(scope, getProject(), inspectionManager, toolWrapper);
 
-    InspectionTestUtil.runTool(toolWrapper, scope, globalContext, inspectionManager);
+    InspectionTestUtil.runTool(toolWrapper, scope, globalContext);
     InspectionTestUtil.compareToolResults(globalContext, toolWrapper, false, new File(getTestDataPath(), testDir).getPath());
   }
 
@@ -1160,6 +1163,7 @@ public class CodeInsightTestFixtureImpl extends BaseFixture implements CodeInsig
   public void setUp() throws Exception {
     super.setUp();
 
+    UsefulTestCase.replaceIdeEventQueueSafely();
     UIUtil.invokeAndWaitIfNeeded(new Runnable() {
       @Override
       public void run() {
@@ -1267,7 +1271,7 @@ public class CodeInsightTestFixtureImpl extends BaseFixture implements CodeInsig
 
       @Override
       public boolean isToolEnabled(HighlightDisplayKey key, PsiElement element) {
-        return key != null && key.toString() != null && myAvailableTools.containsKey(key.toString());
+        return key != null && key.toString() != null && myAvailableTools.containsKey(key.toString()) && !myDisabledInspections.contains(key.toString());
       }
 
       @Override

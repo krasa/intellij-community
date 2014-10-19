@@ -116,7 +116,6 @@ public final class WindowManagerImpl extends WindowManagerEx implements NamedCom
   private Rectangle myFrameBounds;
   private int myFrameExtendedState;
   private final WindowAdapter myActivationListener;
-  private final ApplicationInfoEx myApplicationInfoEx;
   private final DataManager myDataManager;
   private final ActionManagerEx myActionManager;
   private final UISettings myUiSettings;
@@ -125,11 +124,9 @@ public final class WindowManagerImpl extends WindowManagerEx implements NamedCom
    * invoked by reflection
    */
   public WindowManagerImpl(DataManager dataManager,
-                           ApplicationInfoEx applicationInfoEx,
                            ActionManagerEx actionManager,
                            UISettings uiSettings,
                            MessageBus bus) {
-    myApplicationInfoEx = applicationInfoEx;
     myDataManager = dataManager;
     myActionManager = actionManager;
     myUiSettings = uiSettings;
@@ -524,7 +521,7 @@ public final class WindowManagerImpl extends WindowManagerEx implements NamedCom
   }
 
   public void showFrame() {
-    final IdeFrameImpl frame = new IdeFrameImpl(myApplicationInfoEx,
+    final IdeFrameImpl frame = new IdeFrameImpl(ApplicationInfoEx.getInstanceEx(),
                                                 myActionManager, myUiSettings, myDataManager,
                                                 ApplicationManager.getApplication());
     myProject2Frame.put(null, frame);
@@ -595,7 +592,7 @@ public final class WindowManagerImpl extends WindowManagerEx implements NamedCom
       frame.setProject(project);
     }
     else {
-      frame = new IdeFrameImpl(myApplicationInfoEx, myActionManager, myUiSettings,
+      frame = new IdeFrameImpl(ApplicationInfoEx.getInstanceEx(), myActionManager, myUiSettings,
                                myDataManager, ApplicationManager.getApplication());
 
       final Rectangle bounds = ProjectFrameBounds.getInstance(project).getBounds();
@@ -615,7 +612,12 @@ public final class WindowManagerImpl extends WindowManagerEx implements NamedCom
     }
 
     frame.addWindowListener(myActivationListener);
-
+    frame.addComponentListener(new ComponentAdapter() {
+      @Override
+      public void componentMoved(@NotNull ComponentEvent e) {
+        updateFrameBounds(frame);
+      }
+    });
     myEventDispatcher.getMulticaster().frameCreated(frame);
 
     return frame;
@@ -781,7 +783,21 @@ public final class WindowManagerImpl extends WindowManagerEx implements NamedCom
       return null;
     }
 
+    int extendedState = updateFrameBounds(frame);
+    Rectangle rectangle = myFrameBounds;
     final Element frameElement = new Element(FRAME_ELEMENT);
+    frameElement.setAttribute(X_ATTR, Integer.toString(rectangle.x));
+    frameElement.setAttribute(Y_ATTR, Integer.toString(rectangle.y));
+    frameElement.setAttribute(WIDTH_ATTR, Integer.toString(rectangle.width));
+    frameElement.setAttribute(HEIGHT_ATTR, Integer.toString(rectangle.height));
+
+    if (!(frame.isInFullScreen() && SystemInfo.isAppleJvm)) {
+      frameElement.setAttribute(EXTENDED_STATE_ATTR, Integer.toString(extendedState));
+    }
+    return frameElement;
+  }
+
+  private int updateFrameBounds(IdeFrameImpl frame) {
     int extendedState = frame.getExtendedState();
     if (SystemInfo.isMacOSLion) {
       @SuppressWarnings("deprecation") ComponentPeer peer = frame.getPeer();
@@ -795,16 +811,10 @@ public final class WindowManagerImpl extends WindowManagerEx implements NamedCom
     boolean usePreviousBounds = isMaximized &&
                                 myFrameBounds != null &&
                                 frame.getBounds().contains(new Point((int)myFrameBounds.getCenterX(), (int)myFrameBounds.getCenterY()));
-    Rectangle rectangle = usePreviousBounds ? myFrameBounds : frame.getBounds();
-    frameElement.setAttribute(X_ATTR, Integer.toString(rectangle.x));
-    frameElement.setAttribute(Y_ATTR, Integer.toString(rectangle.y));
-    frameElement.setAttribute(WIDTH_ATTR, Integer.toString(rectangle.width));
-    frameElement.setAttribute(HEIGHT_ATTR, Integer.toString(rectangle.height));
-
-    if (!(frame.isInFullScreen() && SystemInfo.isAppleJvm)) {
-      frameElement.setAttribute(EXTENDED_STATE_ATTR, Integer.toString(extendedState));
+    if (!usePreviousBounds) {
+      myFrameBounds = frame.getBounds();
     }
-    return frameElement;
+    return extendedState;
   }
 
   @Override

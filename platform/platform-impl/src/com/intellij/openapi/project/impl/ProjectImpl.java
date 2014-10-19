@@ -16,7 +16,7 @@
 package com.intellij.openapi.project.impl;
 
 import com.intellij.diagnostic.PluginException;
-import com.intellij.ide.RecentProjectsManagerBase;
+import com.intellij.ide.RecentProjectsManager;
 import com.intellij.ide.plugins.IdeaPluginDescriptor;
 import com.intellij.ide.plugins.PluginManagerCore;
 import com.intellij.ide.startup.StartupManagerEx;
@@ -343,13 +343,13 @@ public class ProjectImpl extends PlatformComponentManagerImpl implements Project
           if (ideaDir != null && ideaDir.isValid() && ideaDir.isDirectory()) {
             File nameFile = new File(ideaDir.getPath(), NAME_FILE);
             try {
-              FileUtil.writeToFile(nameFile, getName().getBytes("UTF-8"), false);
+              FileUtil.writeToFile(nameFile, getName());
               myOldName = null;
             }
             catch (IOException e) {
               LOG.info("Unable to store project name to: " + nameFile.getPath());
             }
-            RecentProjectsManagerBase.getInstance().clearNameCache();
+            RecentProjectsManager.getInstance().clearNameCache();
           }
         }
       }

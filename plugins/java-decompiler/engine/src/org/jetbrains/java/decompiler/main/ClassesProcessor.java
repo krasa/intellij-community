@@ -48,10 +48,8 @@ public class ClassesProcessor {
   public ClassesProcessor(StructContext context) {
 
     HashMap<String, Object[]> mapInnerClasses = new HashMap<String, Object[]>();
-
     HashMap<String, HashSet<String>> mapNestedClassReferences = new HashMap<String, HashSet<String>>();
     HashMap<String, HashSet<String>> mapEnclosingClassReferences = new HashMap<String, HashSet<String>>();
-
     HashMap<String, String> mapNewSimpleNames = new HashMap<String, String>();
 
     boolean bDecompileInner = DecompilerContext.getOption(IFernflowerPreferences.DECOMPILE_INNER);
@@ -113,11 +111,9 @@ public class ClassesProcessor {
                   if (arrold == null) {
                     mapInnerClasses.put(innername, arr);
                   }
-                  else {
-                    if (!InterpreterUtil.equalObjectArrays(arrold, arr)) {
-                      DecompilerContext.getLogger()
-                        .writeMessage("Inconsistent inner class entries for " + innername + "!", IFernflowerLogger.Severity.WARN);
-                    }
+                  else if (!InterpreterUtil.equalObjectArrays(arrold, arr)) {
+                    String message = "Inconsistent inner class entries for " + innername + "!";
+                    DecompilerContext.getLogger().writeMessage(message, IFernflowerLogger.Severity.WARN);
                   }
 
                   // reference to the nested class
@@ -174,15 +170,13 @@ public class ClassesProcessor {
                   continue;
                 }
 
-                if (setVisited.contains(nestedClass)) {
+                if (!setVisited.add(nestedClass)) {
                   continue;
                 }
-                setVisited.add(nestedClass);
 
                 ClassNode nestednode = mapRootClasses.get(nestedClass);
                 if (nestednode == null) {
-                  DecompilerContext.getLogger().writeMessage("Nested class " + nestedClass + " missing!",
-                                                             IFernflowerLogger.Severity.WARN);
+                  DecompilerContext.getLogger().writeMessage("Nested class " + nestedClass + " missing!", IFernflowerLogger.Severity.WARN);
                   continue;
                 }
 
@@ -207,13 +201,13 @@ public class ClassesProcessor {
 
                   if (interfaces.length > 0) {
                     if (interfaces.length > 1) {
-                      DecompilerContext.getLogger()
-                        .writeMessage("Inconsistent anonymous class definition: " + cl.qualifiedName, IFernflowerLogger.Severity.WARN);
+                      String message = "Inconsistent anonymous class definition: " + cl.qualifiedName;
+                      DecompilerContext.getLogger().writeMessage(message, IFernflowerLogger.Severity.WARN);
                     }
-                    nestednode.anonimousClassType = new VarType(cl.getInterface(0), true);
+                    nestednode.anonymousClassType = new VarType(cl.getInterface(0), true);
                   }
                   else {
-                    nestednode.anonimousClassType = new VarType(cl.superClass.getString(), true);
+                    nestednode.anonymousClassType = new VarType(cl.superClass.getString(), true);
                   }
                 }
                 else if (nestednode.type == ClassNode.CLASS_LOCAL) {
@@ -236,12 +230,13 @@ public class ClassesProcessor {
     }
   }
 
-  public void writeClass(StructClass cl, StringBuilder buffer) throws IOException {
+  public void writeClass(StructClass cl, TextBuffer buffer) throws IOException {
     ClassNode root = mapRootClasses.get(cl.qualifiedName);
     if (root.type != ClassNode.CLASS_ROOT) {
       return;
     }
 
+    DecompilerContext.getLogger().startReadingClass(cl.qualifiedName);
     try {
       ImportCollector importCollector = new ImportCollector(root);
       DecompilerContext.setImportCollector(importCollector);
@@ -260,15 +255,15 @@ public class ClassesProcessor {
 
       new NestedMemberAccess().propagateMemberAccess(root);
 
-      StringBuilder classBuffer = new StringBuilder(AVERAGE_CLASS_SIZE);
-      new ClassWriter().classToJava(root, classBuffer, 0);
+      TextBuffer classBuffer = new TextBuffer(AVERAGE_CLASS_SIZE);
+      new ClassWriter().classToJava(root, classBuffer, 0, null);
 
       String lineSeparator = DecompilerContext.getNewLineSeparator();
       int total_offset_lines = 0;
 
       int index = cl.qualifiedName.lastIndexOf("/");
       if (index >= 0) {
-        total_offset_lines++;
+        total_offset_lines+=2;
         String packageName = cl.qualifiedName.substring(0, index).replace('/', '.');
 
         buffer.append("package ");
@@ -283,19 +278,22 @@ public class ClassesProcessor {
         buffer.append(lineSeparator);
         total_offset_lines += import_lines_written + 1;
       }
+      //buffer.append(lineSeparator);
 
       buffer.append(classBuffer);
 
-      if(DecompilerContext.getOption(IFernflowerPreferences.BYTECODE_SOURCE_MAPPING)) {
+      if (DecompilerContext.getOption(IFernflowerPreferences.BYTECODE_SOURCE_MAPPING)) {
         BytecodeSourceMapper mapper = DecompilerContext.getBytecodeSourceMapper();
         mapper.addTotalOffset(total_offset_lines);
-
-        buffer.append(lineSeparator);
-        mapper.dumpMapping(buffer);
+        if (DecompilerContext.getOption(IFernflowerPreferences.UNIT_TEST_MODE)) {
+          buffer.append(lineSeparator);
+          mapper.dumpMapping(buffer, true);
+        }
       }
     }
     finally {
       destroyWrappers(root);
+      DecompilerContext.getLogger().endReadingClass();
     }
   }
 
@@ -350,30 +348,19 @@ public class ClassesProcessor {
     public static final int CLASS_LAMBDA = 8;
 
     public int type;
-
     public int access;
-
     public String simpleName;
-
     public StructClass classStruct;
-
     public ClassWrapper wrapper;
-
     public String enclosingMethod;
-
     public InvocationExprent superInvocation;
-
-    public HashMap<String, VarVersionPaar> mapFieldsToVars = new HashMap<String, VarVersionPaar>();
-
-    public VarType anonimousClassType;
-
+    public Map<String, VarVersionPaar> mapFieldsToVars = new HashMap<String, VarVersionPaar>();
+    public VarType anonymousClassType;
     public List<ClassNode> nested = new ArrayList<ClassNode>();
-
     public Set<String> enclosingClasses = new HashSet<String>();
-
     public ClassNode parent;
-
-    public LambdaInformation lambda_information;
+    public LambdaInformation lambdaInformation;
+    public boolean namelessConstructorStub = false;
 
     public ClassNode(String content_class_name,
                      String content_method_name,
@@ -386,21 +373,21 @@ public class ClassesProcessor {
       this.type = CLASS_LAMBDA;
       this.classStruct = classStruct; // 'parent' class containing the static function
 
-      lambda_information = new LambdaInformation();
+      lambdaInformation = new LambdaInformation();
 
-      lambda_information.class_name = lambda_class_name;
-      lambda_information.method_name = lambda_method_name;
-      lambda_information.method_descriptor = lambda_method_descriptor;
+      lambdaInformation.class_name = lambda_class_name;
+      lambdaInformation.method_name = lambda_method_name;
+      lambdaInformation.method_descriptor = lambda_method_descriptor;
 
-      lambda_information.content_class_name = content_class_name;
-      lambda_information.content_method_name = content_method_name;
-      lambda_information.content_method_descriptor = content_method_descriptor;
-      lambda_information.content_method_invocation_type = content_method_invocation_type;
+      lambdaInformation.content_class_name = content_class_name;
+      lambdaInformation.content_method_name = content_method_name;
+      lambdaInformation.content_method_descriptor = content_method_descriptor;
+      lambdaInformation.content_method_invocation_type = content_method_invocation_type;
 
-      lambda_information.content_method_key =
-        InterpreterUtil.makeUniqueKey(lambda_information.content_method_name, lambda_information.content_method_descriptor);
+      lambdaInformation.content_method_key =
+        InterpreterUtil.makeUniqueKey(lambdaInformation.content_method_name, lambdaInformation.content_method_descriptor);
 
-      anonimousClassType = new VarType(lambda_class_name, true);
+      anonymousClassType = new VarType(lambda_class_name, true);
 
       boolean is_method_reference = (content_class_name != classStruct.qualifiedName);
       if (!is_method_reference) { // content method in the same class, check synthetic flag
@@ -408,9 +395,9 @@ public class ClassesProcessor {
         is_method_reference = !mt.isSynthetic(); // if not synthetic -> method reference
       }
 
-      lambda_information.is_method_reference = is_method_reference;
-      lambda_information.is_content_method_static =
-        (lambda_information.content_method_invocation_type == CodeConstants.CONSTANT_MethodHandle_REF_invokeStatic); // FIXME: redundant?
+      lambdaInformation.is_method_reference = is_method_reference;
+      lambdaInformation.is_content_method_static =
+        (lambdaInformation.content_method_invocation_type == CodeConstants.CONSTANT_MethodHandle_REF_invokeStatic); // FIXME: redundant?
     }
 
     public ClassNode(int type, StructClass classStruct) {
@@ -438,7 +425,6 @@ public class ClassesProcessor {
       public String content_method_name;
       public String content_method_descriptor;
       public int content_method_invocation_type; // values from CONSTANT_MethodHandle_REF_*
-
       public String content_method_key;
 
       public boolean is_method_reference;

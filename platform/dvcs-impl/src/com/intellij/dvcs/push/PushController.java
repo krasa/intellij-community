@@ -37,6 +37,7 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.tree.DefaultTreeModel;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.io.File;
@@ -167,17 +168,25 @@ public class PushController implements Disposable {
     if (target == null) {
       model.setError(VcsError.createEmptyTargetError(repoName));
     }
+
     final PushTargetPanel<T> pushTargetPanel = support.createTargetPanel(repository, target);
-    RepositoryWithBranchPanel<T> repoPanel = new RepositoryWithBranchPanel<T>(myProject, repoName,
-                                                                              source.getPresentation(), pushTargetPanel);
+    final RepositoryWithBranchPanel<T> repoPanel = new RepositoryWithBranchPanel<T>(myProject, repoName,
+                                                                                    source.getPresentation(), pushTargetPanel);
+    CheckBoxModel checkBoxModel = model.getCheckBoxModel();
     final RepositoryNode repoNode = mySingleRepoProject
-                                    ? new SingleRepositoryNode(repoPanel)
-                                    : new RepositoryNode(repoPanel, target != null);
+                                    ? new SingleRepositoryNode(repoPanel, checkBoxModel)
+                                    : new RepositoryNode(repoPanel, checkBoxModel, target != null);
+    pushTargetPanel.setFireOnChangeAction(new Runnable() {
+      @Override
+      public void run() {
+        repoPanel.fireOnChange();
+        ((DefaultTreeModel)myPushLog.getTree().getModel()).nodeChanged(repoNode); // tell the tree to repaint the changed node
+      }
+    });
     myView2Model.put(repoNode, model);
     repoPanel.addRepoNodeListener(new RepositoryNodeListener<T>() {
       @Override
       public void onTargetChanged(T newTarget) {
-        model.setSelected(true);
         repoNode.setChecked(true);
         model.setTarget(newTarget);
         model.clearErrors();
@@ -186,8 +195,6 @@ public class PushController implements Disposable {
 
       @Override
       public void onSelectionChanged(boolean isSelected) {
-        model.setSelected(isSelected);
-        rootNode.setChecked(isSelected);
         myDialog.enableOkActions(isPushAllowed());
         if (isSelected && !model.hasCommitInfo() && !model.getSupport().shouldRequestIncomingChangesForNotCheckedRepositories()) {
           //download incoming if was not loaded before and marked as selected
@@ -228,20 +235,7 @@ public class PushController implements Disposable {
 
   public boolean isPushAllowed() {
     JTree tree = myPushLog.getTree();
-    return !tree.isEditing() && ContainerUtil.exists(myPushSupports, new Condition<PushSupport<?, ?, ?>>() {
-      @Override
-      public boolean value(PushSupport<?, ?, ?> support) {
-        return isPushAllowed(support);
-      }
-    });
-  }
-
-  private boolean isPushAllowed(@NotNull PushSupport<?, ?, ?> pushSupport) {
-    Collection<RepositoryNode> nodes = getNodesForSupport(pushSupport);
-    if (pushSupport.getRepositoryManager().isSyncEnabled()) {
-      return hasCheckedNode(nodes) && allNodesAreLoaded(nodes);
-    }
-    return hasCheckedNode(nodes);
+    return !tree.isEditing() && !getSelectedRepoNode().isEmpty() && allNodesAreLoaded(myView2Model.keySet());
   }
 
   private static boolean allNodesAreLoaded(@NotNull Collection<RepositoryNode> nodes) {
@@ -249,25 +243,6 @@ public class PushController implements Disposable {
       @Override
       public boolean value(@NotNull RepositoryNode node) {
         return node.isLoading();
-      }
-    });
-  }
-
-  private static boolean hasCheckedNode(@NotNull Collection<RepositoryNode> nodes) {
-    return ContainerUtil.exists(nodes, new Condition<RepositoryNode>() {
-      @Override
-      public boolean value(@NotNull RepositoryNode node) {
-        return node.isChecked();
-      }
-    });
-  }
-
-  @NotNull
-  private Collection<RepositoryNode> getNodesForSupport(final PushSupport<?, ?, ?> support) {
-    return ContainerUtil.mapNotNull(myView2Model.entrySet(), new Function<Map.Entry<RepositoryNode, MyRepoModel>, RepositoryNode>() {
-      @Override
-      public RepositoryNode fun(Map.Entry<RepositoryNode, MyRepoModel> entry) {
-        return entry.getValue().getSupport().equals(support) ? entry.getKey() : null;
       }
     });
   }
@@ -331,7 +306,6 @@ public class PushController implements Disposable {
             node.stopLoading();
             if (shouldBeSelected) { // never remove selection; initially all checkboxes are not selected
               node.setChecked(true);
-              model.setSelected(true);
             }
             myDialog.enableOkActions(isPushAllowed());
           }
@@ -472,7 +446,7 @@ public class PushController implements Disposable {
 
     int myNumberOfShownCommits;
     @NotNull List<? extends VcsFullCommitDetails> myLoadedCommits = Collections.emptyList();
-    boolean myIsSelected;
+    @NotNull CheckBoxModel myCheckBoxModel;
 
     public MyRepoModel(@NotNull Repo repository,
                        @NotNull PushSupport<Repo, S, T> supportForRepo,
@@ -480,7 +454,7 @@ public class PushController implements Disposable {
                        int num) {
       myRepository = repository;
       mySupport = supportForRepo;
-      myIsSelected = isSelected;
+      myCheckBoxModel = new CheckBoxModel(isSelected);
       mySource = source;
       myTarget = target;
       myNumberOfShownCommits = num;
@@ -511,7 +485,7 @@ public class PushController implements Disposable {
     }
 
     public boolean isSelected() {
-      return myIsSelected;
+      return myCheckBoxModel.isChecked();
     }
 
     public AbstractVcs<?> getVcs() {
@@ -535,10 +509,6 @@ public class PushController implements Disposable {
       return myTargetError != null;
     }
 
-    public void setSelected(boolean isSelected) {
-      myIsSelected = isSelected;
-    }
-
     public int getNumberOfShownCommits() {
       return myNumberOfShownCommits;
     }
@@ -558,6 +528,11 @@ public class PushController implements Disposable {
 
     public boolean hasCommitInfo() {
       return myTargetError != null || !myLoadedCommits.isEmpty();
+    }
+
+    @NotNull
+    public CheckBoxModel getCheckBoxModel() {
+      return myCheckBoxModel;
     }
   }
 }

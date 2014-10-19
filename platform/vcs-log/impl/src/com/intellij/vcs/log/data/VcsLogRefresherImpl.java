@@ -15,7 +15,6 @@
  */
 package com.intellij.vcs.log.data;
 
-import com.intellij.openapi.diagnostic.Attachment;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.progress.ProgressIndicator;
 import com.intellij.openapi.progress.Task;
@@ -243,8 +242,8 @@ public class VcsLogRefresherImpl implements VcsLogRefresher {
             }
           }
           // couldn't join => need to reload everything; if 5000 commits is still not enough, it's worth reporting:
-          LOG.error("Couldn't join " + commitCount / 5 + " recent commits to the log (" + permanentGraph.getAllCommits().size() + " commits)",
-                    new Attachment("recent_commits", myLoadedInfo.toLogString(myHashMap.asIndexGetter(), currentRefs, myProviders)));
+          LOG.info("Couldn't join " + commitCount / 5 + " recent commits to the log (" +
+                   permanentGraph.getAllCommits().size() + " commits)");
         }
 
         return loadFullLog();
@@ -429,41 +428,5 @@ public class VcsLogRefresherImpl implements VcsLogRefresher {
       return myRefs.get(root);
     }
 
-    @NotNull
-    public String toLogString(@NotNull final NotNullFunction<Hash, Integer> indexGetter,
-                              @NotNull Map<VirtualFile, Set<VcsRef>> previousRefs,
-                              @NotNull Map<VirtualFile, VcsLogProvider> providers) {
-      StringBuilder sb = new StringBuilder();
-      sb.append("LOG:\n");
-      for (Map.Entry<VirtualFile, List<GraphCommit<Integer>>> entry : myCommits.entrySet()) {
-        VirtualFile root = entry.getKey();
-        sb.append(String.format("%s (%s) \n", root.getName(), providers.get(root).getSupportedVcs().getName()));
-        sb.append(StringUtil.join(entry.getValue(), new Function<GraphCommit<Integer>, String>() {
-          @Override
-          public String fun(@NotNull GraphCommit<Integer> commit) {
-            return commit.getId() + "<-" + StringUtil.join(commit.getParents(), ",");
-          }
-        }, "\n"));
-      }
-      sb.append("\nREFS:\n");
-      printRefs(sb, indexGetter, myRefs);
-      sb.append("\nPREVIOUS REFS:\n");
-      printRefs(sb, indexGetter, previousRefs);
-      return sb.toString();
-    }
-
-    private static void printRefs(@NotNull StringBuilder sb,
-                                  @NotNull final NotNullFunction<Hash, Integer> indexGetter,
-                                  @NotNull Map<VirtualFile, Set<VcsRef>> refs) {
-      for (Map.Entry<VirtualFile, Set<VcsRef>> entry : refs.entrySet()) {
-        sb.append(entry.getKey().getName() + "\n");
-        sb.append(StringUtil.join(entry.getValue(), new Function<VcsRef, String>() {
-          @Override
-          public String fun(@NotNull VcsRef ref) {
-            return ref.getName() + "(" + indexGetter.fun(ref.getCommitHash()) + ")";
-          }
-        }, ","));
-      }
-    }
   }
 }
