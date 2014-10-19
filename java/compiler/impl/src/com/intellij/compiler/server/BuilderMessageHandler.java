@@ -29,7 +29,13 @@ public interface BuilderMessageHandler {
   
   void handleBuildMessage(Channel channel, UUID sessionId, CmdlineRemoteProto.Message.BuilderMessage msg);
 
+  /**
+   * something failed, it is broken, show error to the user and unblock
+   */
   void handleFailure(UUID sessionId, CmdlineRemoteProto.Message.Failure failure);
 
+  /**
+   * silently unblock, todo not necessary, delete?
+   */
   void sessionTerminated(UUID sessionId);
 }

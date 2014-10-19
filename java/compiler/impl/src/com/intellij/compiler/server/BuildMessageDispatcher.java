@@ -186,12 +186,11 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
         channel.writeAndFlush(CmdlineProtoUtil.toMessage(sessionId, CmdlineProtoUtil.createCancelCommand()));
       }
       else {
-        //channel was never connected, manual cancel must always release the lock
         SessionData sessionData = myMessageHandlers.get(sessionId);
         if (sessionData != null) {
           BuilderMessageHandler handler = sessionData.handler;
           if (handler != null) {
-            LOG.info("terminating session");
+            LOG.error("terminating session that had no channel");
             handler.sessionTerminated(sessionId);
           }
         }
@@ -294,10 +293,8 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
         if (handler != null) {
           //show error to the user only if the process died during the build
           if (sessionData.isWorking()) {
-             handler.handleFailure(sessionData.sessionId, CmdlineProtoUtil.createFailure("Build process was terminated", null));
-           }
-          // notify the handler only if it has not been notified yet
-          handler.sessionTerminated(sessionData.sessionId);
+            handler.handleFailure(sessionData.sessionId, CmdlineProtoUtil.createFailure("Build process was terminated", null));
+          }
         }
       }
     }

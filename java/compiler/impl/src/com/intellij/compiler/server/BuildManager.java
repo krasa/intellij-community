@@ -554,7 +554,8 @@ public class BuildManager implements ApplicationComponent{
       public void buildStarted(UUID sessionId) {
         super.buildStarted(sessionId);
         try {
-          ApplicationManager.getApplication().getMessageBus().syncPublisher(BuildManagerListener.TOPIC).buildStarted(project, sessionId, isAutomake);
+          ApplicationManager.getApplication().getMessageBus().syncPublisher(BuildManagerListener.TOPIC).buildStarted(project, sessionId,
+                                                                                                                     isAutomake);
         }
         catch (Throwable e) {
           LOG.error(e);
@@ -572,7 +573,6 @@ public class BuildManager implements ApplicationComponent{
       }
       catch (Exception e) {
         handler.handleFailure(sessionId, CmdlineProtoUtil.createFailure(e.getMessage(), null));
-        handler.sessionTerminated(sessionId);
         return null;
       }
     }
@@ -661,7 +661,7 @@ public class BuildManager implements ApplicationComponent{
                   future.get();
                 }
                 catch (Throwable e) {
-                    futureHandler.handleFailure(sessionId, CmdlineProtoUtil.createFailure(e.getMessage(), e));
+                  futureHandler.handleFailure(sessionId, CmdlineProtoUtil.createFailure(e.getMessage(), e));
                 }
                 finally {
                   myBuildsInProgress.remove(projectPath);
@@ -677,7 +677,6 @@ public class BuildManager implements ApplicationComponent{
           catch (Throwable e) {
             myMessageDispatcher.unregisterBuildMessageHandler(sessionId);
             futureHandler.handleFailure(sessionId, CmdlineProtoUtil.createFailure(e.getMessage(), e));
-            futureHandler.sessionTerminated(sessionId);
           }
         }
       });
@@ -686,7 +685,6 @@ public class BuildManager implements ApplicationComponent{
     }
     catch (Throwable e) {
       handler.handleFailure(sessionId, CmdlineProtoUtil.createFailure(e.getMessage(), e));
-      handler.sessionTerminated(sessionId);
     }
 
     return null;
