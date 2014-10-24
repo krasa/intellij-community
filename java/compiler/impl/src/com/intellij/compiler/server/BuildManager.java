@@ -709,8 +709,10 @@ public class BuildManager implements ApplicationComponent{
           LOG.info("BUILDER_PROCESS [" + outputType.toString() + "]: " + text);
           if ("stderr".equals(outputType.toString())) {
             BuildMessageDispatcher.SessionData workingSession = myMessageDispatcher.getWorkingSession(project);
-            workingSession.handler.handleBuildMessage(workingSession.channel, workingSession.sessionId, CmdlineProtoUtil
-              .createCompileMessage(BuildMessage.Kind.WARNING, text, null, -1L, -1L, -1L, -1, -1, -1));
+            if (workingSession != null) {
+              workingSession.handler.handleBuildMessage(workingSession.channel, workingSession.sessionId, CmdlineProtoUtil
+                .createCompileMessage(BuildMessage.Kind.WARNING, text, null, -1L, -1L, -1L, -1, -1, -1));
+            }
           }
         }
       }
