@@ -33,7 +33,6 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.vfs.*;
 import com.intellij.openapi.wm.ToolWindowManager;
-import com.intellij.util.xmlb.annotations.Transient;
 import gnu.trove.THashSet;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -145,23 +144,28 @@ public class IdeDocumentHistoryImpl extends IdeDocumentHistory implements Projec
   }
 
   public static class RecentlyChangedFilesState {
-    @Transient private final List<String> CHANGED_PATHS = new ArrayList<String>();
+
+    private List<String> changedFiles = new ArrayList<String>();
 
     public List<String> getChangedFiles() {
-      return CHANGED_PATHS;
+      return changedFiles;
+    }
+
+    public void setChangedFiles(List<String> changedFiles) {
+      this.changedFiles = changedFiles;
     }
 
     public void register(VirtualFile file) {
       final String path = file.getPath();
-      CHANGED_PATHS.remove(path);
-      CHANGED_PATHS.add(path);
+      changedFiles.remove(path);
+      changedFiles.add(path);
       trimToSize();
     }
 
-    private void trimToSize(){
+    private void trimToSize() {
       final int limit = UISettings.getInstance().RECENT_FILES_LIMIT + 1;
-      while(CHANGED_PATHS.size()>limit){
-        CHANGED_PATHS.remove(0);
+      while (changedFiles.size() > limit) {
+        changedFiles.remove(0);
       }
     }
   }
