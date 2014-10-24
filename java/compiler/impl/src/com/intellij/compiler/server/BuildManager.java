@@ -100,6 +100,7 @@ import org.jetbrains.jps.api.*;
 import org.jetbrains.jps.cmdline.BuildMain;
 import org.jetbrains.jps.cmdline.ClasspathBootstrap;
 import org.jetbrains.jps.incremental.Utils;
+import org.jetbrains.jps.incremental.messages.BuildMessage;
 import org.jetbrains.jps.model.serialization.JpsGlobalLoader;
 
 import javax.tools.JavaCompiler;
@@ -702,10 +703,17 @@ public class BuildManager implements ApplicationComponent{
     process.addProcessListener(new ProcessAdapter() {
       @Override
       public void onTextAvailable(ProcessEvent event, Key outputType) {
-        // re-translate builder's output to idea.log
-        final String text = event.getText();
+        String text = event.getText();
         if (!StringUtil.isEmptyOrSpaces(text)) {
-          LOG.info("BUILDER_PROCESS [" + outputType.toString() + "]: " + text.trim());
+          text = text.trim();
+          LOG.info("BUILDER_PROCESS [" + outputType.toString() + "]: " + text);
+          if ("stderr".equals(outputType.toString())) {
+            BuildMessageDispatcher.SessionData workingSession = myMessageDispatcher.getWorkingSession(project);
+            if (workingSession != null) {
+              workingSession.handler.handleBuildMessage(workingSession.channel, workingSession.sessionId, CmdlineProtoUtil
+                .createCompileMessage(BuildMessage.Kind.WARNING, text, null, -1L, -1L, -1L, -1, -1, -1));
+            }
+          }
         }
       }
 
@@ -1384,7 +1392,7 @@ public class BuildManager implements ApplicationComponent{
   @Nullable
   public boolean hasRunningBuildProcess(Project project) {
     BuildMessageDispatcher.SessionData session = myMessageDispatcher.getSessionByProject(project);
-    return session != null && session.channel !=null && session.channel.isActive();
+    return session != null && session.channel != null && session.channel.isActive();
   }
 
   public void stopBuildProcess(Project project) {

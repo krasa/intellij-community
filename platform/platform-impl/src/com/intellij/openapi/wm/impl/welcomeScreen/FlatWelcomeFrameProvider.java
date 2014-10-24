@@ -13,29 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.intellij.ide.actions;
+package com.intellij.openapi.wm.impl.welcomeScreen;
 
-import com.intellij.icons.AllIcons;
-import com.intellij.openapi.actionSystem.ActionPlaces;
-import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.util.registry.Registry;
+import com.intellij.openapi.wm.IdeFrame;
+import com.intellij.openapi.wm.WelcomeFrameProvider;
+import com.intellij.util.PlatformUtils;
 
 /**
- * @author Dmitry Avdeev
- *         Date: 11/6/12
+ * @author Konstantin Bulenkov
  */
-public class ImportProjectAction extends ImportModuleAction {
-
-
+public class FlatWelcomeFrameProvider implements WelcomeFrameProvider {
   @Override
-  public void actionPerformed(AnActionEvent e) {
-    doImport(null);
-  }
-
-  @Override
-  public void update(AnActionEvent e) {
-    if (e.getPlace() == ActionPlaces.WELCOME_SCREEN && Registry.is("ide.new.welcome.screen")) {
-      e.getPresentation().setIcon(AllIcons.Welcome.ImportProject);
+  public IdeFrame createFrame() {
+    if (Registry.is("ide.new.welcome.screen") 
+        && (PlatformUtils.isIntelliJ() || PlatformUtils.isCidr())) {
+      return new FlatWelcomeFrame();
     }
+    return null;
   }
 }

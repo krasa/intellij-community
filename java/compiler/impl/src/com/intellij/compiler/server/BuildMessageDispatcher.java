@@ -62,15 +62,20 @@ class BuildMessageDispatcher extends SimpleChannelInboundHandlerAdapter<CmdlineR
   public SessionData getSession(UUID sessionId) {
     return myMessageHandlers.get(sessionId);
   }
-  
+
   @Nullable
   public SessionData getWorkingSession(Project project) {
+    String projectFilePath = project.getProjectFilePath();
+    SessionData result = null;
     for (SessionData sessionData : myMessageHandlers.values()) {
-      if (sessionData.isWorking() && sessionData.myProjectFilePath.equals(project.getProjectFilePath())) {
-        return sessionData;
+      if (sessionData.isWorking() && sessionData.myProjectFilePath.equals(projectFilePath)) {
+        if (result != null) {
+          throw new IllegalStateException("More than one working session for project, state:" + result.state + "," + sessionData.state);
+        }
+        result = sessionData;
       }
     }
-    return null;
+    return result;
   }
 
 

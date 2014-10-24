@@ -39,6 +39,7 @@ import org.jetbrains.jps.incremental.Utils;
 import org.jetbrains.jps.javac.JavacMain;
 import org.jetbrains.jps.service.SharedThreadPool;
 
+import java.beans.Introspector;
 import java.io.*;
 import java.net.InetSocketAddress;
 import java.util.UUID;
@@ -55,6 +56,7 @@ public class BuildMain {
   private static final String DEFAULT_LOGGER_CONFIG = "defaultLogConfig.xml";
   private static final String LOG_FILE_MACRO = "$LOG_FILE_PATH$";
   private static final Logger LOG;
+
   static {
     initLoggers();
     LOG = Logger.getInstance("#org.jetbrains.jps.cmdline.BuildMain");
@@ -67,13 +69,12 @@ public class BuildMain {
 
   private static NioEventLoopGroup ourEventLoopGroup;
 
-  public static void main(String[] args){
+  public static void main(String[] args) {
     System.out.println("Build process started. Classpath: " + System.getProperty("java.class.path"));
     final String host = args[HOST_ARG];
     final int port = Integer.parseInt(args[PORT_ARG]);
     final UUID sessionId = UUID.fromString(args[SESSION_ID_ARG]);
-    @SuppressWarnings("ConstantConditions")
-    final File systemDir = new File(FileUtil.toCanonicalPath(args[SYSTEM_DIR_ARG]));
+    @SuppressWarnings("ConstantConditions") final File systemDir = new File(FileUtil.toCanonicalPath(args[SYSTEM_DIR_ARG]));
     Utils.setSystemRoot(systemDir);
 
     // IDEA-123132, let's try again
@@ -102,11 +103,8 @@ public class BuildMain {
     final Bootstrap bootstrap = new Bootstrap().group(ourEventLoopGroup).channel(NioSocketChannel.class).handler(new ChannelInitializer() {
       @Override
       protected void initChannel(Channel channel) throws Exception {
-        channel.pipeline().addLast(new ProtobufVarint32FrameDecoder(),
-                                   new ProtobufDecoder(CmdlineRemoteProto.Message.getDefaultInstance()),
-                                   new ProtobufVarint32LengthFieldPrepender(),
-                                   new ProtobufEncoder(),
-                                   new MyMessageHandler(sessionId));
+        channel.pipeline().addLast(new ProtobufVarint32FrameDecoder(), new ProtobufDecoder(CmdlineRemoteProto.Message.getDefaultInstance()),
+                                   new ProtobufVarint32LengthFieldPrepender(), new ProtobufEncoder(), new MyMessageHandler(sessionId));
       }
     }).option(ChannelOption.TCP_NODELAY, true).option(ChannelOption.SO_KEEPALIVE, true);
 
@@ -161,10 +159,11 @@ public class BuildMain {
                   }
                   finally {
                     JavacMain.clearCompilerZipFileCache();
-                    mySession=null;
+                    mySession = null;
+                    //uidesigner leak fix
+                    Introspector.flushCaches();
                     //not really important, but can reduce allocated memory
                     System.gc();
-                    //todo fix uidesigner classloader
                     //channel.close();
                     //System.exit(0);
                   }
@@ -250,10 +249,10 @@ public class BuildMain {
   private static void initLoggers() {
     try {
       final String logDir = System.getProperty(GlobalOptions.LOG_DIR_OPTION, null);
-      final File configFile = logDir != null? new File(logDir, LOG_CONFIG_FILE_NAME) : new File(LOG_CONFIG_FILE_NAME);
+      final File configFile = logDir != null ? new File(logDir, LOG_CONFIG_FILE_NAME) : new File(LOG_CONFIG_FILE_NAME);
       ensureLogConfigExists(configFile);
       String text = FileUtil.loadFile(configFile);
-      final String logFile = logDir != null? new File(logDir, LOG_FILE_NAME).getAbsolutePath() : LOG_FILE_NAME;
+      final String logFile = logDir != null ? new File(logDir, LOG_FILE_NAME).getAbsolutePath() : LOG_FILE_NAME;
       text = StringUtil.replace(text, LOG_FILE_MACRO, StringUtil.replace(logFile, "\\", "\\\\"));
       new DOMConfigurator().doConfigure(new StringReader(text), LogManager.getLoggerRepository());
     }
@@ -269,8 +268,8 @@ public class BuildMain {
   private static void ensureLogConfigExists(final File logConfig) throws IOException {
     if (!logConfig.exists()) {
       FileUtil.createIfDoesntExist(logConfig);
-      @SuppressWarnings("IOResourceOpenedButNotSafelyClosed")
-      final InputStream in = BuildMain.class.getResourceAsStream("/" + DEFAULT_LOGGER_CONFIG);
+      @SuppressWarnings("IOResourceOpenedButNotSafelyClosed") final InputStream in =
+        BuildMain.class.getResourceAsStream("/" + DEFAULT_LOGGER_CONFIG);
       if (in != null) {
         try {
           final FileOutputStream out = new FileOutputStream(logConfig);
