@@ -20,7 +20,6 @@ import com.intellij.icons.AllIcons;
 import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
-import com.intellij.openapi.actionSystem.PlatformDataKeys;
 import com.intellij.openapi.compiler.CompilerBundle;
 import com.intellij.openapi.options.ShowSettingsUtil;
 import com.intellij.openapi.project.Project;
@@ -29,7 +28,7 @@ import com.intellij.openapi.project.Project;
 * @author Eugene Zhuravlev
 *         Date: 9/12/12
 */
-class CompilerPropertiesAction extends AnAction {
+public class CompilerPropertiesAction extends AnAction {
   public CompilerPropertiesAction() {
     super(CompilerBundle.message("action.compiler.properties.text"), null, AllIcons.General.Settings);
   }

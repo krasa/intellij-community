@@ -10,6 +10,9 @@
   
   <project-components>
     <component>
+      <implementation-class>com.intellij.compiler.server.BuildProcessWidget</implementation-class>
+    </component>
+    <component>
       <interface-class>com.intellij.packaging.artifacts.ArtifactManager</interface-class>
       <implementation-class>com.intellij.packaging.impl.artifacts.ArtifactManagerImpl</implementation-class>
     </component>

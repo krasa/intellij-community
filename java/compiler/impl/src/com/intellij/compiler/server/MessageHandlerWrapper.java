@@ -32,7 +32,7 @@ class MessageHandlerWrapper implements BuilderMessageHandler {
   }
 
   @Override
-  public void sessionTerminated(UUID sessionId) {
-    myHandler.sessionTerminated(sessionId);
+  public void buildFinished(UUID sessionId) {
+    myHandler.buildFinished(sessionId);
   }
 }

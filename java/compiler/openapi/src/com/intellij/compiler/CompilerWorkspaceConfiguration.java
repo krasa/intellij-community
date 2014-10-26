@@ -41,6 +41,7 @@ public class CompilerWorkspaceConfiguration implements PersistentStateComponent<
   }
 
   public boolean AUTO_SHOW_ERRORS_IN_EDITOR = true;
+  public boolean REUSE_BUILD_PROCESS = true;
   public boolean DISPLAY_NOTIFICATION_POPUP = true;
   @Deprecated public boolean CLOSE_MESSAGE_VIEW_IF_SUCCESS = true;
   public boolean CLEAR_OUTPUT_DIRECTORY = true;

@@ -73,6 +73,7 @@ public class CompilerUIConfigurable implements SearchableConfigurable, Configura
   private JLabel               myResourcePatternsLabel;
   private JLabel               myEnableAutomakeLegendLabel;
   private JLabel               myParallelCompilationLegendLabel;
+  private JCheckBox            myCbReuseBuildProcess;
 
   public CompilerUIConfigurable(@NotNull final Project project) {
     myProject = project;
@@ -126,6 +127,7 @@ public class CompilerUIConfigurable implements SearchableConfigurable, Configura
     controls.put(Setting.REBUILD_MODULE_ON_DEPENDENCY_CHANGE, ContainerUtilRt.<JComponent>newArrayList(myCbRebuildOnDependencyChange));
     controls.put(Setting.HEAP_SIZE, ContainerUtilRt.<JComponent>newArrayList(myHeapSizeLabel, myHeapSizeField));
     controls.put(Setting.COMPILER_VM_OPTIONS, ContainerUtilRt.<JComponent>newArrayList(myVMOptionsLabel, myVMOptionsField));
+    controls.put(Setting.REUSE_BUILD_PROCESS, Collections.<JComponent>singleton(myCbReuseBuildProcess));
     
     for (Setting setting : myDisabledSettings) {
       Collection<JComponent> components = controls.get(setting);
@@ -142,6 +144,7 @@ public class CompilerUIConfigurable implements SearchableConfigurable, Configura
     final CompilerConfigurationImpl configuration = (CompilerConfigurationImpl)CompilerConfiguration.getInstance(myProject);
     final CompilerWorkspaceConfiguration workspaceConfiguration = CompilerWorkspaceConfiguration.getInstance(myProject);
     myCbAutoShowFirstError.setSelected(workspaceConfiguration.AUTO_SHOW_ERRORS_IN_EDITOR);
+    myCbReuseBuildProcess.setSelected(workspaceConfiguration.REUSE_BUILD_PROCESS);
     myCbDisplayNotificationPopup.setSelected(workspaceConfiguration.DISPLAY_NOTIFICATION_POPUP);
     myCbClearOutputDirectory.setSelected(workspaceConfiguration.CLEAR_OUTPUT_DIRECTORY);
     myCbAssertNotNull.setSelected(configuration.isAddNotNullAssertions());
@@ -183,6 +186,9 @@ public class CompilerUIConfigurable implements SearchableConfigurable, Configura
     final CompilerWorkspaceConfiguration workspaceConfiguration = CompilerWorkspaceConfiguration.getInstance(myProject);
     if (!myDisabledSettings.contains(Setting.AUTO_SHOW_FIRST_ERROR_IN_EDITOR)) {
       workspaceConfiguration.AUTO_SHOW_ERRORS_IN_EDITOR = myCbAutoShowFirstError.isSelected();
+    }
+    if (!myDisabledSettings.contains(Setting.REUSE_BUILD_PROCESS)) {
+      workspaceConfiguration.REUSE_BUILD_PROCESS = myCbReuseBuildProcess.isSelected();
     }
     if (!myDisabledSettings.contains(Setting.DISPLAY_NOTIFICATION_POPUP)) {
       workspaceConfiguration.DISPLAY_NOTIFICATION_POPUP = myCbDisplayNotificationPopup.isSelected();
@@ -260,6 +266,8 @@ public class CompilerUIConfigurable implements SearchableConfigurable, Configura
     final CompilerWorkspaceConfiguration workspaceConfiguration = CompilerWorkspaceConfiguration.getInstance(myProject);
     boolean isModified = !myDisabledSettings.contains(Setting.AUTO_SHOW_FIRST_ERROR_IN_EDITOR)
                          && ComparingUtils.isModified(myCbAutoShowFirstError, workspaceConfiguration.AUTO_SHOW_ERRORS_IN_EDITOR);
+    isModified |= !myDisabledSettings.contains(Setting.REUSE_BUILD_PROCESS) &&
+                  ComparingUtils.isModified(myCbReuseBuildProcess, workspaceConfiguration.REUSE_BUILD_PROCESS);
     isModified |= !myDisabledSettings.contains(Setting.DISPLAY_NOTIFICATION_POPUP)
                   && ComparingUtils.isModified(myCbDisplayNotificationPopup, workspaceConfiguration.DISPLAY_NOTIFICATION_POPUP);
     isModified |= !myDisabledSettings.contains(Setting.AUTO_MAKE)

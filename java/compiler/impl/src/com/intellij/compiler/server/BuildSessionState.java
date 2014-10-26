@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2012 JetBrains s.r.o.
+ * Copyright 2000-2014 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,21 +15,9 @@
  */
 package com.intellij.compiler.server;
 
-import io.netty.channel.Channel;
-import org.jetbrains.jps.api.CmdlineRemoteProto;
-
-import java.util.UUID;
-
 /**
- * @author Eugene Zhuravlev
- *         Date: 4/25/12
+ * @author Vojtech Krasa
  */
-public interface BuilderMessageHandler {
-  void buildStarted(UUID sessionId);
-  
-  void handleBuildMessage(Channel channel, UUID sessionId, CmdlineRemoteProto.Message.BuilderMessage msg);
-
-  void handleFailure(UUID sessionId, CmdlineRemoteProto.Message.Failure failure);
-
-  void buildFinished(UUID sessionId);
+enum BuildSessionState {
+  INIT, IDLE, WORKING
 }

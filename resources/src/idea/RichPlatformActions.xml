@@ -113,6 +113,9 @@
 
     <group id="Internal1" text="IDEA Internal Actions" internal="true">
       <separator/>
+      <action id="RebuildProjectRepeatedly" internal="true" class="com.intellij.compiler.actions.internal.RebuildProjectRepeatedlyAction"/>
+      <action id="MakeProjectRepeatedly" internal="true" class="com.intellij.compiler.actions.internal.MakeProjectRepeatedlyAction"/>
+      <separator/>
       <action id="Merge3Files" internal="true" class="com.intellij.openapi.diff.actions.MergeFilesAction"/>
       <separator/>
       <action internal="true" id="DecodeBytesAction" class="com.intellij.internal.encodings.DecodeBytesAction"/>

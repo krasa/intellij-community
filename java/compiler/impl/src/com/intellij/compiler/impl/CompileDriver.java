@@ -243,18 +243,15 @@ public class CompileDriver {
     return buildManager.scheduleBuild(myProject, compileContext.isRebuild(), compileContext.isMake(), onlyCheckUpToDate, scopes, paths, builderParams, new DefaultMessageHandler(myProject) {
 
       @Override
-      public void buildStarted(UUID sessionId) {
-      }
-
-      @Override
-      public void sessionTerminated(final UUID sessionId) {
+      public void buildFinished(UUID sessionId) {
+        super.buildFinished(sessionId);
         if (compileContext.shouldUpdateProblemsView()) {
           final ProblemsView view = ProblemsView.SERVICE.getInstance(myProject);
           view.clearProgress();
           view.clearOldMessages(compileContext.getCompileScope(), compileContext.getSessionId());
         }
       }
-
+      
       @Override
       public void handleFailure(UUID sessionId, CmdlineRemoteProto.Message.Failure failure) {
         compileContext.addMessage(CompilerMessageCategory.ERROR, failure.hasDescription()? failure.getDescription() : "", null, -1, -1);
