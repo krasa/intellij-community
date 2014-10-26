@@ -123,7 +123,12 @@ class AutoMakeMessageHandler extends DefaultMessageHandler {
   }
 
   @Override
-  public void sessionTerminated(UUID sessionId) {
+  public void buildFinished(UUID sessionId) {
+    super.buildFinished(sessionId);
+    updateProblemsView(sessionId);
+  }
+
+  private void updateProblemsView(UUID sessionId) {
     String statusMessage = null/*"Auto make completed"*/;
     switch (myBuildStatus) {
       case SUCCESS:

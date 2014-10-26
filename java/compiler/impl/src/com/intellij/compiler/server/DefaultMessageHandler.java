@@ -90,6 +90,10 @@ public abstract class DefaultMessageHandler implements BuilderMessageHandler {
 
   protected abstract void handleCompileMessage(UUID sessionId, CmdlineRemoteProto.Message.BuilderMessage.CompileMessage message);
 
+  @Override
+  public void buildFinished(UUID sessionId) {
+  }
+
   protected abstract void handleBuildEvent(UUID sessionId, CmdlineRemoteProto.Message.BuilderMessage.BuildEvent event);
 
   private void handleConstantSearchTask(final Channel channel, final UUID sessionId, final CmdlineRemoteProto.Message.BuilderMessage.ConstantSearchTask task) {
