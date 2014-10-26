@@ -101,6 +101,7 @@ final class BuildSession implements Runnable, CanceledStatus {
 
   @Override
   public void run() {
+    final long start = System.nanoTime();
     Throwable error = null;
     final Ref<Boolean> hasErrors = new Ref<Boolean>(false);
     final Ref<Boolean> doneSomething = new Ref<Boolean>(false);
@@ -173,6 +174,13 @@ final class BuildSession implements Runnable, CanceledStatus {
     }
     finally {
       finishBuild(error, hasErrors.get(), doneSomething.get());
+        
+      final long totalTime = (System.nanoTime() - start) / 1000000L;
+  
+      final long millis = totalTime % 1000L ;
+      final long seconds = totalTime / 1000L;
+  
+      LOG.info("Total build time " + seconds + " sec " + millis + " ms");
     }
   }
 
