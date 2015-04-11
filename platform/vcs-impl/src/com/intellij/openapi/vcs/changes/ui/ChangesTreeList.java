@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2014 JetBrains s.r.o.
+ * Copyright 2000-2015 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,11 +16,13 @@
 package com.intellij.openapi.vcs.changes.ui;
 
 import com.intellij.icons.AllIcons;
+import com.intellij.ide.CopyProvider;
 import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.ide.util.treeView.TreeState;
 import com.intellij.openapi.actionSystem.*;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diff.DiffBundle;
+import com.intellij.openapi.ide.CopyPasteManager;
 import com.intellij.openapi.keymap.KeymapManager;
 import com.intellij.openapi.project.DumbAware;
 import com.intellij.openapi.project.Project;
@@ -65,6 +67,7 @@ import javax.swing.event.TreeSelectionEvent;
 import javax.swing.event.TreeSelectionListener;
 import javax.swing.tree.*;
 import java.awt.*;
+import java.awt.datatransfer.StringSelection;
 import java.awt.event.*;
 import java.util.*;
 import java.util.List;
@@ -96,6 +99,7 @@ public abstract class ChangesTreeList<T> extends JPanel implements TypeSafeDataP
   private final Runnable myInclusionListener;
   @Nullable private ChangeNodeDecorator myChangeDecorator;
   private Runnable myGenericSelectionListener;
+  protected CopyProvider myCopyProvider;
 
   public ChangesTreeList(final Project project, Collection<T> initiallyIncluded, final boolean showCheckboxes,
                          final boolean highlightProblems, @Nullable final Runnable inclusionListener, @Nullable final ChangeNodeDecorator decorator) {
@@ -226,6 +230,7 @@ public abstract class ChangesTreeList<T> extends JPanel implements TypeSafeDataP
 
     String emptyText = StringUtil.capitalize(DiffBundle.message("diff.count.differences.status.text", 0));
     setEmptyText(emptyText);
+    myCopyProvider = new MyCopyProvider();
   }
 
   public void setEmptyText(@NotNull String emptyText) {
@@ -970,6 +975,9 @@ public abstract class ChangesTreeList<T> extends JPanel implements TypeSafeDataP
 
   @Override
   public void calcData(DataKey key, DataSink sink) {
+    if (PlatformDataKeys.COPY_PROVIDER == key) {
+      sink.put(PlatformDataKeys.COPY_PROVIDER, myCopyProvider);
+    }
   }
 
   private class MyTree extends Tree implements TypeSafeDataProvider {
@@ -1045,6 +1053,40 @@ public abstract class ChangesTreeList<T> extends JPanel implements TypeSafeDataP
     public void calcData(DataKey key, DataSink sink) {
       // just delegate to the change list
       ChangesTreeList.this.calcData(key, sink);
+    }
+  }
+
+  private class MyCopyProvider implements CopyProvider {
+    public boolean isCopyEnabled(@NotNull DataContext dataContext) {
+      return myTree.getSelectionPath() != null;
+    }
+
+    public boolean isCopyVisible(@NotNull DataContext dataContext) {
+      return true;
+    }
+
+    public void performCopy(@NotNull DataContext dataContext) {
+      TreePath selection = myTree.getSelectionPath();
+      Object node = selection.getLastPathComponent();
+      String text = null;
+      if (node instanceof ChangesBrowserChangeNode) {
+        ChangesBrowserChangeNode messageNode = ((ChangesBrowserChangeNode)node);
+        Change userObject = messageNode.getUserObject();
+        VirtualFile virtualFile = userObject.getVirtualFile();
+        if (virtualFile != null) {
+          text = virtualFile.getNameWithoutExtension();
+        }
+      }
+      else if (node instanceof ChangesBrowserFilePathNode) {
+        ChangesBrowserFilePathNode messageNode = ((ChangesBrowserFilePathNode)node);
+        FilePath userObject = messageNode.getUserObject();
+        text = userObject.getName();
+      }
+
+      if (text == null) {
+        text = node.toString();
+      }
+      CopyPasteManager.getInstance().setContents(new StringSelection(text));
     }
   }
 }
