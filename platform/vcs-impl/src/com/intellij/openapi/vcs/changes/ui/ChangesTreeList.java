@@ -1070,16 +1070,14 @@ public abstract class ChangesTreeList<T> extends JPanel implements TypeSafeDataP
       Object node = selection.getLastPathComponent();
       String text = null;
       if (node instanceof ChangesBrowserChangeNode) {
-        ChangesBrowserChangeNode messageNode = ((ChangesBrowserChangeNode)node);
-        Change userObject = messageNode.getUserObject();
+        Change userObject = ((ChangesBrowserChangeNode)node).getUserObject();
         VirtualFile virtualFile = userObject.getVirtualFile();
         if (virtualFile != null) {
           text = virtualFile.getNameWithoutExtension();
         }
       }
       else if (node instanceof ChangesBrowserFilePathNode) {
-        ChangesBrowserFilePathNode messageNode = ((ChangesBrowserFilePathNode)node);
-        FilePath userObject = messageNode.getUserObject();
+        FilePath userObject = ((ChangesBrowserFilePathNode)node).getUserObject();
         text = userObject.getName();
       }
 
