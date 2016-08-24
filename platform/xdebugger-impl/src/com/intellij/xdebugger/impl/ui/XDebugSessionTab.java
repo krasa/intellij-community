@@ -90,7 +90,7 @@ public class XDebugSessionTab extends DebuggerSessionTabBase {
       if (component != null) {
         XDebugSessionTab oldTab = TAB_KEY.getData(DataManager.getInstance().getDataContext(component));
         if (oldTab != null) {
-          oldTab.setSession(session, environment, icon);
+          oldTab.setSession(session, environment, icon, contentToReuse.getRunnerLayoutUi());
           oldTab.attachToSession(session);
           return oldTab;
         }
@@ -111,7 +111,7 @@ public class XDebugSessionTab extends DebuggerSessionTabBase {
                            @Nullable ExecutionEnvironment environment) {
     super(session.getProject(), "Debug", session.getSessionName(), GlobalSearchScope.allScope(session.getProject()));
 
-    setSession(session, environment, icon);
+    setSession(session, environment, icon, myUi);
 
     myUi.addContent(createFramesContent(), 0, PlaceInGrid.left, false);
     addVariablesAndWatches(session);
@@ -142,7 +142,10 @@ public class XDebugSessionTab extends DebuggerSessionTabBase {
     }
   }
 
-  private void setSession(@NotNull XDebugSessionImpl session, @Nullable ExecutionEnvironment environment, @Nullable Icon icon) {
+  private void setSession(@NotNull XDebugSessionImpl session,
+                          @Nullable ExecutionEnvironment environment,
+                          @Nullable Icon icon,
+                          @Nullable RunnerLayoutUi ui) {
     myEnvironment = environment;
     mySession = session;
     mySessionData = session.getSessionData();
@@ -158,7 +161,8 @@ public class XDebugSessionTab extends DebuggerSessionTabBase {
     }
 
     myRunContentDescriptor = new RunContentDescriptor(myConsole, session.getDebugProcess().getProcessHandler(),
-                                                      myUi.getComponent(), session.getSessionName(), icon, myRebuildWatchesRunnable, restartActions);
+                                                      myUi.getComponent(), session.getSessionName(), icon, myRebuildWatchesRunnable,
+                                                      restartActions, ui);
     Disposer.register(myRunContentDescriptor, this);
     Disposer.register(myProject, myRunContentDescriptor);
   }
@@ -211,7 +215,8 @@ public class XDebugSessionTab extends DebuggerSessionTabBase {
     myWatchesView = new XWatchesViewImpl(session, myWatchesInVariables);
     registerView(DebuggerContentInfo.WATCHES_CONTENT, myWatchesView);
     Content watchesContent = myUi.createContent(DebuggerContentInfo.WATCHES_CONTENT, myWatchesView.getPanel(),
-                                                XDebuggerBundle.message("debugger.session.tab.watches.title"), AllIcons.Debugger.Watches, null);
+                                                XDebuggerBundle.message("debugger.session.tab.watches.title"), AllIcons.Debugger.Watches,
+                                                null);
     watchesContent.setCloseable(false);
     return watchesContent;
   }

@@ -58,7 +58,7 @@ public class RunContentDescriptor implements Disposable {
                               String displayName,
                               @Nullable Icon icon,
                               @Nullable Runnable activationCallback) {
-    this(executionConsole, processHandler, component, displayName, icon, activationCallback, null);
+    this(executionConsole, processHandler, component, displayName, icon, activationCallback, null, null);
   }
 
   public RunContentDescriptor(@Nullable ExecutionConsole executionConsole,
@@ -67,7 +67,8 @@ public class RunContentDescriptor implements Disposable {
                               String displayName,
                               @Nullable Icon icon,
                               @Nullable Runnable activationCallback,
-                              @Nullable AnAction[] restartActions) {
+                              @Nullable AnAction[] restartActions,
+                              @Nullable RunnerLayoutUi ui) {
     myExecutionConsole = executionConsole;
     myProcessHandler = processHandler;
     myComponent = component;
@@ -80,6 +81,7 @@ public class RunContentDescriptor implements Disposable {
     }
 
     myRestartActions = restartActions == null ? AnAction.EMPTY_ARRAY : restartActions;
+    myRunnerLayoutUi = ui;
   }
 
   public RunContentDescriptor(@Nullable ExecutionConsole executionConsole,
@@ -87,14 +89,14 @@ public class RunContentDescriptor implements Disposable {
                               @NotNull JComponent component,
                               String displayName,
                               @Nullable Icon icon) {
-    this(executionConsole, processHandler, component, displayName, icon, null, null);
+    this(executionConsole, processHandler, component, displayName, icon, null, null, null);
   }
 
   public RunContentDescriptor(@Nullable ExecutionConsole executionConsole,
                               @Nullable ProcessHandler processHandler,
                               @NotNull JComponent component,
                               String displayName) {
-    this(executionConsole, processHandler, component, displayName, null, null, null);
+    this(executionConsole, processHandler, component, displayName, null, null, null, null);
   }
 
   public RunContentDescriptor(@NotNull RunProfile profile, @NotNull ExecutionResult executionResult, @NotNull RunnerLayoutUi ui) {
@@ -104,7 +106,7 @@ public class RunContentDescriptor implements Disposable {
          profile.getName(),
          profile.getIcon(),
          null,
-         executionResult instanceof DefaultExecutionResult ? ((DefaultExecutionResult)executionResult).getRestartActions() : null);
+         executionResult instanceof DefaultExecutionResult ? ((DefaultExecutionResult)executionResult).getRestartActions() : null, ui);
     myRunnerLayoutUi = ui;
   }
 
