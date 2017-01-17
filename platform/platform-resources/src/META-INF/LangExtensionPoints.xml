@@ -447,6 +447,9 @@
 
     <extensionPoint name="consoleFilterProvider" interface="com.intellij.execution.filters.ConsoleFilterProvider"/>
     <extensionPoint name="consoleInputFilterProvider" interface="com.intellij.execution.filters.ConsoleInputFilterProvider"/>
+    <extensionPoint name="consoleInputFilterExProvider" interface="com.intellij.execution.filters.ConsoleInputFilterExProvider"/>
+    <extensionPoint name="consoleHighlightingInputFilterExProvider" interface="com.intellij.execution.filters.ConsoleHighlightingInputFilterExProvider"/>
+    
     <extensionPoint name="consoleActionsPostProcessor" interface="com.intellij.execution.actions.ConsoleActionsPostProcessor"/>
 
     <extensionPoint name="console.folding" interface="com.intellij.execution.ConsoleFolding"/>
