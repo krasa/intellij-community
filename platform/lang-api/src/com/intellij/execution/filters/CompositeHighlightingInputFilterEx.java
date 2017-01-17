@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2014 JetBrains s.r.o.
+ * Copyright 2000-2017 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,57 +22,65 @@ import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Pair;
 import com.intellij.util.containers.ContainerUtilRt;
+import kotlin.ranges.IntRange;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
 
-public class CompositeInputFilter implements InputFilter {
-  private static final Logger LOG = Logger.getInstance(CompositeInputFilter.class);
+public class CompositeHighlightingInputFilterEx implements HighlightingInputFilterEx {
+  private static final Logger LOG = Logger.getInstance(CompositeHighlightingInputFilterEx.class);
 
-  private final List<Pair<InputFilter, Boolean /* is dumb aware */>> myFilters = ContainerUtilRt.newArrayList();
+  private final List<Pair<HighlightingInputFilterEx, Boolean /* is dumb aware */>> myFilters = ContainerUtilRt.newArrayList();
   private final DumbService myDumbService;
 
-  public CompositeInputFilter(@NotNull Project project) {
+  public CompositeHighlightingInputFilterEx(@NotNull Project project) {
     myDumbService = DumbService.getInstance(project);
   }
 
   @Override
   @Nullable
-  public List<Pair<String, ConsoleViewContentType>> applyFilter(final String text, final ConsoleViewContentType contentType) {
+  public List<Pair<IntRange, ConsoleViewContentType>> applyFilter(@NotNull final String text,
+                                                                  @NotNull final ConsoleViewContentType contentType) {
     boolean dumb = myDumbService.isDumb();
-    for (Pair<InputFilter, Boolean> pair : myFilters) {
+    List<Pair<IntRange, ConsoleViewContentType>> mergedResult = null;
+    for (Pair<HighlightingInputFilterEx, Boolean> pair : myFilters) {
       if (!dumb || pair.second == Boolean.TRUE) {
         long t0 = System.currentTimeMillis();
-        InputFilter filter = pair.first;
-        List<Pair<String, ConsoleViewContentType>> result = filter.applyFilter(text, contentType);
+        HighlightingInputFilterEx filter = pair.first;
+        List<Pair<IntRange, ConsoleViewContentType>> result = filter.applyFilter(text, contentType);
+        if (result != null) {
+          if (mergedResult == null) {
+            mergedResult = new ArrayList<>();
+          }
+          mergedResult.addAll(result);
+        }
         t0 = System.currentTimeMillis() - t0;
         if (t0 > 100) {
           LOG.warn(filter + ".applyFilter() took " + t0 + " ms on '''" + text + "'''");
         }
-        if (result != null) {
-          return result;
-        }
       }
     }
-    return null;
+    return mergedResult;
   }
 
-  public void addFilter(@NotNull final InputFilter filter) {
-    myFilters.add(Pair.create(new MyInputFilter(filter), DumbService.isDumbAware(filter)));
+  public void addFilter(@NotNull final HighlightingInputFilterEx filter) {
+    myFilters.add(Pair.create(new MyHighlightingInputFilterEx(filter), DumbService.isDumbAware(filter)));
   }
 
-  private static class MyInputFilter implements InputFilter {
-    private final InputFilter myFilter;
+
+  private static class MyHighlightingInputFilterEx implements HighlightingInputFilterEx {
+    private final HighlightingInputFilterEx myFilter;
     boolean isBroken;
 
-    public MyInputFilter(InputFilter filter) {
+    public MyHighlightingInputFilterEx(HighlightingInputFilterEx filter) {
       myFilter = filter;
     }
 
     @Nullable
     @Override
-    public List<Pair<String, ConsoleViewContentType>> applyFilter(String text, ConsoleViewContentType contentType) {
+    public List<Pair<IntRange, ConsoleViewContentType>> applyFilter(@NotNull String text, @NotNull ConsoleViewContentType contentType) {
       if (!isBroken) {
         try {
           return myFilter.applyFilter(text, contentType);

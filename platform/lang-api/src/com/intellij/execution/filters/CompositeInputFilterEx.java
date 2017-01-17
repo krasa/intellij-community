@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2014 JetBrains s.r.o.
+ * Copyright 2000-2017 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,52 +27,54 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
-public class CompositeInputFilter implements InputFilter {
-  private static final Logger LOG = Logger.getInstance(CompositeInputFilter.class);
+public class CompositeInputFilterEx implements InputFilterEx {
+  private static final Logger LOG = Logger.getInstance(CompositeInputFilterEx.class);
 
-  private final List<Pair<InputFilter, Boolean /* is dumb aware */>> myFilters = ContainerUtilRt.newArrayList();
+  private final List<Pair<InputFilterEx, Boolean /* is dumb aware */>> myFilters = ContainerUtilRt.newArrayList();
   private final DumbService myDumbService;
 
-  public CompositeInputFilter(@NotNull Project project) {
+  public CompositeInputFilterEx(@NotNull Project project) {
     myDumbService = DumbService.getInstance(project);
   }
 
   @Override
   @Nullable
-  public List<Pair<String, ConsoleViewContentType>> applyFilter(final String text, final ConsoleViewContentType contentType) {
+  public String applyFilter(@NotNull final String text, @NotNull final ConsoleViewContentType contentType) {
     boolean dumb = myDumbService.isDumb();
-    for (Pair<InputFilter, Boolean> pair : myFilters) {
+    String filteredText = text;
+    for (int i = 0; i < myFilters.size(); i++) {
+      Pair<InputFilterEx, Boolean> pair = myFilters.get(i);
       if (!dumb || pair.second == Boolean.TRUE) {
         long t0 = System.currentTimeMillis();
-        InputFilter filter = pair.first;
-        List<Pair<String, ConsoleViewContentType>> result = filter.applyFilter(text, contentType);
+        InputFilterEx filter = pair.first;
+        filteredText = filter.applyFilter(filteredText, contentType);
         t0 = System.currentTimeMillis() - t0;
         if (t0 > 100) {
           LOG.warn(filter + ".applyFilter() took " + t0 + " ms on '''" + text + "'''");
         }
-        if (result != null) {
-          return result;
+        if (filteredText == null) {
+          return null;
         }
       }
     }
-    return null;
+    return filteredText;
   }
 
-  public void addFilter(@NotNull final InputFilter filter) {
-    myFilters.add(Pair.create(new MyInputFilter(filter), DumbService.isDumbAware(filter)));
+  public void addFilter(@NotNull final InputFilterEx filter) {
+    myFilters.add(Pair.create(new MyInputFilterExWrapper(filter), DumbService.isDumbAware(filter)));
   }
 
-  private static class MyInputFilter implements InputFilter {
-    private final InputFilter myFilter;
+  private static class MyInputFilterExWrapper implements InputFilterEx {
+    private final InputFilterEx myFilter;
     boolean isBroken;
 
-    public MyInputFilter(InputFilter filter) {
+    public MyInputFilterExWrapper(InputFilterEx filter) {
       myFilter = filter;
     }
 
     @Nullable
     @Override
-    public List<Pair<String, ConsoleViewContentType>> applyFilter(String text, ConsoleViewContentType contentType) {
+    public String applyFilter(@NotNull String text, @NotNull ConsoleViewContentType contentType) {
       if (!isBroken) {
         try {
           return myFilter.applyFilter(text, contentType);
@@ -82,8 +84,9 @@ public class CompositeInputFilter implements InputFilter {
           LOG.error(e);
         }
       }
-      return null;
+      return text;
     }
+
 
     @Override
     public String toString() {

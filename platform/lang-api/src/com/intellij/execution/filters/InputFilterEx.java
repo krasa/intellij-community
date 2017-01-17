@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2012 JetBrains s.r.o.
+ * Copyright 2000-2017 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,20 +16,13 @@
 package com.intellij.execution.filters;
 
 import com.intellij.execution.ui.ConsoleViewContentType;
-import com.intellij.openapi.util.Pair;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.List;
-
-@Deprecated
-public interface InputFilter {
-
+public interface InputFilterEx {
   /**
-   * @param text        the text to be filtered.
-   * @param contentType the content type of filtered text
-   * @return            <tt>null</tt>, if there was no match, otherwise, a list of pairs like ('string to use', 'content type to use')
+   * transform the text, or return null to filter it out
    */
   @Nullable
-  List<Pair<String, ConsoleViewContentType>> applyFilter(String text, ConsoleViewContentType contentType);
-
+  String applyFilter(@NotNull final String text, @NotNull final ConsoleViewContentType contentType);
 }

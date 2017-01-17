@@ -17,12 +17,15 @@ package com.intellij.execution.impl;
 
 import com.intellij.execution.filters.HyperlinkInfo;
 import com.intellij.execution.ui.ConsoleViewContentType;
+import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.containers.Queue;
+import kotlin.ranges.IntRange;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -30,7 +33,7 @@ import java.util.stream.Collectors;
 /**
  * Stores list of tokens (a token is {@link TokenInfo} which is a text plus {@link ConsoleViewContentType} plus {@link HyperlinkInfo})
  * Tries to maintain the total token text length not more than {@link #maxCapacity}, trims tokens from the beginning on overflow.
- * Add token via {@link #print(String, ConsoleViewContentType, HyperlinkInfo)}
+ * Add token via {@link #print(String, List, HyperlinkInfo)}
  * Get all tokens via {@link #drain()}
  */
 class TokenBuffer {
@@ -47,7 +50,7 @@ class TokenBuffer {
     tokens = new Queue<>(10);
   }
 
-  void print(@NotNull String text, @NotNull ConsoleViewContentType contentType, @Nullable HyperlinkInfo info) {
+  void print(@NotNull String text, @NotNull List<Pair<IntRange, ConsoleViewContentType>> contentTypes, @Nullable HyperlinkInfo info) {
     int start = 0;
     while (start < text.length()) {
       if (hasTrailingCR()) {
@@ -55,14 +58,14 @@ class TokenBuffer {
       }
       int crIndex = text.indexOf('\r', start);
       if (crIndex == -1 || crIndex == text.length() - 1) {
-        TokenInfo tokenInfo = new TokenInfo(contentType, text.substring(start, text.length()), info);
+        TokenInfo tokenInfo = new TokenInfo(contentTypes, text.substring(start, text.length()), info, start);
         tokens.addLast(tokenInfo);
         size += tokenInfo.length();
         break;
       }
 
       if (start!=crIndex) {
-        TokenInfo tokenInfo = new TokenInfo(contentType, text.substring(start, crIndex), info);
+        TokenInfo tokenInfo = new TokenInfo(contentTypes, text.substring(start, crIndex), info, start);
         tokens.addLast(tokenInfo);
         size += tokenInfo.length();
         removeLastLine();
@@ -90,7 +93,7 @@ class TokenBuffer {
       TokenInfo last = tokens.removeLast();
       String lastTextWithNoCR = last.getText().substring(0, last.length() - 1);
       if (!lastTextWithNoCR.isEmpty()) {
-        TokenInfo newLast = new TokenInfo(last.contentType, lastTextWithNoCR, last.getHyperlinkInfo());
+        TokenInfo newLast = new TokenInfo(last.contentTypes, lastTextWithNoCR, last.getHyperlinkInfo());
         tokens.addLast(newLast);
         size --;
       }
@@ -107,7 +110,7 @@ class TokenBuffer {
       int lfIndex = text.lastIndexOf('\n');
       if (lfIndex != -1) {
         // split token
-        TokenInfo newToken = new TokenInfo(last.contentType, text.substring(0, lfIndex + 1), last.getHyperlinkInfo());
+        TokenInfo newToken = new TokenInfo(last.contentTypes, text.substring(0, lfIndex + 1), last.getHyperlinkInfo());
         tokens.addLast(newToken);
         size -= text.length() - newToken.length();
         break;
@@ -174,7 +177,7 @@ class TokenBuffer {
     if (startIndex != 0) {
       // slice the first token
       TokenInfo first = list.get(0);
-      TokenInfo sliced = new TokenInfo(first.contentType, first.getText().substring(startIndex), first.getHyperlinkInfo());
+      TokenInfo sliced = new TokenInfo(first.contentTypes, first.getText().substring(startIndex), first.getHyperlinkInfo(), startIndex);
       return ContainerUtil.concat(Collections.singletonList(sliced), list.subList(1, list.size()));
     }
     return list;
@@ -186,16 +189,37 @@ class TokenBuffer {
 
   static class TokenInfo {
     @NotNull
-    final ConsoleViewContentType contentType;
+    final List<Pair<IntRange, ConsoleViewContentType>> contentTypes;
+    final int myContentTypesRangesOffset;
     private final String text;
     private final HyperlinkInfo myHyperlinkInfo;
 
     TokenInfo(@NotNull ConsoleViewContentType contentType,
               @NotNull String text,
               @Nullable HyperlinkInfo hyperlinkInfo) {
-      this.contentType = contentType;
-      myHyperlinkInfo = hyperlinkInfo;
+      this.contentTypes = Collections.singletonList(Pair.create(new IntRange(0, text.length()), contentType));
+      this.myHyperlinkInfo = hyperlinkInfo;
       this.text = text;
+      this.myContentTypesRangesOffset = 0;
+    }
+
+    TokenInfo(@NotNull List<Pair<IntRange, ConsoleViewContentType>> contentTypes,
+              @NotNull String text,
+              @Nullable HyperlinkInfo hyperlinkInfo) {
+      this.contentTypes = contentTypes;
+      this.myHyperlinkInfo = hyperlinkInfo;
+      this.text = text;
+      this.myContentTypesRangesOffset = 0;
+    }
+
+    TokenInfo(@NotNull List<Pair<IntRange, ConsoleViewContentType>> contentTypes,
+              @NotNull String text,
+              @Nullable HyperlinkInfo hyperlinkInfo,
+              int contentTypesRangeOffset) {
+      this.contentTypes = contentTypes;
+      this.myHyperlinkInfo = hyperlinkInfo;
+      this.text = text;
+      this.myContentTypesRangesOffset = contentTypesRangeOffset;
     }
 
     int length() {
@@ -204,7 +228,7 @@ class TokenBuffer {
 
     @Override
     public String toString() {
-      return contentType + "[" + length() + "]";
+      return "[" + length() + "]" + contentTypes;
     }
 
     HyperlinkInfo getHyperlinkInfo() {
@@ -214,6 +238,12 @@ class TokenBuffer {
     @NotNull
     String getText() {
       return text;
+    }
+
+    public void addAllContentTypesTo(Collection<ConsoleViewContentType> types) {
+      for (Pair<IntRange, ConsoleViewContentType> type : contentTypes) {
+        types.add(type.second);
+      }
     }
   }
 }

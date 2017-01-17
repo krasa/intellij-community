@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2012 JetBrains s.r.o.
+ * Copyright 2000-2017 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,19 +17,13 @@ package com.intellij.execution.filters;
 
 import com.intellij.execution.ui.ConsoleViewContentType;
 import com.intellij.openapi.util.Pair;
+import kotlin.ranges.IntRange;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
-@Deprecated
-public interface InputFilter {
-
-  /**
-   * @param text        the text to be filtered.
-   * @param contentType the content type of filtered text
-   * @return            <tt>null</tt>, if there was no match, otherwise, a list of pairs like ('string to use', 'content type to use')
-   */
+public interface HighlightingInputFilterEx {
   @Nullable
-  List<Pair<String, ConsoleViewContentType>> applyFilter(String text, ConsoleViewContentType contentType);
-
+  List<Pair<IntRange, ConsoleViewContentType>> applyFilter(@NotNull final String text, @NotNull final ConsoleViewContentType contentType);
 }

@@ -72,6 +72,7 @@ import com.intellij.util.text.CharArrayUtil;
 import com.intellij.util.ui.UIUtil;
 import gnu.trove.THashSet;
 import gnu.trove.TIntObjectHashMap;
+import kotlin.ranges.IntRange;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -153,7 +154,8 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
 
   protected final CompositeFilter myFilters;
 
-  @Nullable private final InputFilter myInputMessageFilter;
+  @Nullable private final InputFilterEx myInputMessageFilterEx;
+  @Nullable private final HighlightingInputFilterEx myHighlightingInputFilterEx;
 
   public Editor getEditor() {
     return myEditor;
@@ -221,20 +223,9 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     myFilters = new CompositeFilter(project, usePredefinedMessageFilter ? computeConsoleFilters(project, searchScope) : new SmartList<>());
     myFilters.setForceUseAllFilters(true);
 
-    ConsoleInputFilterProvider[] inputFilters = Extensions.getExtensions(ConsoleInputFilterProvider.INPUT_FILTER_PROVIDERS);
-    if (inputFilters.length > 0) {
-      CompositeInputFilter compositeInputFilter = new CompositeInputFilter(project);
-      myInputMessageFilter = compositeInputFilter;
-      for (ConsoleInputFilterProvider eachProvider : inputFilters) {
-        InputFilter[] filters = eachProvider.getDefaultFilters(project);
-        for (InputFilter filter : filters) {
-          compositeInputFilter.addFilter(filter);
-        }
-      }
-    }
-    else {
-      myInputMessageFilter = null;
-    }
+    myInputMessageFilterEx = computeInputFilters(project, searchScope);
+    myHighlightingInputFilterEx = computeInputHighlightingFilterEx(project, searchScope);
+
 
     project.getMessageBus().connect(this).subscribe(DumbService.DUMB_MODE, new DumbService.DumbModeListener() {
       private long myLastStamp;
@@ -278,6 +269,38 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
       ContainerUtil.addAll(result, filters);
     }
     return result;
+  }
+
+  private CompositeInputFilterEx computeInputFilters(@NotNull Project project, @NotNull GlobalSearchScope searchScope) {
+    CompositeInputFilterEx compositeInputFilter = null;
+    ConsoleInputFilterExProvider[] providers = Extensions.getExtensions(ConsoleInputFilterExProvider.FILTER_PROVIDERS);
+    if (providers.length > 0) {
+      compositeInputFilter = new CompositeInputFilterEx(project);
+      compositeInputFilter.addFilter(new InputFilterBackwardCompatibility(project));
+      for (ConsoleInputFilterExProvider eachProvider : providers) {
+        InputFilterEx[] filters = eachProvider.getInputFilters(this, project, searchScope);
+        for (InputFilterEx filter : filters) {
+          compositeInputFilter.addFilter(filter);
+        }
+      }
+    }
+    return compositeInputFilter;
+  }
+
+  private HighlightingInputFilterEx computeInputHighlightingFilterEx(Project project, GlobalSearchScope searchScope) {
+    CompositeHighlightingInputFilterEx compositeInputHighlightingFilter = null;
+    ConsoleHighlightingInputFilterExProvider[] providers =
+      Extensions.getExtensions(ConsoleHighlightingInputFilterExProvider.FILTER_PROVIDERS);
+    if (providers.length > 0) {
+      compositeInputHighlightingFilter = new CompositeHighlightingInputFilterEx(project);
+      for (ConsoleHighlightingInputFilterExProvider eachProvider : providers) {
+        HighlightingInputFilterEx[] filters = eachProvider.getHighlightingFilters(this, project, searchScope);
+        for (HighlightingInputFilterEx filter : filters) {
+          compositeInputHighlightingFilter.addFilter(filter);
+        }
+      }
+    }
+    return compositeInputHighlightingFilter;
   }
 
   @Override
@@ -547,44 +570,73 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
 
   @Override
   public void print(@NotNull String text, @NotNull ConsoleViewContentType contentType) {
-    if (myInputMessageFilter == null) {
-      print(text, contentType, null);
+    text = convertLineSeparators(text);
+
+    if (myInputMessageFilterEx != null) {
+      text = myInputMessageFilterEx.applyFilter(text, contentType);
+    }
+    if (text == null) {
       return;
     }
 
-    List<Pair<String, ConsoleViewContentType>> result = myInputMessageFilter.applyFilter(text, contentType);
-    if (result == null) {
-      print(text, contentType, null);
+    List<Pair<IntRange, ConsoleViewContentType>> pairs = null;
+    if (myHighlightingInputFilterEx != null) {
+      pairs = myHighlightingInputFilterEx.applyFilter(text, contentType);
+    }
+
+    if (pairs == null || pairs.isEmpty()) {
+      print(text, Collections.singletonList(Pair.create(new IntRange(0, text.length()), contentType)), null);
     }
     else {
-      for (Pair<String, ConsoleViewContentType> pair : result) {
-        if (pair.first != null) {
-          print(pair.first, pair.second == null ? contentType : pair.second, null);
+      pairs.add(Pair.create(new IntRange(0, text.length()), contentType));
+      print(text, pairs, null);
+    }
+  }
+
+  private void print(@NotNull String text,
+                     @NotNull List<Pair<IntRange, ConsoleViewContentType>> contentTypes,
+                     @Nullable HyperlinkInfo info) {
+    //make sure to #convertLineSeparators before calling this
+
+    synchronized (LOCK) {
+      myDeferredBuffer.print(text, contentTypes, info);
+
+      if (isUserInput(contentTypes)) {
+        requestFlushImmediately();
+      }
+      else {
+        if (myEditor != null) {
+          final boolean shouldFlushNow = myDeferredBuffer.length() >= myDeferredBuffer.getCycleBufferSize();
+          addFlushRequest(FLUSH, shouldFlushNow ? 0 : DEFAULT_FLUSH_DELAY);
         }
       }
     }
   }
 
-  private void print(@NotNull String text, @NotNull ConsoleViewContentType contentType, @Nullable HyperlinkInfo info) {
+  @NotNull
+  private String convertLineSeparators(@NotNull String text) {
     // optimisation: most of the strings don't contain line separators
-    for (int i=0; i<text.length(); i++) {
+    for (int i = 0; i < text.length(); i++) {
       char c = text.charAt(i);
       if (c == '\n' || c == '\r') {
         text = StringUtil.convertLineSeparators(text, keepSlashR);
         break;
       }
     }
-    synchronized (LOCK) {
-      myDeferredBuffer.print(text, contentType, info);
+    return text;
+  }
 
-      if (contentType == ConsoleViewContentType.USER_INPUT) {
-        requestFlushImmediately();
-      }
-      else if (myEditor != null) {
-        final boolean shouldFlushNow = myDeferredBuffer.length() >= myDeferredBuffer.getCycleBufferSize();
-        addFlushRequest(FLUSH, shouldFlushNow ? 0 : DEFAULT_FLUSH_DELAY);
+  private boolean isUserInput(@NotNull List<Pair<IntRange, ConsoleViewContentType>> contentTypes) {
+    boolean containsUserInput = false;
+    //noinspection ForLoopReplaceableByForEach
+    for (int i = 0; i < contentTypes.size(); i++) {
+      Pair<IntRange, ConsoleViewContentType> pair = contentTypes.get(i);
+      if (pair != null && pair.second == ConsoleViewContentType.USER_INPUT) {
+        containsUserInput = true;
+        break;
       }
     }
+    return containsUserInput;
   }
 
   private void sendUserInput(@NotNull CharSequence typedText) {
@@ -695,7 +747,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
         int offset = document.getTextLength();
         for (int i = deferredTokens.size() - 1; i >= startIndex; i--) {
           TokenBuffer.TokenInfo token = deferredTokens.get(i);
-          contentTypes.add(token.contentType);
+          token.addAllContentTypesTo(contentTypes);
           int tokenLength = token.length();
           final HyperlinkInfo info = token.getHyperlinkInfo();
           int start = Math.max(0, offset - tokenLength);
@@ -703,7 +755,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
           if (info != null) {
             myHyperlinks.createHyperlink(start, offset, null, info);
           }
-          createTokenRangeHighlighter(token.contentType, start, offset);
+          createTokenRangeHighlighter(token, start, offset);
           offset = start;
         }
       }
@@ -730,15 +782,26 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     sendUserInput(addedText);
   }
 
-  private void createTokenRangeHighlighter(@NotNull ConsoleViewContentType contentType,
+  private void createTokenRangeHighlighter(@NotNull TokenBuffer.TokenInfo tokenInfo,
                                            int startOffset,
                                            int endOffset) {
     ApplicationManager.getApplication().assertIsDispatchThread();
-    TextAttributes attributes = contentType.getAttributes();
     MarkupModel model = DocumentMarkupModel.forDocument(myEditor.getDocument(), getProject(), true);
-    RangeHighlighter tokenMarker = model.addRangeHighlighter(startOffset, endOffset, HighlighterLayer.CONSOLE_FILTER,
-                                                             attributes, HighlighterTargetArea.EXACT_RANGE);
-    tokenMarker.putUserData(CONTENT_TYPE, contentType);
+    for (Pair<IntRange, ConsoleViewContentType> pair : tokenInfo.contentTypes) {
+      IntRange range = pair.getFirst();
+      ConsoleViewContentType contentType = pair.getSecond();
+      TextAttributes attributes = contentType.getAttributes();
+
+      int adjustedStartOffset = Math.min(startOffset + range.getStart() + tokenInfo.myContentTypesRangesOffset, endOffset);
+      int adjustedEndOffset = Math.min(startOffset + range.getEndInclusive() + tokenInfo.myContentTypesRangesOffset, endOffset);
+
+      if (adjustedStartOffset != adjustedEndOffset) {
+        RangeHighlighter tokenMarker = model.addRangeHighlighter(adjustedStartOffset, adjustedEndOffset, HighlighterLayer.CONSOLE_FILTER,
+                                                                 attributes, HighlighterTargetArea.EXACT_RANGE);
+        tokenMarker.putUserData(CONTENT_TYPE, contentType);
+      }
+    }
+  
   }
 
   boolean isDisposed() {
@@ -834,7 +897,9 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
 
   @Override
   public void printHyperlink(@NotNull final String hyperlinkText, @Nullable HyperlinkInfo info) {
-    print(hyperlinkText, ConsoleViewContentType.NORMAL_OUTPUT, info);
+    String text = hyperlinkText;
+    text = convertLineSeparators(text);
+    print(text, Collections.singletonList(Pair.create(new IntRange(0, text.length()), ConsoleViewContentType.NORMAL_OUTPUT)), info);
   }
 
   @NotNull
@@ -1429,7 +1494,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     int newEndOffset = document.getTextLength() - oldDocLength + offset; // take care of trim document
 
     if (findTokenMarker(newEndOffset) == null) {
-      createTokenRangeHighlighter(ConsoleViewContentType.USER_INPUT, newStartOffset, newEndOffset);
+      createTokenRangeHighlighter(new TokenBuffer.TokenInfo(ConsoleViewContentType.USER_INPUT, text, null), newStartOffset, newEndOffset);
     }
 
     moveScrollRemoveSelection(editor, newEndOffset);

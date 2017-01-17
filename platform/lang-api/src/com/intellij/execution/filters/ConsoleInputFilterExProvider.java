@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2012 JetBrains s.r.o.
+ * Copyright 2000-2017 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,18 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.intellij.execution.filters;
 
+import com.intellij.execution.ui.ConsoleView;
 import com.intellij.openapi.extensions.ExtensionPointName;
 import com.intellij.openapi.project.Project;
+import com.intellij.psi.search.GlobalSearchScope;
 import org.jetbrains.annotations.NotNull;
 
-@Deprecated
-public interface ConsoleInputFilterProvider {
-  ExtensionPointName<ConsoleInputFilterProvider> INPUT_FILTER_PROVIDERS =
-    ExtensionPointName.create("com.intellij.consoleInputFilterProvider");
+public abstract class ConsoleInputFilterExProvider {
+  public static final ExtensionPointName<ConsoleInputFilterExProvider> FILTER_PROVIDERS =
+    ExtensionPointName.create("com.intellij.consoleInputFilterExProvider");
 
   @NotNull
-  InputFilter[] getDefaultFilters(@NotNull Project project);
+  public abstract InputFilterEx[] getInputFilters(@NotNull ConsoleView consoleView,
+                                                  @NotNull Project project,
+                                                  @NotNull GlobalSearchScope scope);
 }
