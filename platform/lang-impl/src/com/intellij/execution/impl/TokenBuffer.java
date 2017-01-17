@@ -93,7 +93,7 @@ class TokenBuffer {
       TokenInfo last = tokens.removeLast();
       String lastTextWithNoCR = last.getText().substring(0, last.length() - 1);
       if (!lastTextWithNoCR.isEmpty()) {
-        TokenInfo newLast = new TokenInfo(last.contentTypes, lastTextWithNoCR, last.getHyperlinkInfo());
+        TokenInfo newLast = new TokenInfo(last.contentTypes, lastTextWithNoCR, last.getHyperlinkInfo(), last.myContentTypesRangesOffset);
         tokens.addLast(newLast);
         size --;
       }
@@ -110,7 +110,8 @@ class TokenBuffer {
       int lfIndex = text.lastIndexOf('\n');
       if (lfIndex != -1) {
         // split token
-        TokenInfo newToken = new TokenInfo(last.contentTypes, text.substring(0, lfIndex + 1), last.getHyperlinkInfo());
+        TokenInfo newToken =
+          new TokenInfo(last.contentTypes, text.substring(0, lfIndex + 1), last.getHyperlinkInfo(), last.myContentTypesRangesOffset);
         tokens.addLast(newToken);
         size -= text.length() - newToken.length();
         break;
@@ -177,7 +178,8 @@ class TokenBuffer {
     if (startIndex != 0) {
       // slice the first token
       TokenInfo first = list.get(0);
-      TokenInfo sliced = new TokenInfo(first.contentTypes, first.getText().substring(startIndex), first.getHyperlinkInfo(), startIndex);
+      TokenInfo sliced = new TokenInfo(first.contentTypes, first.getText().substring(startIndex), first.getHyperlinkInfo(),
+                                       first.myContentTypesRangesOffset + startIndex);
       return ContainerUtil.concat(Collections.singletonList(sliced), list.subList(1, list.size()));
     }
     return list;
@@ -191,8 +193,7 @@ class TokenBuffer {
     @NotNull
     final List<Pair<IntRange, ConsoleViewContentType>> contentTypes;
     /**
-     * the original text for which the ranges were made, was moved/cutted, the ranges needs to be adjusted by that when highlighting
-     * TODO tricky part, does not really work properly when \r is printed. must review it
+     * the original text for which the ranges were made was cut, the ranges needs to be adjusted by that when highlighting
      */
     final int myContentTypesRangesOffset;
     private final String text;
@@ -202,15 +203,6 @@ class TokenBuffer {
               @NotNull String text,
               @Nullable HyperlinkInfo hyperlinkInfo) {
       this.contentTypes = Collections.singletonList(Pair.create(new IntRange(0, text.length()), contentType));
-      this.myHyperlinkInfo = hyperlinkInfo;
-      this.text = text;
-      this.myContentTypesRangesOffset = 0;
-    }
-
-    TokenInfo(@NotNull List<Pair<IntRange, ConsoleViewContentType>> contentTypes,
-              @NotNull String text,
-              @Nullable HyperlinkInfo hyperlinkInfo) {
-      this.contentTypes = contentTypes;
       this.myHyperlinkInfo = hyperlinkInfo;
       this.text = text;
       this.myContentTypesRangesOffset = 0;

@@ -791,26 +791,31 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
                                            int endOffset) {
     ApplicationManager.getApplication().assertIsDispatchThread();
     MarkupModel model = DocumentMarkupModel.forDocument(myEditor.getDocument(), getProject(), true);
+    int length = tokenInfo.length();
+    int tokenOffset = tokenInfo.myContentTypesRangesOffset;
+    
     for (Pair<IntRange, ConsoleViewContentType> pair : tokenInfo.contentTypes) {
       IntRange range = pair.getFirst();
       ConsoleViewContentType contentType = pair.getSecond();
       TextAttributes attributes = contentType.getAttributes();
 
       //adjusted to the actual token content
-      int adjustedStart = Math.max(range.getStart() - tokenInfo.myContentTypesRangesOffset, 0);
-      int adjustedEnd = Math.max(range.getEndInclusive() - tokenInfo.myContentTypesRangesOffset, 0);
-      //text for which the range was created was cutted out, or the range was not valid
-      if ((adjustedStart == 0 && adjustedEnd == 0) || adjustedStart == adjustedEnd) {
+      int adjustedStart = Math.max(range.getStart() - tokenOffset, 0);
+      int adjustedEnd = Math.max(range.getEndInclusive() - tokenOffset, 0);
+      adjustedStart = Math.min(adjustedStart, length);
+      adjustedEnd = Math.min(adjustedEnd, length);
+      if (adjustedStart == adjustedEnd) {
+        //text for which the range was created was cut out, or the range was not valid
         continue;
       }
 
-      //adjusted by document offsets
+      //adjusted by document offset
       int adjustedStartOffset = Math.min(adjustedStart + startOffset, endOffset);
       int adjustedEndOffset = Math.min(adjustedEnd + startOffset, endOffset);
       if (adjustedStartOffset == adjustedEndOffset) {
+        //this should never happen, but just to be sure
         continue;
       }
-
       RangeHighlighter tokenMarker = model.addRangeHighlighter(adjustedStartOffset, adjustedEndOffset, HighlighterLayer.CONSOLE_FILTER,
                                                                attributes, HighlighterTargetArea.EXACT_RANGE);
       tokenMarker.putUserData(CONTENT_TYPE, contentType);
