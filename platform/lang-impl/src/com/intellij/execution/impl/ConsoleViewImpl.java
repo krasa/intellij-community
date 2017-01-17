@@ -280,7 +280,9 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
       for (ConsoleInputFilterExProvider eachProvider : providers) {
         InputFilterEx[] filters = eachProvider.getInputFilters(this, project, searchScope);
         for (InputFilterEx filter : filters) {
-          compositeInputFilter.addFilter(filter);
+          if (filter != null) {
+            compositeInputFilter.addFilter(filter);
+          }
         }
       }
     }
@@ -296,7 +298,9 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
       for (ConsoleHighlightingInputFilterExProvider eachProvider : providers) {
         HighlightingInputFilterEx[] filters = eachProvider.getHighlightingFilters(this, project, searchScope);
         for (HighlightingInputFilterEx filter : filters) {
-          compositeInputHighlightingFilter.addFilter(filter);
+          if (filter != null) {
+            compositeInputHighlightingFilter.addFilter(filter);
+          }
         }
       }
     }
