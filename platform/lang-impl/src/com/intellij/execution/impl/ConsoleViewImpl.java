@@ -796,16 +796,25 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
       ConsoleViewContentType contentType = pair.getSecond();
       TextAttributes attributes = contentType.getAttributes();
 
-      int adjustedStartOffset = Math.min(startOffset + range.getStart() + tokenInfo.myContentTypesRangesOffset, endOffset);
-      int adjustedEndOffset = Math.min(startOffset + range.getEndInclusive() + tokenInfo.myContentTypesRangesOffset, endOffset);
-
-      if (adjustedStartOffset != adjustedEndOffset) {
-        RangeHighlighter tokenMarker = model.addRangeHighlighter(adjustedStartOffset, adjustedEndOffset, HighlighterLayer.CONSOLE_FILTER,
-                                                                 attributes, HighlighterTargetArea.EXACT_RANGE);
-        tokenMarker.putUserData(CONTENT_TYPE, contentType);
+      //adjusted to the actual token content
+      int adjustedStart = Math.max(range.getStart() - tokenInfo.myContentTypesRangesOffset, 0);
+      int adjustedEnd = Math.max(range.getEndInclusive() - tokenInfo.myContentTypesRangesOffset, 0);
+      //text for which the range was created was cutted out, or the range was not valid
+      if ((adjustedStart == 0 && adjustedEnd == 0) || adjustedStart == adjustedEnd) {
+        continue;
       }
+
+      //adjusted by document offsets
+      int adjustedStartOffset = Math.min(adjustedStart + startOffset, endOffset);
+      int adjustedEndOffset = Math.min(adjustedEnd + startOffset, endOffset);
+      if (adjustedStartOffset == adjustedEndOffset) {
+        continue;
+      }
+
+      RangeHighlighter tokenMarker = model.addRangeHighlighter(adjustedStartOffset, adjustedEndOffset, HighlighterLayer.CONSOLE_FILTER,
+                                                               attributes, HighlighterTargetArea.EXACT_RANGE);
+      tokenMarker.putUserData(CONTENT_TYPE, contentType);
     }
-  
   }
 
   boolean isDisposed() {

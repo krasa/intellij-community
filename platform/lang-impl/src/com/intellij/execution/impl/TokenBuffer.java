@@ -190,6 +190,10 @@ class TokenBuffer {
   static class TokenInfo {
     @NotNull
     final List<Pair<IntRange, ConsoleViewContentType>> contentTypes;
+    /**
+     * the original text for which the ranges were made, was moved/cutted, the ranges needs to be adjusted by that when highlighting
+     * TODO tricky part, does not really work properly when \r is printed. must review it
+     */
     final int myContentTypesRangesOffset;
     private final String text;
     private final HyperlinkInfo myHyperlinkInfo;
