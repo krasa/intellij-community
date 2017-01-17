@@ -26,10 +26,10 @@ import com.intellij.openapi.util.Pair;
 
 import java.util.List;
 
-class InputFilterBackwardCompatibility implements InputFilterEx {
+class InputFilterForBackwardCompatibility implements InputFilterEx {
   CompositeInputFilter myInputMessageFilter;
 
-  public InputFilterBackwardCompatibility(Project project) {
+  public InputFilterForBackwardCompatibility(Project project) {
     ConsoleInputFilterProvider[] inputFilters = Extensions.getExtensions(ConsoleInputFilterProvider.INPUT_FILTER_PROVIDERS);
     if (inputFilters.length > 0) {
       CompositeInputFilter compositeInputFilter = new CompositeInputFilter(project);

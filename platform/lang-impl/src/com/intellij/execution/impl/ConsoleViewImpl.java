@@ -276,7 +276,6 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     ConsoleInputFilterExProvider[] providers = Extensions.getExtensions(ConsoleInputFilterExProvider.FILTER_PROVIDERS);
     if (providers.length > 0) {
       compositeInputFilter = new CompositeInputFilterEx(project);
-      compositeInputFilter.addFilter(new InputFilterBackwardCompatibility(project));
       for (ConsoleInputFilterExProvider eachProvider : providers) {
         InputFilterEx[] filters = eachProvider.getInputFilters(this, project, searchScope);
         for (InputFilterEx filter : filters) {
@@ -285,6 +284,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
           }
         }
       }
+      compositeInputFilter.addFilter(new InputFilterForBackwardCompatibility(project));
     }
     return compositeInputFilter;
   }
