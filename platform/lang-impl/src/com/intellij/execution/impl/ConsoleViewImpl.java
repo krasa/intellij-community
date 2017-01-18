@@ -589,23 +589,23 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     }
 
     if (pairs == null || pairs.isEmpty()) {
-      print(text, Collections.singletonList(Pair.create(new IntRange(0, text.length()), contentType)), null);
+      print(text, contentType, null, null);
     }
     else {
-      pairs.add(Pair.create(new IntRange(0, text.length()), contentType));
-      print(text, pairs, null);
+      print(text, contentType, pairs, null);
     }
   }
 
   private void print(@NotNull String text,
-                     @NotNull List<Pair<IntRange, ConsoleViewContentType>> contentTypes,
+                     @NotNull ConsoleViewContentType contentType,
+                     @Nullable List<Pair<IntRange, ConsoleViewContentType>> highlighters,
                      @Nullable HyperlinkInfo info) {
     //make sure to #convertLineSeparators before calling this
 
     synchronized (LOCK) {
-      myDeferredBuffer.print(text, contentTypes, info);
+      myDeferredBuffer.print(text, contentType, highlighters, info);
 
-      if (isUserInput(contentTypes)) {
+      if (contentType == ConsoleViewContentType.USER_INPUT) {
         requestFlushImmediately();
       }
       else {
@@ -628,19 +628,6 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
       }
     }
     return text;
-  }
-
-  private boolean isUserInput(@NotNull List<Pair<IntRange, ConsoleViewContentType>> contentTypes) {
-    boolean containsUserInput = false;
-    //noinspection ForLoopReplaceableByForEach
-    for (int i = 0; i < contentTypes.size(); i++) {
-      Pair<IntRange, ConsoleViewContentType> pair = contentTypes.get(i);
-      if (pair != null && pair.second == ConsoleViewContentType.USER_INPUT) {
-        containsUserInput = true;
-        break;
-      }
-    }
-    return containsUserInput;
   }
 
   private void sendUserInput(@NotNull CharSequence typedText) {
@@ -751,7 +738,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
         int offset = document.getTextLength();
         for (int i = deferredTokens.size() - 1; i >= startIndex; i--) {
           TokenBuffer.TokenInfo token = deferredTokens.get(i);
-          token.addAllContentTypesTo(contentTypes);
+          contentTypes.add(token.contentType);
           int tokenLength = token.length();
           final HyperlinkInfo info = token.getHyperlinkInfo();
           int start = Math.max(0, offset - tokenLength);
@@ -759,7 +746,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
           if (info != null) {
             myHyperlinks.createHyperlink(start, offset, null, info).putUserData(MANUAL_HYPERLINK, true);
           }
-          createTokenRangeHighlighter(token, start, offset);
+          createHighlighters(token, start, offset);
           offset = start;
         }
       }
@@ -786,39 +773,58 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     sendUserInput(addedText);
   }
 
-  private void createTokenRangeHighlighter(@NotNull TokenBuffer.TokenInfo tokenInfo,
-                                           int startOffset,
-                                           int endOffset) {
+  private void createHighlighters(@NotNull TokenBuffer.TokenInfo tokenInfo,
+                                  int startOffset,
+                                  int endOffset) {
     ApplicationManager.getApplication().assertIsDispatchThread();
+
     MarkupModel model = DocumentMarkupModel.forDocument(myEditor.getDocument(), getProject(), true);
+
+    createFilterHighlighters(tokenInfo, startOffset, endOffset, model);
+
+    ConsoleViewContentType contentType = tokenInfo.contentType;
+    RangeHighlighter tokenMarker = model.addRangeHighlighter(startOffset, endOffset, HighlighterLayer.CONSOLE_FILTER,
+                                                             contentType.getAttributes(), HighlighterTargetArea.EXACT_RANGE);
+    tokenMarker.putUserData(CONTENT_TYPE, contentType);
+  }
+
+  private void createFilterHighlighters(@NotNull TokenBuffer.TokenInfo tokenInfo, int startOffset, int endOffset, MarkupModel model) {
     int length = tokenInfo.length();
-    int tokenOffset = tokenInfo.myContentTypesRangesOffset;
-    
-    for (Pair<IntRange, ConsoleViewContentType> pair : tokenInfo.contentTypes) {
-      IntRange range = pair.getFirst();
-      ConsoleViewContentType contentType = pair.getSecond();
-      TextAttributes attributes = contentType.getAttributes();
+    int tokenOffset = tokenInfo.myHighlightersRangeOffset;
+    if (tokenInfo.highlighters != null) {
+      List<Pair<IntRange, ConsoleViewContentType>> highlighters = tokenInfo.highlighters;
+      //noinspection ForLoopReplaceableByForEach
+      for (int i = 0; i < highlighters.size(); i++) {
+        Pair<IntRange, ConsoleViewContentType> pair = highlighters.get(i);
+        IntRange range = pair.getFirst();
+        ConsoleViewContentType contentType = pair.getSecond();
+        TextAttributes attributes = contentType.getAttributes();
 
-      //adjusted to the actual token content
-      int adjustedStart = Math.max(range.getStart() - tokenOffset, 0);
-      int adjustedEnd = Math.max(range.getEndInclusive() - tokenOffset, 0);
-      adjustedStart = Math.min(adjustedStart, length);
-      adjustedEnd = Math.min(adjustedEnd, length);
-      if (adjustedStart == adjustedEnd) {
-        //text for which the range was created was cut out, or the range was not valid
-        continue;
-      }
+        //adjusted to the actual token content
+        int adjustedStart = Math.max(range.getStart() - tokenOffset, 0);
+        int adjustedEnd = Math.max(range.getEndInclusive() - tokenOffset, 0);
+        adjustedStart = Math.min(adjustedStart, length);
+        adjustedEnd = Math.min(adjustedEnd, length);
+        if (adjustedStart == adjustedEnd) {
+          //text for which the range was created was cut out, or the range was not valid
+          continue;
+        }
 
-      //adjusted by document offset
-      int adjustedStartOffset = Math.min(adjustedStart + startOffset, endOffset);
-      int adjustedEndOffset = Math.min(adjustedEnd + startOffset, endOffset);
-      if (adjustedStartOffset == adjustedEndOffset) {
-        //this should never happen, but just to be sure
-        continue;
+        //adjusted by document offset
+        int adjustedStartOffset = Math.min(adjustedStart + startOffset, endOffset);
+        int adjustedEndOffset = Math.min(adjustedEnd + startOffset, endOffset);
+        if (adjustedStartOffset == adjustedEndOffset) {
+          //this should never happen, but just to be sure
+          continue;
+        }
+
+        //TODO why are here 2  MarkupModels ? Is one for filters, and another for  contentType? 
+        // - that might actually be nice if I were to continue keep calling editor.getMarkupModel().removeAllHighlighters(); to clear them, without removing e.g. red color for stderr
+
+        myHyperlinks.addHighlighter(adjustedStartOffset, adjustedEndOffset, attributes);
+        //RangeHighlighter tokenMarker = model.addRangeHighlighter(adjustedStartOffset, adjustedEndOffset, HighlighterLayer.CONSOLE_FILTER,
+        //                                                         attributes, HighlighterTargetArea.EXACT_RANGE);
       }
-      RangeHighlighter tokenMarker = model.addRangeHighlighter(adjustedStartOffset, adjustedEndOffset, HighlighterLayer.CONSOLE_FILTER,
-                                                               attributes, HighlighterTargetArea.EXACT_RANGE);
-      tokenMarker.putUserData(CONTENT_TYPE, contentType);
     }
   }
 
@@ -921,7 +927,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
   public void printHyperlink(@NotNull final String hyperlinkText, @Nullable HyperlinkInfo info) {
     String text = hyperlinkText;
     text = convertLineSeparators(text);
-    print(text, Collections.singletonList(Pair.create(new IntRange(0, text.length()), ConsoleViewContentType.NORMAL_OUTPUT)), info);
+    print(text, ConsoleViewContentType.NORMAL_OUTPUT, null, info);
   }
 
   @NotNull
@@ -1523,7 +1529,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     int newEndOffset = document.getTextLength() - oldDocLength + offset; // take care of trim document
 
     if (findTokenMarker(newEndOffset) == null) {
-      createTokenRangeHighlighter(new TokenBuffer.TokenInfo(ConsoleViewContentType.USER_INPUT, text, null), newStartOffset, newEndOffset);
+      createHighlighters(new TokenBuffer.TokenInfo(ConsoleViewContentType.USER_INPUT, text, null), newStartOffset, newEndOffset);
     }
 
     moveScrollRemoveSelection(editor, newEndOffset);

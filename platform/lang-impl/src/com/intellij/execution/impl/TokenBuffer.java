@@ -25,7 +25,6 @@ import kotlin.ranges.IntRange;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -50,7 +49,10 @@ class TokenBuffer {
     tokens = new Queue<>(10);
   }
 
-  void print(@NotNull String text, @NotNull List<Pair<IntRange, ConsoleViewContentType>> contentTypes, @Nullable HyperlinkInfo info) {
+  void print(@NotNull String text,
+             @NotNull ConsoleViewContentType contentType,
+             @Nullable List<Pair<IntRange, ConsoleViewContentType>> highlighters,
+             @Nullable HyperlinkInfo info) {
     int start = 0;
     while (start < text.length()) {
       if (hasTrailingCR()) {
@@ -58,14 +60,14 @@ class TokenBuffer {
       }
       int crIndex = text.indexOf('\r', start);
       if (crIndex == -1 || crIndex == text.length() - 1) {
-        TokenInfo tokenInfo = new TokenInfo(contentTypes, text.substring(start, text.length()), info, start);
+        TokenInfo tokenInfo = new TokenInfo(contentType, highlighters, text.substring(start, text.length()), info, start);
         tokens.addLast(tokenInfo);
         size += tokenInfo.length();
         break;
       }
 
       if (start!=crIndex) {
-        TokenInfo tokenInfo = new TokenInfo(contentTypes, text.substring(start, crIndex), info, start);
+        TokenInfo tokenInfo = new TokenInfo(contentType, highlighters, text.substring(start, crIndex), info, start);
         tokens.addLast(tokenInfo);
         size += tokenInfo.length();
         removeLastLine();
@@ -93,7 +95,8 @@ class TokenBuffer {
       TokenInfo last = tokens.removeLast();
       String lastTextWithNoCR = last.getText().substring(0, last.length() - 1);
       if (!lastTextWithNoCR.isEmpty()) {
-        TokenInfo newLast = new TokenInfo(last.contentTypes, lastTextWithNoCR, last.getHyperlinkInfo(), last.myContentTypesRangesOffset);
+        TokenInfo newLast =
+          new TokenInfo(last.contentType, last.highlighters, lastTextWithNoCR, last.getHyperlinkInfo(), last.myHighlightersRangeOffset);
         tokens.addLast(newLast);
         size --;
       }
@@ -111,7 +114,8 @@ class TokenBuffer {
       if (lfIndex != -1) {
         // split token
         TokenInfo newToken =
-          new TokenInfo(last.contentTypes, text.substring(0, lfIndex + 1), last.getHyperlinkInfo(), last.myContentTypesRangesOffset);
+          new TokenInfo(last.contentType, last.highlighters, text.substring(0, lfIndex + 1), last.getHyperlinkInfo(),
+                        last.myHighlightersRangeOffset);
         tokens.addLast(newToken);
         size -= text.length() - newToken.length();
         break;
@@ -178,8 +182,9 @@ class TokenBuffer {
     if (startIndex != 0) {
       // slice the first token
       TokenInfo first = list.get(0);
-      TokenInfo sliced = new TokenInfo(first.contentTypes, first.getText().substring(startIndex), first.getHyperlinkInfo(),
-                                       first.myContentTypesRangesOffset + startIndex);
+      TokenInfo sliced =
+        new TokenInfo(first.contentType, first.highlighters, first.getText().substring(startIndex), first.getHyperlinkInfo(),
+                      first.myHighlightersRangeOffset + startIndex);
       return ContainerUtil.concat(Collections.singletonList(sliced), list.subList(1, list.size()));
     }
     return list;
@@ -191,28 +196,33 @@ class TokenBuffer {
 
   static class TokenInfo {
     @NotNull
-    final List<Pair<IntRange, ConsoleViewContentType>> contentTypes;
-    final int myContentTypesRangesOffset;
+    final ConsoleViewContentType contentType;
+    @Nullable
+    final List<Pair<IntRange, ConsoleViewContentType>> highlighters;
+    final int myHighlightersRangeOffset;
     private final String text;
     private final HyperlinkInfo myHyperlinkInfo;
 
     TokenInfo(@NotNull ConsoleViewContentType contentType,
               @NotNull String text,
               @Nullable HyperlinkInfo hyperlinkInfo) {
-      this.contentTypes = Collections.singletonList(Pair.create(new IntRange(0, text.length()), contentType));
+      this.contentType = contentType;
+      this.highlighters = null;
       this.myHyperlinkInfo = hyperlinkInfo;
       this.text = text;
-      this.myContentTypesRangesOffset = 0;
+      this.myHighlightersRangeOffset = 0;
     }
 
-    TokenInfo(@NotNull List<Pair<IntRange, ConsoleViewContentType>> contentTypes,
+    TokenInfo(@NotNull ConsoleViewContentType contentType,
+              @Nullable List<Pair<IntRange, ConsoleViewContentType>> highlighters,
               @NotNull String text,
               @Nullable HyperlinkInfo hyperlinkInfo,
               int contentTypesRangeOffset) {
-      this.contentTypes = contentTypes;
+      this.contentType = contentType;
+      this.highlighters = highlighters;
       this.myHyperlinkInfo = hyperlinkInfo;
       this.text = text;
-      this.myContentTypesRangesOffset = contentTypesRangeOffset;
+      this.myHighlightersRangeOffset = contentTypesRangeOffset;
     }
 
     int length() {
@@ -221,7 +231,7 @@ class TokenBuffer {
 
     @Override
     public String toString() {
-      return "[" + length() + "]" + contentTypes;
+      return contentType + "[" + length() + "]";
     }
 
     HyperlinkInfo getHyperlinkInfo() {
@@ -233,10 +243,5 @@ class TokenBuffer {
       return text;
     }
 
-    public void addAllContentTypesTo(Collection<ConsoleViewContentType> types) {
-      for (Pair<IntRange, ConsoleViewContentType> type : contentTypes) {
-        types.add(type.second);
-      }
-    }
   }
 }
