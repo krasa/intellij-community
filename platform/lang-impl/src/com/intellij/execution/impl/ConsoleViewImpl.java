@@ -778,6 +778,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     createFilterHighlighters(tokenInfo, startOffset, endOffset, model);
 
     ConsoleViewContentType contentType = tokenInfo.contentType;
+    //TODO  HighlighterLayer.CONSOLE_FILTER ??? 
     RangeHighlighter tokenMarker = model.addRangeHighlighter(startOffset, endOffset, HighlighterLayer.CONSOLE_FILTER,
                                                              contentType.getAttributes(), HighlighterTargetArea.EXACT_RANGE);
     tokenMarker.putUserData(CONTENT_TYPE, contentType);
@@ -815,7 +816,6 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
 
         //TODO why are here 2  MarkupModels ? Is one for filters, and another for  contentType? But then wouldn't it be better to add MANUAL_HYPERLINKs to the other one?
         // - that might actually be nice if I were to continue keep calling editor.getMarkupModel().removeAllHighlighters() in GrepConsole to redone highlights but without clearing MANUAL_HYPERLINKs and e.g. red color for stderr
-
         myHyperlinks.addHighlighter(adjustedStartOffset, adjustedEndOffset, attributes);
         //RangeHighlighter tokenMarker = model.addRangeHighlighter(adjustedStartOffset, adjustedEndOffset, HighlighterLayer.CONSOLE_FILTER,
         //                                                         attributes, HighlighterTargetArea.EXACT_RANGE);
