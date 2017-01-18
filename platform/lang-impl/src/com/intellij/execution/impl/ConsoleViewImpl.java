@@ -588,12 +588,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
       pairs = myHighlightingInputFilterEx.applyFilter(text, contentType);
     }
 
-    if (pairs == null || pairs.isEmpty()) {
-      print(text, contentType, null, null);
-    }
-    else {
-      print(text, contentType, pairs, null);
-    }
+    print(text, contentType, pairs, null);
   }
 
   private void print(@NotNull String text,
