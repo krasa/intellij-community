@@ -24,6 +24,9 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 
 public interface HighlightingInputFilterEx {
+  /**
+   * the contentType may be null in case of rehighlighting of the console on the background
+   */
   @Nullable
-  List<Pair<IntRange, ConsoleViewContentType>> applyFilter(@NotNull final String text, @NotNull final ConsoleViewContentType contentType);
+  List<Pair<IntRange, ConsoleViewContentType>> applyFilter(@NotNull final String text, @Nullable final ConsoleViewContentType contentType);
 }

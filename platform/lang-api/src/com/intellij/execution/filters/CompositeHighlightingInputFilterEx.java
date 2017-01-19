@@ -42,7 +42,7 @@ public class CompositeHighlightingInputFilterEx implements HighlightingInputFilt
   @Override
   @Nullable
   public List<Pair<IntRange, ConsoleViewContentType>> applyFilter(@NotNull final String text,
-                                                                  @NotNull final ConsoleViewContentType contentType) {
+                                                                  @Nullable final ConsoleViewContentType contentType) {
     boolean dumb = myDumbService.isDumb();
     List<Pair<IntRange, ConsoleViewContentType>> mergedResult = null;
     for (Pair<HighlightingInputFilterEx, Boolean> pair : myFilters) {
@@ -80,7 +80,7 @@ public class CompositeHighlightingInputFilterEx implements HighlightingInputFilt
 
     @Nullable
     @Override
-    public List<Pair<IntRange, ConsoleViewContentType>> applyFilter(@NotNull String text, @NotNull ConsoleViewContentType contentType) {
+    public List<Pair<IntRange, ConsoleViewContentType>> applyFilter(@NotNull String text, @Nullable ConsoleViewContentType contentType) {
       if (!isBroken) {
         try {
           return myFilter.applyFilter(text, contentType);

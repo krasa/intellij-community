@@ -245,7 +245,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
 
           DocumentEx document = myEditor.getDocument();
           if (myLastStamp != document.getModificationStamp()) {
-            rehighlightHyperlinksAndFoldings();
+            rehighlightHyperlinksAndFoldings(false);
           }
         });
       }
@@ -760,7 +760,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
 
     int startLine = lastProcessedOutput.isValid() ? myEditor.getDocument().getLineNumber(lastProcessedOutput.getEndOffset()) : 0;
     lastProcessedOutput.dispose();
-    highlightHyperlinksAndFoldings(startLine);
+    highlightHyperlinksAndFoldings(startLine, false);
 
     if (shouldStickToEnd) {
       scrollToEnd();
@@ -792,6 +792,9 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
       //noinspection ForLoopReplaceableByForEach
       for (int i = 0; i < highlighters.size(); i++) {
         Pair<IntRange, ConsoleViewContentType> pair = highlighters.get(i);
+        if (pair == null || pair.getFirst() == null || pair.second == null) {
+          continue;
+        }
         IntRange range = pair.getFirst();
         ConsoleViewContentType contentType = pair.getSecond();
         TextAttributes attributes = contentType.getAttributes();
@@ -1002,7 +1005,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     menu.getComponent().show(mouseEvent.getComponent(), mouseEvent.getX(), mouseEvent.getY());
   }
 
-  private void highlightHyperlinksAndFoldings(int startLine) {
+  private void highlightHyperlinksAndFoldings(int startLine, boolean runHighlightingInputFilters) {
     ApplicationManager.getApplication().assertIsDispatchThread();
     boolean canHighlightHyperlinks = !myFilters.isEmpty();
 
@@ -1011,6 +1014,10 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     }
     int endLine = myEditor.getDocument().getLineCount() - 1;
 
+    if (runHighlightingInputFilters && myHighlightingInputFilterEx != null) {
+      myHyperlinks.highlightHyperlinks(new HighlightingInputFilterAdapter(myHighlightingInputFilterEx), startLine, endLine);
+    }
+    
     if (canHighlightHyperlinks) {
       myHyperlinks.highlightHyperlinks(myFilters, startLine, endLine);
     }
@@ -1023,11 +1030,11 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     }
   }
 
-  public void rehighlightHyperlinksAndFoldings() {
+  public void rehighlightHyperlinksAndFoldings(boolean runHighlightingInputFilters) {
     if (myEditor == null || myProject.isDisposed()) return;
 
     clearHyperlinkAndFoldings();
-    highlightHyperlinksAndFoldings(0);
+    highlightHyperlinksAndFoldings(0, runHighlightingInputFilters);
   }
 
   private void runHeavyFilters(int line1, int endLine) {
@@ -1680,6 +1687,36 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
   @NotNull
   public String getText() {
     return myEditor.getDocument().getText();
+  }
+
+  private static class HighlightingInputFilterAdapter implements Filter {
+    private final HighlightingInputFilterEx myFilter;
+
+    public HighlightingInputFilterAdapter(@NotNull HighlightingInputFilterEx filter) {
+      myFilter = filter;
+    }
+
+    @Nullable
+    @Override
+    public Result applyFilter(String line, int entireLength) {
+      int offset = entireLength - line.length();
+      //why bother sending the content type?
+      List<Pair<IntRange, ConsoleViewContentType>> pairs = myFilter.applyFilter(line, null);
+      if (pairs != null) {
+        List<ResultItem> items = new ArrayList<>(pairs.size());
+        for (Pair<IntRange, ConsoleViewContentType> pair : pairs) {
+          if (pair != null) {
+            IntRange range = pair.first;
+            TextAttributes attributes = pair.second.getAttributes();
+            if (range != null && attributes != null) {
+              items.add(new ResultItem(range.getStart() + offset, range.getEndInclusive() + offset, null, attributes));
+            }
+          }
+        }
+        return new Result(items);
+      }
+      return null;
+    }
   }
 }
 
