@@ -282,6 +282,11 @@ public class TaskExecutionView implements ConsoleView, DataProvider {
   }
 
   @Override
+  public void rehighlightHyperlinksAndFoldings() {
+  }
+  
+
+  @Override
   public void scrollTo(int offset) {
 
   }

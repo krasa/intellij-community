@@ -18,7 +18,10 @@ package com.intellij.execution.testframework.ui;
 import com.intellij.execution.filters.Filter;
 import com.intellij.execution.filters.HyperlinkInfo;
 import com.intellij.execution.process.ProcessHandler;
-import com.intellij.execution.testframework.*;
+import com.intellij.execution.testframework.AbstractTestProxy;
+import com.intellij.execution.testframework.HyperLink;
+import com.intellij.execution.testframework.Printable;
+import com.intellij.execution.testframework.TestConsoleProperties;
 import com.intellij.execution.ui.ConsoleView;
 import com.intellij.execution.ui.ConsoleViewContentType;
 import com.intellij.execution.ui.ObservableConsoleView;
@@ -78,6 +81,11 @@ public abstract class BaseTestsOutputConsoleView implements ConsoleView, Observa
     myConsole.clear();
   }
 
+  @Override
+  public void rehighlightHyperlinksAndFoldings() {
+    myConsole.rehighlightHyperlinksAndFoldings();
+  }
+    
   @Override
   public void scrollTo(final int offset) {
     myConsole.scrollTo(offset);

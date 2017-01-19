@@ -1030,7 +1030,12 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     }
   }
 
-  public void rehighlightHyperlinksAndFoldings(boolean runHighlightingInputFilters) {
+  @Override
+  public void rehighlightHyperlinksAndFoldings() {
+    rehighlightHyperlinksAndFoldings(true);
+  }
+
+  private void rehighlightHyperlinksAndFoldings(boolean runHighlightingInputFilters) {
     if (myEditor == null || myProject.isDisposed()) return;
 
     clearHyperlinkAndFoldings();

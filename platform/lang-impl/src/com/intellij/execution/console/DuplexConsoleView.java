@@ -152,6 +152,13 @@ public class DuplexConsoleView<S extends ConsoleView, T extends ConsoleView> ext
   }
 
   @Override
+  public void rehighlightHyperlinksAndFoldings() {
+    myPrimaryConsoleView.rehighlightHyperlinksAndFoldings();
+    mySecondaryConsoleView.rehighlightHyperlinksAndFoldings();
+  }
+  
+
+  @Override
   public void scrollTo(int offset) {
     myPrimaryConsoleView.scrollTo(offset);
     mySecondaryConsoleView.scrollTo(offset);

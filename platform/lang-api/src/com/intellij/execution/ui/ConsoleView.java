@@ -27,6 +27,8 @@ public interface ConsoleView extends ExecutionConsole {
 
   void clear();
 
+  void rehighlightHyperlinksAndFoldings();
+  
   void scrollTo(int offset);
 
   void attachToProcess(ProcessHandler processHandler);
