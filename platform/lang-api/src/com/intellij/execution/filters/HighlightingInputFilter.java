@@ -15,18 +15,18 @@
  */
 package com.intellij.execution.filters;
 
-import com.intellij.execution.ui.ConsoleView;
-import com.intellij.openapi.extensions.ExtensionPointName;
-import com.intellij.openapi.project.Project;
-import com.intellij.psi.search.GlobalSearchScope;
+import com.intellij.execution.ui.ConsoleViewContentType;
+import com.intellij.openapi.util.Pair;
+import kotlin.ranges.IntRange;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
-public abstract class ConsoleInputFilterExProvider {
-  public static final ExtensionPointName<ConsoleInputFilterExProvider> FILTER_PROVIDERS =
-    ExtensionPointName.create("com.intellij.consoleInputFilterExProvider");
+import java.util.List;
 
-  @NotNull
-  public abstract InputFilterEx[] getInputFilters(@NotNull ConsoleView consoleView,
-                                                  @NotNull Project project,
-                                                  @NotNull GlobalSearchScope scope);
+public interface HighlightingInputFilter {
+  /**
+   * the contentType may be null in case of rehighlighting of the console on the background
+   */
+  @Nullable
+  List<Pair<IntRange, ConsoleViewContentType>> applyFilter(@NotNull final String text, @Nullable final ConsoleViewContentType contentType);
 }

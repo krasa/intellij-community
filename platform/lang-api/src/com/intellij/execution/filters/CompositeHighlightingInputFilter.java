@@ -22,59 +22,65 @@ import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Pair;
 import com.intellij.util.containers.ContainerUtilRt;
+import kotlin.ranges.IntRange;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
 
-public class CompositeInputFilterEx implements InputFilterEx {
-  private static final Logger LOG = Logger.getInstance(CompositeInputFilterEx.class);
+public class CompositeHighlightingInputFilter implements HighlightingInputFilter {
+  private static final Logger LOG = Logger.getInstance(CompositeHighlightingInputFilter.class);
 
-  private final List<Pair<InputFilterEx, Boolean /* is dumb aware */>> myFilters = ContainerUtilRt.newArrayList();
+  private final List<Pair<HighlightingInputFilter, Boolean /* is dumb aware */>> myFilters = ContainerUtilRt.newArrayList();
   private final DumbService myDumbService;
 
-  public CompositeInputFilterEx(@NotNull Project project) {
+  public CompositeHighlightingInputFilter(@NotNull Project project) {
     myDumbService = DumbService.getInstance(project);
   }
 
   @Override
   @Nullable
-  public String applyFilter(@NotNull final String text, @NotNull final ConsoleViewContentType contentType) {
+  public List<Pair<IntRange, ConsoleViewContentType>> applyFilter(@NotNull final String text,
+                                                                  @Nullable final ConsoleViewContentType contentType) {
     boolean dumb = myDumbService.isDumb();
-    String filteredText = text;
-    for (int i = 0; i < myFilters.size(); i++) {
-      Pair<InputFilterEx, Boolean> pair = myFilters.get(i);
+    List<Pair<IntRange, ConsoleViewContentType>> mergedResult = null;
+    for (Pair<HighlightingInputFilter, Boolean> pair : myFilters) {
       if (!dumb || pair.second == Boolean.TRUE) {
         long t0 = System.currentTimeMillis();
-        InputFilterEx filter = pair.first;
-        filteredText = filter.applyFilter(filteredText, contentType);
+        HighlightingInputFilter filter = pair.first;
+        List<Pair<IntRange, ConsoleViewContentType>> result = filter.applyFilter(text, contentType);
+        if (result != null) {
+          if (mergedResult == null) {
+            mergedResult = new ArrayList<>();
+          }
+          mergedResult.addAll(result);
+        }
         t0 = System.currentTimeMillis() - t0;
         if (t0 > 100) {
           LOG.warn(filter + ".applyFilter() took " + t0 + " ms on '''" + text + "'''");
         }
-        if (filteredText == null) {
-          return null;
-        }
       }
     }
-    return filteredText;
+    return mergedResult;
   }
 
-  public void addFilter(@NotNull final InputFilterEx filter) {
-    myFilters.add(Pair.create(new MyInputFilterExWrapper(filter), DumbService.isDumbAware(filter)));
+  public void addFilter(@NotNull final HighlightingInputFilter filter) {
+    myFilters.add(Pair.create(new MyHighlightingInputFilter(filter), DumbService.isDumbAware(filter)));
   }
 
-  private static class MyInputFilterExWrapper implements InputFilterEx {
-    private final InputFilterEx myFilter;
+
+  private static class MyHighlightingInputFilter implements HighlightingInputFilter {
+    private final HighlightingInputFilter myFilter;
     boolean isBroken;
 
-    public MyInputFilterExWrapper(InputFilterEx filter) {
+    public MyHighlightingInputFilter(HighlightingInputFilter filter) {
       myFilter = filter;
     }
 
     @Nullable
     @Override
-    public String applyFilter(@NotNull String text, @NotNull ConsoleViewContentType contentType) {
+    public List<Pair<IntRange, ConsoleViewContentType>> applyFilter(@NotNull String text, @Nullable ConsoleViewContentType contentType) {
       if (!isBroken) {
         try {
           return myFilter.applyFilter(text, contentType);
@@ -84,9 +90,8 @@ public class CompositeInputFilterEx implements InputFilterEx {
           LOG.error(e);
         }
       }
-      return text;
+      return null;
     }
-
 
     @Override
     public String toString() {

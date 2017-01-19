@@ -18,15 +18,16 @@ package com.intellij.execution.impl;
 import com.intellij.execution.filters.CompositeInputFilter;
 import com.intellij.execution.filters.ConsoleInputFilterProvider;
 import com.intellij.execution.filters.InputFilter;
-import com.intellij.execution.filters.InputFilterEx;
+import com.intellij.execution.filters.TextInputFilter;
 import com.intellij.execution.ui.ConsoleViewContentType;
 import com.intellij.openapi.extensions.Extensions;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Pair;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
-class InputFilterForBackwardCompatibility implements InputFilterEx {
+class InputFilterForBackwardCompatibility implements TextInputFilter {
   CompositeInputFilter myInputMessageFilter;
 
   public InputFilterForBackwardCompatibility(Project project) {
@@ -47,7 +48,7 @@ class InputFilterForBackwardCompatibility implements InputFilterEx {
   }
 
   @Override
-  public String applyFilter(String text, ConsoleViewContentType contentType) {
+  public String applyFilter(@NotNull String text, @NotNull ConsoleViewContentType contentType) {
     if (myInputMessageFilter == null) {
       return text;
     }

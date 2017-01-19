@@ -19,7 +19,7 @@ import com.intellij.execution.ui.ConsoleViewContentType;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-public interface InputFilterEx {
+public interface TextInputFilter {
   /**
    * transform the text, or return null to filter it out
    */

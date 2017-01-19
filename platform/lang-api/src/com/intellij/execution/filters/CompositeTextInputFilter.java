@@ -22,65 +22,59 @@ import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Pair;
 import com.intellij.util.containers.ContainerUtilRt;
-import kotlin.ranges.IntRange;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.List;
 
-public class CompositeHighlightingInputFilterEx implements HighlightingInputFilterEx {
-  private static final Logger LOG = Logger.getInstance(CompositeHighlightingInputFilterEx.class);
+public class CompositeTextInputFilter implements TextInputFilter {
+  private static final Logger LOG = Logger.getInstance(CompositeTextInputFilter.class);
 
-  private final List<Pair<HighlightingInputFilterEx, Boolean /* is dumb aware */>> myFilters = ContainerUtilRt.newArrayList();
+  private final List<Pair<TextInputFilter, Boolean /* is dumb aware */>> myFilters = ContainerUtilRt.newArrayList();
   private final DumbService myDumbService;
 
-  public CompositeHighlightingInputFilterEx(@NotNull Project project) {
+  public CompositeTextInputFilter(@NotNull Project project) {
     myDumbService = DumbService.getInstance(project);
   }
 
   @Override
   @Nullable
-  public List<Pair<IntRange, ConsoleViewContentType>> applyFilter(@NotNull final String text,
-                                                                  @Nullable final ConsoleViewContentType contentType) {
+  public String applyFilter(@NotNull final String text, @NotNull final ConsoleViewContentType contentType) {
     boolean dumb = myDumbService.isDumb();
-    List<Pair<IntRange, ConsoleViewContentType>> mergedResult = null;
-    for (Pair<HighlightingInputFilterEx, Boolean> pair : myFilters) {
+    String filteredText = text;
+    for (int i = 0; i < myFilters.size(); i++) {
+      Pair<TextInputFilter, Boolean> pair = myFilters.get(i);
       if (!dumb || pair.second == Boolean.TRUE) {
         long t0 = System.currentTimeMillis();
-        HighlightingInputFilterEx filter = pair.first;
-        List<Pair<IntRange, ConsoleViewContentType>> result = filter.applyFilter(text, contentType);
-        if (result != null) {
-          if (mergedResult == null) {
-            mergedResult = new ArrayList<>();
-          }
-          mergedResult.addAll(result);
-        }
+        TextInputFilter filter = pair.first;
+        filteredText = filter.applyFilter(filteredText, contentType);
         t0 = System.currentTimeMillis() - t0;
         if (t0 > 100) {
           LOG.warn(filter + ".applyFilter() took " + t0 + " ms on '''" + text + "'''");
         }
+        if (filteredText == null) {
+          return null;
+        }
       }
     }
-    return mergedResult;
+    return filteredText;
   }
 
-  public void addFilter(@NotNull final HighlightingInputFilterEx filter) {
-    myFilters.add(Pair.create(new MyHighlightingInputFilterEx(filter), DumbService.isDumbAware(filter)));
+  public void addFilter(@NotNull final TextInputFilter filter) {
+    myFilters.add(Pair.create(new MyTextInputFilterWrapper(filter), DumbService.isDumbAware(filter)));
   }
 
-
-  private static class MyHighlightingInputFilterEx implements HighlightingInputFilterEx {
-    private final HighlightingInputFilterEx myFilter;
+  private static class MyTextInputFilterWrapper implements TextInputFilter {
+    private final TextInputFilter myFilter;
     boolean isBroken;
 
-    public MyHighlightingInputFilterEx(HighlightingInputFilterEx filter) {
+    public MyTextInputFilterWrapper(TextInputFilter filter) {
       myFilter = filter;
     }
 
     @Nullable
     @Override
-    public List<Pair<IntRange, ConsoleViewContentType>> applyFilter(@NotNull String text, @Nullable ConsoleViewContentType contentType) {
+    public String applyFilter(@NotNull String text, @NotNull ConsoleViewContentType contentType) {
       if (!isBroken) {
         try {
           return myFilter.applyFilter(text, contentType);
@@ -90,8 +84,9 @@ public class CompositeHighlightingInputFilterEx implements HighlightingInputFilt
           LOG.error(e);
         }
       }
-      return null;
+      return text;
     }
+
 
     @Override
     public String toString() {

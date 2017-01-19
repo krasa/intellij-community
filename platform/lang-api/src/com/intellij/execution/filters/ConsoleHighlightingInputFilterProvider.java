@@ -21,12 +21,12 @@ import com.intellij.openapi.project.Project;
 import com.intellij.psi.search.GlobalSearchScope;
 import org.jetbrains.annotations.NotNull;
 
-public abstract class ConsoleHighlightingInputFilterExProvider {
-  public static final ExtensionPointName<ConsoleHighlightingInputFilterExProvider> FILTER_PROVIDERS =
+public abstract class ConsoleHighlightingInputFilterProvider {
+  public static final ExtensionPointName<ConsoleHighlightingInputFilterProvider> FILTER_PROVIDERS =
     ExtensionPointName.create("com.intellij.consoleHighlightingInputFilterExProvider");
 
   @NotNull
-  public abstract HighlightingInputFilterEx[] getHighlightingFilters(@NotNull ConsoleView consoleView,
-                                                                     @NotNull Project project,
-                                                                     @NotNull GlobalSearchScope scope);
+  public abstract HighlightingInputFilter[] getFilters(@NotNull ConsoleView consoleView,
+                                                       @NotNull Project project,
+                                                       @NotNull GlobalSearchScope scope);
 }

@@ -155,8 +155,8 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
 
   protected final CompositeFilter myFilters;
 
-  @Nullable private final InputFilterEx myInputMessageFilterEx;
-  @Nullable private final HighlightingInputFilterEx myHighlightingInputFilterEx;
+  @Nullable private final TextInputFilter myTextInputFilter;
+  @Nullable private final HighlightingInputFilter myHighlightingInputFilter;
 
   public Editor getEditor() {
     return myEditor;
@@ -224,8 +224,8 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     myFilters = new CompositeFilter(project, usePredefinedMessageFilter ? computeConsoleFilters(project, searchScope) : new SmartList<>());
     myFilters.setForceUseAllFilters(true);
 
-    myInputMessageFilterEx = computeInputFilters(project, searchScope);
-    myHighlightingInputFilterEx = computeInputHighlightingFilterEx(project, searchScope);
+    myTextInputFilter = computeTextInputFilters(project, searchScope);
+    myHighlightingInputFilter = computeHighlightingInputFilter(project, searchScope);
 
 
     project.getMessageBus().connect(this).subscribe(DumbService.DUMB_MODE, new DumbService.DumbModeListener() {
@@ -271,14 +271,14 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     return result;
   }
 
-  private CompositeInputFilterEx computeInputFilters(@NotNull Project project, @NotNull GlobalSearchScope searchScope) {
-    CompositeInputFilterEx compositeInputFilter = null;
-    ConsoleInputFilterExProvider[] providers = Extensions.getExtensions(ConsoleInputFilterExProvider.FILTER_PROVIDERS);
+  private CompositeTextInputFilter computeTextInputFilters(@NotNull Project project, @NotNull GlobalSearchScope searchScope) {
+    CompositeTextInputFilter compositeInputFilter = null;
+    ConsoleTextInputFilterProvider[] providers = Extensions.getExtensions(ConsoleTextInputFilterProvider.FILTER_PROVIDERS);
     if (providers.length > 0) {
-      compositeInputFilter = new CompositeInputFilterEx(project);
-      for (ConsoleInputFilterExProvider eachProvider : providers) {
-        InputFilterEx[] filters = eachProvider.getInputFilters(this, project, searchScope);
-        for (InputFilterEx filter : filters) {
+      compositeInputFilter = new CompositeTextInputFilter(project);
+      for (ConsoleTextInputFilterProvider eachProvider : providers) {
+        TextInputFilter[] filters = eachProvider.getFilters(this, project, searchScope);
+        for (TextInputFilter filter : filters) {
           if (filter != null) {
             compositeInputFilter.addFilter(filter);
           }
@@ -289,15 +289,15 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     return compositeInputFilter;
   }
 
-  private HighlightingInputFilterEx computeInputHighlightingFilterEx(Project project, GlobalSearchScope searchScope) {
-    CompositeHighlightingInputFilterEx compositeInputHighlightingFilter = null;
-    ConsoleHighlightingInputFilterExProvider[] providers =
-      Extensions.getExtensions(ConsoleHighlightingInputFilterExProvider.FILTER_PROVIDERS);
+  private HighlightingInputFilter computeHighlightingInputFilter(Project project, GlobalSearchScope searchScope) {
+    CompositeHighlightingInputFilter compositeInputHighlightingFilter = null;
+    ConsoleHighlightingInputFilterProvider[] providers =
+      Extensions.getExtensions(ConsoleHighlightingInputFilterProvider.FILTER_PROVIDERS);
     if (providers.length > 0) {
-      compositeInputHighlightingFilter = new CompositeHighlightingInputFilterEx(project);
-      for (ConsoleHighlightingInputFilterExProvider eachProvider : providers) {
-        HighlightingInputFilterEx[] filters = eachProvider.getHighlightingFilters(this, project, searchScope);
-        for (HighlightingInputFilterEx filter : filters) {
+      compositeInputHighlightingFilter = new CompositeHighlightingInputFilter(project);
+      for (ConsoleHighlightingInputFilterProvider eachProvider : providers) {
+        HighlightingInputFilter[] filters = eachProvider.getFilters(this, project, searchScope);
+        for (HighlightingInputFilter filter : filters) {
           if (filter != null) {
             compositeInputHighlightingFilter.addFilter(filter);
           }
@@ -576,16 +576,16 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
   public void print(@NotNull String text, @NotNull ConsoleViewContentType contentType) {
     text = convertLineSeparators(text);
 
-    if (myInputMessageFilterEx != null) {
-      text = myInputMessageFilterEx.applyFilter(text, contentType);
+    if (myTextInputFilter != null) {
+      text = myTextInputFilter.applyFilter(text, contentType);
     }
     if (text == null) {
       return;
     }
 
     List<Pair<IntRange, ConsoleViewContentType>> pairs = null;
-    if (myHighlightingInputFilterEx != null) {
-      pairs = myHighlightingInputFilterEx.applyFilter(text, contentType);
+    if (myHighlightingInputFilter != null) {
+      pairs = myHighlightingInputFilter.applyFilter(text, contentType);
     }
 
     print(text, contentType, pairs, null);
@@ -1013,8 +1013,8 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     }
     int endLine = myEditor.getDocument().getLineCount() - 1;
 
-    if (runHighlightingInputFilters && myHighlightingInputFilterEx != null) {
-      myHyperlinks.highlightHyperlinks(new HighlightingInputFilterAdapter(myHighlightingInputFilterEx), startLine, endLine);
+    if (runHighlightingInputFilters && myHighlightingInputFilter != null) {
+      myHyperlinks.highlightHyperlinks(new HighlightingInputFilterAdapter(myHighlightingInputFilter), startLine, endLine);
     }
     
     if (canHighlightHyperlinks) {
@@ -1694,9 +1694,9 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
   }
 
   private static class HighlightingInputFilterAdapter implements Filter {
-    private final HighlightingInputFilterEx myFilter;
+    private final HighlightingInputFilter myFilter;
 
-    public HighlightingInputFilterAdapter(@NotNull HighlightingInputFilterEx filter) {
+    public HighlightingInputFilterAdapter(@NotNull HighlightingInputFilter filter) {
       myFilter = filter;
     }
 
