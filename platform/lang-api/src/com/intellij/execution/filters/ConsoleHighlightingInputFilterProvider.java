@@ -15,15 +15,16 @@
  */
 package com.intellij.execution.filters;
 
+import org.jetbrains.annotations.NotNull;
+
 import com.intellij.execution.ui.ConsoleView;
 import com.intellij.openapi.extensions.ExtensionPointName;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.search.GlobalSearchScope;
-import org.jetbrains.annotations.NotNull;
 
 public abstract class ConsoleHighlightingInputFilterProvider {
   public static final ExtensionPointName<ConsoleHighlightingInputFilterProvider> FILTER_PROVIDERS =
-    ExtensionPointName.create("com.intellij.consoleHighlightingInputFilterExProvider");
+    ExtensionPointName.create("com.intellij.consoleHighlightingInputFilterProvider");
 
   @NotNull
   public abstract HighlightingInputFilter[] getFilters(@NotNull ConsoleView consoleView,

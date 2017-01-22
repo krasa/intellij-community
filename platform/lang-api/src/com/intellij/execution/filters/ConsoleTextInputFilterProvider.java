@@ -15,15 +15,16 @@
  */
 package com.intellij.execution.filters;
 
+import org.jetbrains.annotations.NotNull;
+
 import com.intellij.execution.ui.ConsoleView;
 import com.intellij.openapi.extensions.ExtensionPointName;
 import com.intellij.openapi.project.Project;
 import com.intellij.psi.search.GlobalSearchScope;
-import org.jetbrains.annotations.NotNull;
 
 public abstract class ConsoleTextInputFilterProvider {
   public static final ExtensionPointName<ConsoleTextInputFilterProvider> FILTER_PROVIDERS =
-    ExtensionPointName.create("com.intellij.consoleInputFilterExProvider");
+    ExtensionPointName.create("com.intellij.consoleTextInputFilterProvider");
 
   @NotNull
   public abstract TextInputFilter[] getFilters(@NotNull ConsoleView consoleView,
