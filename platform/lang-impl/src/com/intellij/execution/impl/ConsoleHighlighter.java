@@ -33,13 +33,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * MarkupModel is too expensive, it is probably never going to be fast enough for the console, use this for highlighting
+ * MarkupModel is too expensive, it is probably never going to be fast enough for the console, use this for highlighting from HighlightingInputFilter and content type on input. 
+ * Asynchronous Filters do not need to use this, it would be too complex, and unnecessary as number of their highlights will be always low (if GrepConsole will use HighlightingInputFilter.
  * - some of it is copy paste from IJ 2016...
  * <p>
+ * TODO properly handle intervals. Imho we need some interval tree, that will split intervals when intersecting with another and keep list of contentTypes of overlapping intervals so we can merge them in the right order.
  * TODO consider using it for USER_INPUT, as was in IJ 2016, whatever makes the code cleaner and less buggy
  * TODO #rehighlightHyperlinksAndFoldings by HighlightingInputFilter must use it
  * TODO keep SYSTEM_ERR,SYSTEM_OUT... when clearing? perhaps make another list just for backing content types?
- * TODO perhaps use it also for async Filters (might not be needed if GrepConsole will use only HighlightingInputFilter),
  */
 class ConsoleHighlighter extends DocumentAdapter implements EditorHighlighter {
   private static final Logger LOG = Logger.getInstance("#com.intellij.execution.impl.ConsoleHighlighter");
