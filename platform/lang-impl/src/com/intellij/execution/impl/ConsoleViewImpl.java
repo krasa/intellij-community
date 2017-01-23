@@ -43,6 +43,8 @@ import com.intellij.openapi.editor.*;
 import com.intellij.openapi.editor.actionSystem.*;
 import com.intellij.openapi.editor.actions.ScrollToTheEndToolbarAction;
 import com.intellij.openapi.editor.actions.ToggleUseSoftWrapsToolbarAction;
+import com.intellij.openapi.editor.event.DocumentAdapter;
+import com.intellij.openapi.editor.event.DocumentEvent;
 import com.intellij.openapi.editor.event.EditorMouseEvent;
 import com.intellij.openapi.editor.ex.DocumentEx;
 import com.intellij.openapi.editor.ex.EditorEx;
@@ -103,6 +105,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
   private static boolean ourTypedHandlerInitialized;
   private final Alarm myFlushUserInputAlarm = new Alarm(Alarm.ThreadToUse.POOLED_THREAD, this);
   private static final CharMatcher NEW_LINE_MATCHER = CharMatcher.anyOf("\n\r");
+  private ConsoleHighlighter myFastHighlighter;
 
   private static synchronized void initTypedHandler() {
     if (ourTypedHandlerInitialized) return;
@@ -226,7 +229,8 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
 
     myTextInputFilter = computeTextInputFilters(project, searchScope);
     myHighlightingInputFilter = computeHighlightingInputFilter(project, searchScope);
-
+    myFastHighlighter = createHighlighter();
+         
 
     project.getMessageBus().connect(this).subscribe(DumbService.DUMB_MODE, new DumbService.DumbModeListener() {
       private long myLastStamp;
@@ -724,6 +728,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
           // remove last line if any
           if (document.getLineCount() != 0) {
             int lineStartOffset = document.getLineStartOffset(document.getLineCount() - 1);
+            myFastHighlighter.updateTokensOnTextRemoval(document.getTextLength(), document.getTextLength() + 1);
             document.deleteString(lineStartOffset, document.getTextLength());
           }
         }
@@ -731,6 +736,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
         // add token information as range markers
         // start from the end because portion of the text can be stripped from the document beginning because of a cycle buffer
         int offset = document.getTextLength();
+        List<Pair<Integer, TokenBuffer.TokenInfo>> addedTokens = new ArrayList<>(deferredTokens.size());
         for (int i = deferredTokens.size() - 1; i >= startIndex; i--) {
           TokenBuffer.TokenInfo token = deferredTokens.get(i);
           contentTypes.add(token.contentType);
@@ -741,9 +747,10 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
           if (info != null) {
             myHyperlinks.createHyperlink(start, offset, null, info).putUserData(MANUAL_HYPERLINK, true);
           }
-          createHighlighters(token, start, offset);
+          addedTokens.add(new Pair<>(start, token));
           offset = start;
         }
+        createHighlighters(addedTokens); 
       }
       finally {
         if (!shouldStickToEnd) {
@@ -768,59 +775,36 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     sendUserInput(addedText);
   }
 
+  private void createHighlighters(List<Pair<Integer, TokenBuffer.TokenInfo>> highlighters) {
+    Collections.reverse(highlighters);
+    for (Pair<Integer, TokenBuffer.TokenInfo> highlighter : highlighters) {
+      Integer start = highlighter.first;
+      TokenBuffer.TokenInfo tokenInfo = highlighter.second;
+      createHighlighters(tokenInfo, start, start + tokenInfo.length());
+    }
+  }
+
   private void createHighlighters(@NotNull TokenBuffer.TokenInfo tokenInfo,
                                   int startOffset,
                                   int endOffset) {
     ApplicationManager.getApplication().assertIsDispatchThread();
 
-    MarkupModel model = DocumentMarkupModel.forDocument(myEditor.getDocument(), getProject(), true);
-
-    createFilterHighlighters(tokenInfo, startOffset, endOffset, model);
 
     ConsoleViewContentType contentType = tokenInfo.contentType;
-    //TODO  HighlighterLayer.CONSOLE_FILTER ??? 
-    RangeHighlighter tokenMarker = model.addRangeHighlighter(startOffset, endOffset, HighlighterLayer.CONSOLE_FILTER,
-                                                             contentType.getAttributes(), HighlighterTargetArea.EXACT_RANGE);
-    tokenMarker.putUserData(CONTENT_TYPE, contentType);
+    if (contentType == ConsoleViewContentType.USER_INPUT) {
+      MarkupModel model = DocumentMarkupModel.forDocument(myEditor.getDocument(), getProject(), true);
+      RangeHighlighter tokenMarker = model.addRangeHighlighter(startOffset, endOffset, HighlighterLayer.CONSOLE_FILTER,
+                                                               contentType.getAttributes(), HighlighterTargetArea.EXACT_RANGE);
+      tokenMarker.putUserData(CONTENT_TYPE, contentType);
+    }
+    myFastHighlighter.addToken(startOffset, endOffset, tokenInfo);
   }
 
-  private void createFilterHighlighters(@NotNull TokenBuffer.TokenInfo tokenInfo, int startOffset, int endOffset, MarkupModel model) {
-    int length = tokenInfo.length();
-    int tokenOffset = tokenInfo.myHighlightersRangeOffset;
-    if (tokenInfo.highlighters != null) {
-      List<Pair<IntRange, ConsoleViewContentType>> highlighters = tokenInfo.highlighters;
-      //noinspection ForLoopReplaceableByForEach
-      for (int i = 0; i < highlighters.size(); i++) {
-        Pair<IntRange, ConsoleViewContentType> pair = highlighters.get(i);
-        if (pair == null || pair.getFirst() == null || pair.second == null) {
-          continue;
-        }
-        IntRange range = pair.getFirst();
-        ConsoleViewContentType contentType = pair.getSecond();
-        TextAttributes attributes = contentType.getAttributes();
-
-        //adjusted to the actual token content
-        int adjustedStart = Math.max(range.getStart() - tokenOffset, 0);
-        int adjustedEnd = Math.max(range.getEndInclusive() - tokenOffset, 0);
-        adjustedStart = Math.min(adjustedStart, length);
-        adjustedEnd = Math.min(adjustedEnd, length);
-        if (adjustedStart == adjustedEnd) {
-          //text for which the range was created was cut out, or the range was not valid
-          continue;
-        }
-
-        //adjusted by document offset
-        int adjustedStartOffset = Math.min(adjustedStart + startOffset, endOffset);
-        int adjustedEndOffset = Math.min(adjustedEnd + startOffset, endOffset);
-        if (adjustedStartOffset == adjustedEndOffset) {
-          //this should never happen, but just to be sure
-          continue;
-        }
-
-        //TODO why are here 2  MarkupModels ? Is one for filters, and another for  contentType? But then wouldn't it be better to add MANUAL_HYPERLINKs to the other one?
-        myHyperlinks.addHighlighter(adjustedStartOffset, adjustedEndOffset, attributes);
-        //RangeHighlighter tokenMarker = model.addRangeHighlighter(adjustedStartOffset, adjustedEndOffset, HighlighterLayer.CONSOLE_FILTER,
-        //                                                         attributes, HighlighterTargetArea.EXACT_RANGE);
+  private void onDocumentChanged(@NotNull DocumentEvent event) {
+    if (event.getNewLength() == 0) {
+      // string has been removed, adjust token ranges
+      synchronized (LOCK) {
+        myFastHighlighter.updateTokensOnTextRemoval(event.getOffset(), event.getOffset() + event.getOldLength());
       }
     }
   }
@@ -836,6 +820,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     final DocumentEx document = myEditor.getDocument();
     synchronized (LOCK) {
       clearHyperlinkAndFoldings();
+      myFastHighlighter.clear();
     }
     final int documentTextLength = document.getTextLength();
     if (documentTextLength > 0) {
@@ -940,13 +925,20 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
         }
       });
 
+      editor.getDocument().addDocumentListener(new DocumentAdapter() {
+        @Override
+        public void documentChanged(DocumentEvent event) {
+          onDocumentChanged(event);
+        }
+      }, this);
       int bufferSize = ConsoleBuffer.useCycleBuffer() ? ConsoleBuffer.getCycleBufferSize() : 0;
       editor.getDocument().setCyclicBufferSize(bufferSize);
 
       editor.putUserData(CONSOLE_VIEW_IN_EDITOR_VIEW, this);
 
       editor.getSettings().setAllowSingleLogicalLineFolding(true); // We want to fold long soft-wrapped command lines
-
+      editor.setHighlighter(myFastHighlighter);
+                 
       return editor;
     });
   }
@@ -954,6 +946,10 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
   @NotNull
   protected EditorEx doCreateConsoleEditor() {
     return ConsoleViewUtil.setupConsoleEditor(myProject, true, false);
+  }
+
+  protected ConsoleHighlighter createHighlighter() {
+    return new ConsoleHighlighter();
   }
 
   private void registerConsoleEditorActions() {
