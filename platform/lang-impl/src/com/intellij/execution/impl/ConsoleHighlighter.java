@@ -15,6 +15,7 @@
  */
 package com.intellij.execution.impl;
 
+import com.intellij.execution.filters.HighlightingInputFilter;
 import com.intellij.execution.ui.ConsoleViewContentType;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.editor.Document;
@@ -24,9 +25,7 @@ import com.intellij.openapi.editor.highlighter.EditorHighlighter;
 import com.intellij.openapi.editor.highlighter.HighlighterClient;
 import com.intellij.openapi.editor.highlighter.HighlighterIterator;
 import com.intellij.openapi.editor.markup.TextAttributes;
-import com.intellij.openapi.util.Pair;
 import com.intellij.psi.tree.IElementType;
-import kotlin.ranges.IntRange;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -109,20 +108,18 @@ class ConsoleHighlighter extends DocumentAdapter implements EditorHighlighter {
     int length = tokenInfo.length();
     int tokenOffset = tokenInfo.myHighlightersRangeOffset;
     if (tokenInfo.highlighters != null) {
-      List<Pair<IntRange, ConsoleViewContentType>> highlighters = tokenInfo.highlighters;
+      List<HighlightingInputFilter.ResultItem> highlighters = tokenInfo.highlighters;
       //noinspection ForLoopReplaceableByForEach
       newTokens = new ArrayList<>(highlighters.size());
       for (int i = 0; i < highlighters.size(); i++) {
-        Pair<IntRange, ConsoleViewContentType> pair = highlighters.get(i);
-        if (pair == null || pair.getFirst() == null || pair.second == null) {
+        HighlightingInputFilter.ResultItem item = highlighters.get(i);
+        if (item == null) {
           continue;
         }
-        IntRange range = pair.getFirst();
-        ConsoleViewContentType contentType = pair.getSecond();
 
         //adjusted to the actual token content
-        int adjustedStart = Math.max(range.getStart() - tokenOffset, 0);
-        int adjustedEnd = Math.max(range.getEndInclusive() - tokenOffset, 0);
+        int adjustedStart = Math.max(item.getStartOffset() - tokenOffset, 0);
+        int adjustedEnd = Math.max(item.getEndOffset() - tokenOffset, 0);
         adjustedStart = Math.min(adjustedStart, length);
         adjustedEnd = Math.min(adjustedEnd, length);
         if (adjustedStart == adjustedEnd) {
@@ -139,7 +136,7 @@ class ConsoleHighlighter extends DocumentAdapter implements EditorHighlighter {
           continue;
         }
         //addToken(adjustedStartOffset, adjustedEndOffset, contentType);
-        newTokens.add(new PushedTokenInfo(contentType, adjustedStartOffset, adjustedEndOffset));
+        newTokens.add(new PushedTokenInfo(item.getContentType(), adjustedStartOffset, adjustedEndOffset));
       }
     }
     return newTokens;

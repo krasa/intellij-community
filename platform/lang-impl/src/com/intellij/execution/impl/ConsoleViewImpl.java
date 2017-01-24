@@ -74,7 +74,6 @@ import com.intellij.util.text.CharArrayUtil;
 import com.intellij.util.ui.UIUtil;
 import gnu.trove.THashSet;
 import gnu.trove.TIntObjectHashMap;
-import kotlin.ranges.IntRange;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -587,17 +586,20 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
       return;
     }
 
-    List<Pair<IntRange, ConsoleViewContentType>> pairs = null;
+    List<HighlightingInputFilter.ResultItem> highlighters = null;
     if (myHighlightingInputFilter != null) {
-      pairs = myHighlightingInputFilter.applyFilter(text, contentType);
+      HighlightingInputFilter.Result result = myHighlightingInputFilter.applyFilter(text, contentType);
+      if (result != null) {
+        highlighters = result.getResultItems();
+      }
     }
 
-    print(text, contentType, pairs, null);
+    print(text, contentType, highlighters, null);
   }
 
   private void print(@NotNull String text,
                      @NotNull ConsoleViewContentType contentType,
-                     @Nullable List<Pair<IntRange, ConsoleViewContentType>> highlighters,
+                     @Nullable List<HighlightingInputFilter.ResultItem> highlighters,
                      @Nullable HyperlinkInfo info) {
     //make sure to #convertLineSeparators before calling this
 
@@ -1704,16 +1706,13 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     public Result applyFilter(String line, int entireLength) {
       int offset = entireLength - line.length();
       //why bother sending the content type?
-      List<Pair<IntRange, ConsoleViewContentType>> pairs = myFilter.applyFilter(line, null);
-      if (pairs != null) {
-        List<ResultItem> items = new ArrayList<>(pairs.size());
-        for (Pair<IntRange, ConsoleViewContentType> pair : pairs) {
-          if (pair != null) {
-            IntRange range = pair.first;
-            TextAttributes attributes = pair.second.getAttributes();
-            if (range != null && attributes != null) {
-              items.add(new ResultItem(range.getStart() + offset, range.getEndInclusive() + offset, null, attributes));
-            }
+      HighlightingInputFilter.Result result = myFilter.applyFilter(line, null);
+      if (result != null) {
+        List<ResultItem> items = new ArrayList<>(result.getResultItems().size());
+        for (HighlightingInputFilter.ResultItem item : result.getResultItems()) {
+          if (item != null) {
+            TextAttributes attributes = item.getContentType().getAttributes();
+            items.add(new ResultItem(item.getStartOffset() + offset, item.getEndOffset() + offset, null, attributes));
           }
         }
         return new Result(items);

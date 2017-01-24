@@ -22,7 +22,6 @@ import com.intellij.openapi.project.DumbService;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.Pair;
 import com.intellij.util.containers.ContainerUtilRt;
-import kotlin.ranges.IntRange;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -41,20 +40,23 @@ public class CompositeHighlightingInputFilter implements HighlightingInputFilter
 
   @Override
   @Nullable
-  public List<Pair<IntRange, ConsoleViewContentType>> applyFilter(@NotNull final String text,
-                                                                  @Nullable final ConsoleViewContentType contentType) {
+  public Result applyFilter(@NotNull final String text,
+                            @Nullable final ConsoleViewContentType contentType) {
     boolean dumb = myDumbService.isDumb();
-    List<Pair<IntRange, ConsoleViewContentType>> mergedResult = null;
+    Result mergedResult = null;
+    List<ResultItem> items = null;
+    
     for (Pair<HighlightingInputFilter, Boolean> pair : myFilters) {
       if (!dumb || pair.second == Boolean.TRUE) {
         long t0 = System.currentTimeMillis();
         HighlightingInputFilter filter = pair.first;
-        List<Pair<IntRange, ConsoleViewContentType>> result = filter.applyFilter(text, contentType);
+        Result result = filter.applyFilter(text, contentType);
         if (result != null) {
           if (mergedResult == null) {
-            mergedResult = new ArrayList<>();
+            items = new ArrayList<>();
+            mergedResult = new Result(items);
           }
-          mergedResult.addAll(result);
+          items.addAll(result.getResultItems());
         }
         t0 = System.currentTimeMillis() - t0;
         if (t0 > 100) {
@@ -80,7 +82,7 @@ public class CompositeHighlightingInputFilter implements HighlightingInputFilter
 
     @Nullable
     @Override
-    public List<Pair<IntRange, ConsoleViewContentType>> applyFilter(@NotNull String text, @Nullable ConsoleViewContentType contentType) {
+    public Result applyFilter(@NotNull String text, @Nullable ConsoleViewContentType contentType) {
       if (!isBroken) {
         try {
           return myFilter.applyFilter(text, contentType);

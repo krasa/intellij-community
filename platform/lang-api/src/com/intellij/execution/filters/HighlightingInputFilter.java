@@ -16,8 +16,6 @@
 package com.intellij.execution.filters;
 
 import com.intellij.execution.ui.ConsoleViewContentType;
-import com.intellij.openapi.util.Pair;
-import kotlin.ranges.IntRange;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -28,5 +26,45 @@ public interface HighlightingInputFilter {
    * the contentType may be null in case of rehighlighting of the console on the background
    */
   @Nullable
-  List<Pair<IntRange, ConsoleViewContentType>> applyFilter(@NotNull final String text, @Nullable final ConsoleViewContentType contentType);
+  Result applyFilter(@NotNull final String text, @Nullable final ConsoleViewContentType contentType);
+
+
+  class Result {
+    private final List<ResultItem> myResultItems;
+
+    public Result(@NotNull List<ResultItem> resultItems) {
+      myResultItems = resultItems;
+    }
+
+    @NotNull
+    public List<ResultItem> getResultItems() {
+      return myResultItems;
+    }
+  }
+
+  class ResultItem {
+
+    private final int myStartOffset;
+    private final int myEndOffset;
+    private final ConsoleViewContentType myContentType;
+
+    public ResultItem(int startOffset, int endOffset, @NotNull ConsoleViewContentType contentType) {
+      this.myStartOffset = startOffset;
+      this.myEndOffset = endOffset;
+      myContentType = contentType;
+    }
+
+    public int getStartOffset() {
+      return myStartOffset;
+    }
+
+    public int getEndOffset() {
+      return myEndOffset;
+    }
+
+    public ConsoleViewContentType getContentType() {
+      return myContentType;
+    }
+  }
+      
 }

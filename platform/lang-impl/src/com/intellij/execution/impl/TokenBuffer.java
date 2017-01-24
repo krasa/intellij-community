@@ -15,13 +15,12 @@
  */
 package com.intellij.execution.impl;
 
+import com.intellij.execution.filters.HighlightingInputFilter;
 import com.intellij.execution.filters.HyperlinkInfo;
 import com.intellij.execution.ui.ConsoleViewContentType;
-import com.intellij.openapi.util.Pair;
 import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.containers.Queue;
-import kotlin.ranges.IntRange;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -51,7 +50,7 @@ class TokenBuffer {
 
   void print(@NotNull String text,
              @NotNull ConsoleViewContentType contentType,
-             @Nullable List<Pair<IntRange, ConsoleViewContentType>> highlighters,
+             @Nullable List<HighlightingInputFilter.ResultItem> highlighters,
              @Nullable HyperlinkInfo info) {
     int start = 0;
     while (start < text.length()) {
@@ -198,7 +197,7 @@ class TokenBuffer {
     @NotNull
     final ConsoleViewContentType contentType;
     @Nullable
-    final List<Pair<IntRange, ConsoleViewContentType>> highlighters;
+    final List<HighlightingInputFilter.ResultItem> highlighters;
     final int myHighlightersRangeOffset;
     private final String text;
     private final HyperlinkInfo myHyperlinkInfo;
@@ -214,7 +213,7 @@ class TokenBuffer {
     }
 
     TokenInfo(@NotNull ConsoleViewContentType contentType,
-              @Nullable List<Pair<IntRange, ConsoleViewContentType>> highlighters,
+              @Nullable List<HighlightingInputFilter.ResultItem> highlighters,
               @NotNull String text,
               @Nullable HyperlinkInfo hyperlinkInfo,
               int contentTypesRangeOffset) {
