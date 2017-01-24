@@ -27,8 +27,11 @@ import com.intellij.openapi.editor.highlighter.HighlighterIterator;
 import com.intellij.openapi.editor.markup.TextAttributes;
 import com.intellij.psi.tree.IElementType;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -41,6 +44,7 @@ import java.util.List;
  * TODO #rehighlightHyperlinksAndFoldings by HighlightingInputFilter should use it - HighlightingInputFilterAdapter puts them into MarkupModel
  * TODO keep SYSTEM_ERR,SYSTEM_OUT... when clearing? perhaps make another list just for backing content types?
  */
+@SuppressWarnings("ForLoopReplaceableByForEach")
 class ConsoleHighlighter extends DocumentAdapter implements EditorHighlighter {
   private static final Logger LOG = Logger.getInstance("#com.intellij.execution.impl.ConsoleHighlighter");
 
@@ -48,99 +52,112 @@ class ConsoleHighlighter extends DocumentAdapter implements EditorHighlighter {
    * Holds information about lexical division by offsets of the text already pushed to document.
    * <p/>
    * Target offsets are anchored to the document here.
+   *
+   * assumed that tokens are ordered by offset in ascending order.
    */
   private final List<PushedTokenInfo> myTokens = new ArrayList<>();
   private HighlighterClient myEditor;
 
 
-  /**
-   * assumed that tokens are ordered by offset in ascending order.
-   */
   public void addToken(int startOffset, int endOffset, final TokenBuffer.TokenInfo tokenInfo) {
     ConsoleViewContentType contentType = tokenInfo.contentType;
 
-    int lastEnd = startOffset;
-    if (!myTokens.isEmpty()) {
-      PushedTokenInfo lastToken = myTokens.get(myTokens.size() - 1);
-      lastEnd = lastToken.endOffset;
-    }
+    List<OrderedItem> items = adjustAndSort(tokenInfo);
+    List<PushedTokenInfo> pushedTokens = transform(contentType, items, endOffset - startOffset);
 
-    //THIS IS ALL WRONG - must merge+split overlapping ones
-    List<PushedTokenInfo> highlighters = createInputFilterHighlighters(tokenInfo, startOffset, endOffset);
-    if (highlighters != null) {
-      //noinspection ForLoopReplaceableByForEach
-      for (int i = 0; i < highlighters.size(); i++) {
-        PushedTokenInfo highlighter = highlighters.get(i);
-        if (enlargeLastToken(highlighter.startOffset, highlighter.endOffset, highlighter.myContentType)) {
-          lastEnd = highlighter.endOffset;
-          continue;
-        }
+    for (int i = 0; i < pushedTokens.size(); i++) {
+      PushedTokenInfo newToken = pushedTokens.get(i);
 
-        if (lastEnd < highlighter.startOffset) {
-          myTokens.add(new PushedTokenInfo(contentType, lastEnd, highlighter.startOffset));
-          lastEnd = highlighter.startOffset;
-        }
+      //adjusted by document offset
+      int adjustedStartOffset = Math.min(newToken.startOffset + startOffset, endOffset);
+      int adjustedEndOffset = Math.min(newToken.endOffset + startOffset, endOffset);
 
-        myTokens.add(new PushedTokenInfo(highlighter.myContentType, lastEnd, highlighter.endOffset));
-        lastEnd = highlighter.endOffset;
+      newToken.startOffset = adjustedStartOffset;
+      newToken.endOffset = adjustedEndOffset;
+
+      if (!enlargeLastToken(newToken)) {
+        myTokens.add(newToken);
       }
-    }
-
-    if (!enlargeLastToken(lastEnd, endOffset, contentType)) {
-      myTokens.add(new PushedTokenInfo(contentType, lastEnd, endOffset));
     }
   }
 
-  private boolean enlargeLastToken(int startOffset, int endOffset, ConsoleViewContentType contentType) {
+  private boolean enlargeLastToken(PushedTokenInfo newToken) {
     if (!myTokens.isEmpty()) {
       final PushedTokenInfo lastPushedToken = myTokens.get(myTokens.size() - 1);
-      if (lastPushedToken.myContentType == contentType
-          && lastPushedToken.endOffset == startOffset) {
-        lastPushedToken.endOffset = endOffset; // optimization}
+      if (lastPushedToken.myContentType == newToken.myContentType
+          && lastPushedToken.endOffset == newToken.startOffset) {
+        lastPushedToken.endOffset = newToken.endOffset; // optimization}
         return true;
       }
     }
     return false;
   }
 
-  private List<PushedTokenInfo> createInputFilterHighlighters(@NotNull TokenBuffer.TokenInfo tokenInfo, int startOffset, int endOffset) {
-    List<PushedTokenInfo> newTokens = null;
-    int length = tokenInfo.length();
-    int tokenOffset = tokenInfo.myHighlightersRangeOffset;
-    if (tokenInfo.highlighters != null) {
-      List<HighlightingInputFilter.ResultItem> highlighters = tokenInfo.highlighters;
-      //noinspection ForLoopReplaceableByForEach
-      newTokens = new ArrayList<>(highlighters.size());
-      for (int i = 0; i < highlighters.size(); i++) {
-        HighlightingInputFilter.ResultItem item = highlighters.get(i);
-        if (item == null) {
+  private List<PushedTokenInfo> transform(ConsoleViewContentType contentType,
+                                          List<OrderedItem> items, int length) {
+    List<PushedTokenInfo> pushedTokenInfos = new ArrayList<>(items == null ? 1 : items.size());
+    int lastIndex = 0;
+    if (items != null) {
+      for (int i = 0; i < items.size(); i++) {
+        OrderedItem item = items.get(i);
+        int start = Math.max(item.getStartOffset(), lastIndex);
+        int end = item.getEndOffset();
+
+        if (start > end) {
           continue;
         }
 
-        //adjusted to the actual token content
+        if (start > lastIndex) {
+          pushedTokenInfos.add(new PushedTokenInfo(contentType, lastIndex, start));
+        }
+
+        for (int j = i + 1; j < items.size(); j++) {
+          OrderedItem next = items.get(j);
+          if (next.getStartOffset() <= end) {
+            if (next.getOrder() < item.getOrder()) {
+              end = next.getStartOffset();
+            }
+          }
+          else {
+            break;
+          }
+        }
+
+        pushedTokenInfos.add(new PushedTokenInfo(item.getContentType(), start, end));
+        lastIndex = end;
+      }
+    }
+    if (lastIndex < length) {
+      pushedTokenInfos.add(new PushedTokenInfo(contentType, lastIndex, length));
+    }
+    return pushedTokenInfos;
+  }
+
+  @Nullable
+  private List<OrderedItem> adjustAndSort(TokenBuffer.TokenInfo tokenInfo) {
+    List<OrderedItem> items = null;
+    List<HighlightingInputFilter.ResultItem> highlighters = tokenInfo.highlighters;
+    int i = 0;
+    if (highlighters != null) {
+      items = new ArrayList<>(highlighters.size());
+      int tokenOffset = tokenInfo.myHighlightersRangeOffset;
+      int length = tokenInfo.length();
+
+      for (int i1 = 0; i1 < highlighters.size(); i1++) {
+        HighlightingInputFilter.ResultItem item = highlighters.get(i1);
+
         int adjustedStart = Math.max(item.getStartOffset() - tokenOffset, 0);
         int adjustedEnd = Math.max(item.getEndOffset() - tokenOffset, 0);
         adjustedStart = Math.min(adjustedStart, length);
         adjustedEnd = Math.min(adjustedEnd, length);
-        if (adjustedStart == adjustedEnd) {
-          //text for which the range was created was cut out, or the range was not valid
-          continue;
-        }
 
-        //adjusted by document offset
-        int adjustedStartOffset = Math.min(adjustedStart + startOffset, endOffset);
-        int adjustedEndOffset = Math.min(adjustedEnd + startOffset, endOffset);
-
-        if (adjustedStartOffset == adjustedEndOffset) {
-          //this should never happen, but just to be sure
-          continue;
-        }
-        //addToken(adjustedStartOffset, adjustedEndOffset, contentType);
-        newTokens.add(new PushedTokenInfo(item.getContentType(), adjustedStartOffset, adjustedEndOffset));
+        items.add(new OrderedItem(adjustedStart, adjustedEnd, item.getContentType(), i++));
       }
+      Collections.sort(items, OrderedItem.MY_COMPARATOR);
     }
-    return newTokens;
+    return items;
   }
+
 
   public void clear() {
     myTokens.clear();
@@ -176,6 +193,27 @@ class ConsoleHighlighter extends DocumentAdapter implements EditorHighlighter {
     }
   }
 
+  static class OrderedItem extends HighlightingInputFilter.ResultItem {
+    private static final OrderedItemComparator MY_COMPARATOR = new OrderedItemComparator();
+
+    int myOrder;
+
+    public OrderedItem(int offset, int offset1, ConsoleViewContentType type, int order) {
+      super(offset, offset1, type);
+      this.myOrder = order;
+    }
+
+    public int getOrder() {
+      return myOrder;
+    }
+
+    @Override
+    public String toString() {
+      return "OrderedItem{" +
+             "myOrder=" + myOrder +
+             "} " + super.toString();
+    }
+  }
 
   /**
    * Utility method that allows to adjust ranges of the given tokens within the text removal.
@@ -344,6 +382,16 @@ class ConsoleHighlighter extends DocumentAdapter implements EditorHighlighter {
 
   @Override
   public void setColorScheme(@NotNull EditorColorsScheme scheme) {
+  }
+
+  private static class OrderedItemComparator implements Comparator<OrderedItem> {
+    @Override
+    public int compare(OrderedItem o1, OrderedItem o2) {
+      if (o1.getStartOffset() == o2.getStartOffset()) {
+        return o1.getOrder() - o2.getOrder();
+      }
+      return o1.getStartOffset() - o2.getStartOffset();
+    }
   }
 }
 

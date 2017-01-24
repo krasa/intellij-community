@@ -41,6 +41,13 @@ public interface HighlightingInputFilter {
     public List<ResultItem> getResultItems() {
       return myResultItems;
     }
+
+    @Override
+    public String toString() {
+      return "Result{" +
+             "myResultItems=" + myResultItems +
+             '}';
+    }
   }
 
   class ResultItem {
@@ -67,6 +74,15 @@ public interface HighlightingInputFilter {
     @NotNull
     public ConsoleViewContentType getContentType() {
       return myContentType;
+    }
+
+    @Override
+    public String toString() {
+      return "ResultItem{" +
+             "myStartOffset=" + myStartOffset +
+             ", myEndOffset=" + myEndOffset +
+             ", myContentType=" + myContentType +
+             '}';
     }
   }
       
