@@ -30,6 +30,7 @@ public interface HighlightingInputFilter {
 
 
   class Result {
+    @NotNull
     private final List<ResultItem> myResultItems;
 
     public Result(@NotNull List<ResultItem> resultItems) {
@@ -46,6 +47,7 @@ public interface HighlightingInputFilter {
 
     private final int myStartOffset;
     private final int myEndOffset;
+    @NotNull
     private final ConsoleViewContentType myContentType;
 
     public ResultItem(int startOffset, int endOffset, @NotNull ConsoleViewContentType contentType) {
@@ -62,6 +64,7 @@ public interface HighlightingInputFilter {
       return myEndOffset;
     }
 
+    @NotNull
     public ConsoleViewContentType getContentType() {
       return myContentType;
     }
