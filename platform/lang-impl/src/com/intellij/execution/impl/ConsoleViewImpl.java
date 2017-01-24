@@ -1010,6 +1010,9 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     int endLine = myEditor.getDocument().getLineCount() - 1;
 
     if (runHighlightingInputFilters && myHighlightingInputFilter != null) {
+      synchronized (LOCK) { //do i need lock?
+        myFastHighlighter.clear();
+      }
       myHyperlinks.highlightHyperlinks(new HighlightingInputFilterAdapter(myHighlightingInputFilter), startLine, endLine);
     }
     

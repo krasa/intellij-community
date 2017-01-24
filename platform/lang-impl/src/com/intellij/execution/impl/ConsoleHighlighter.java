@@ -39,7 +39,7 @@ import java.util.List;
  * <p>
  * TODO properly handle intervals. Imho we need some interval tree, that will split intervals when intersecting with another and keep list of contentTypes of overlapping intervals so we can merge them in the right order.
  * TODO consider using it for USER_INPUT, as was in IJ 2016, whatever makes the code cleaner and less buggy
- * TODO #rehighlightHyperlinksAndFoldings by HighlightingInputFilter must use it
+ * TODO #rehighlightHyperlinksAndFoldings by HighlightingInputFilter should use it - HighlightingInputFilterAdapter puts them into MarkupModel
  * TODO keep SYSTEM_ERR,SYSTEM_OUT... when clearing? perhaps make another list just for backing content types?
  */
 class ConsoleHighlighter extends DocumentAdapter implements EditorHighlighter {
