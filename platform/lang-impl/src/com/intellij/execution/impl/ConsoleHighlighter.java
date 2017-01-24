@@ -60,13 +60,14 @@ class ConsoleHighlighter extends DocumentAdapter implements EditorHighlighter {
   public void addToken(int startOffset, int endOffset, final TokenBuffer.TokenInfo tokenInfo) {
     ConsoleViewContentType contentType = tokenInfo.contentType;
 
-    List<PushedTokenInfo> highlighters = createInputFilterHighlighters(tokenInfo, startOffset, endOffset);
     int lastEnd = startOffset;
     if (!myTokens.isEmpty()) {
       PushedTokenInfo lastToken = myTokens.get(myTokens.size() - 1);
       lastEnd = lastToken.endOffset;
     }
 
+    //THIS IS ALL WRONG - must merge+split overlapping ones
+    List<PushedTokenInfo> highlighters = createInputFilterHighlighters(tokenInfo, startOffset, endOffset);
     if (highlighters != null) {
       //noinspection ForLoopReplaceableByForEach
       for (int i = 0; i < highlighters.size(); i++) {
