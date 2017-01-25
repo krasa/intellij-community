@@ -26,26 +26,23 @@ import com.intellij.openapi.editor.highlighter.HighlighterClient;
 import com.intellij.openapi.editor.highlighter.HighlighterIterator;
 import com.intellij.openapi.editor.markup.TextAttributes;
 import com.intellij.psi.tree.IElementType;
+import com.intellij.util.containers.HashSet;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 
 /**
  * MarkupModel is too expensive, it is probably never going to be fast enough for the console, use this for highlighting from HighlightingInputFilter and content type on input. 
  * Asynchronous Filters do not need to use this, it would be too complex, and unnecessary as number of their highlights will be always low (if GrepConsole will use HighlightingInputFilter.
  * - some of it is copy paste from IJ 2016...
  * <p>
- * TODO properly handle intervals. Imho we need some interval tree, that will split intervals when intersecting with another and keep list of contentTypes of overlapping intervals so we can merge them in the right order.
  * TODO consider using it for USER_INPUT, as was in IJ 2016, whatever makes the code cleaner and less buggy
  * TODO #rehighlightHyperlinksAndFoldings by HighlightingInputFilter should use it - HighlightingInputFilterAdapter puts them into MarkupModel
  * TODO keep SYSTEM_ERR,SYSTEM_OUT... when clearing? perhaps make another list just for backing content types?
  */
 @SuppressWarnings("ForLoopReplaceableByForEach")
-class ConsoleHighlighter extends DocumentAdapter implements EditorHighlighter {
+public class ConsoleHighlighter extends DocumentAdapter implements EditorHighlighter {
   private static final Logger LOG = Logger.getInstance("#com.intellij.execution.impl.ConsoleHighlighter");
 
   /**
@@ -63,7 +60,8 @@ class ConsoleHighlighter extends DocumentAdapter implements EditorHighlighter {
     ConsoleViewContentType contentType = tokenInfo.contentType;
 
     List<OrderedToken> items = adjustAndSort(tokenInfo);
-    List<PushedTokenInfo> pushedTokens = transform(contentType, items, endOffset - startOffset);
+    //List<PushedTokenInfo> pushedTokens = transform_naive(contentType, items, endOffset - startOffset);
+    List<PushedTokenInfo> pushedTokens = transform_withMergingOfTextAttributes(contentType, items, endOffset - startOffset);
 
     for (int i = 0; i < pushedTokens.size(); i++) {
       PushedTokenInfo newToken = pushedTokens.get(i);
@@ -84,7 +82,9 @@ class ConsoleHighlighter extends DocumentAdapter implements EditorHighlighter {
   private boolean mergeWithLastToken(PushedTokenInfo newToken) {
     if (!myTokens.isEmpty()) {
       final PushedTokenInfo lastPushedToken = myTokens.get(myTokens.size() - 1);
-      if (lastPushedToken.myContentType == newToken.myContentType && lastPushedToken.endOffset == newToken.startOffset) {
+      if (lastPushedToken.contentType == newToken.contentType
+          && lastPushedToken.mergedAttributes == newToken.mergedAttributes
+          && lastPushedToken.endOffset == newToken.startOffset) {
         lastPushedToken.endOffset = newToken.endOffset; // optimization}
         return true;
       }
@@ -92,30 +92,34 @@ class ConsoleHighlighter extends DocumentAdapter implements EditorHighlighter {
     return false;
   }
 
-  private List<PushedTokenInfo> transform(ConsoleViewContentType contentType,
-                                          List<OrderedToken> items, int length) {
+  /**
+   * it is a little bit broken, see tests
+   */
+  @Deprecated
+  protected List<PushedTokenInfo> transform_naive(ConsoleViewContentType contentType,
+                                                  List<OrderedToken> items, int length) {
     List<PushedTokenInfo> pushedTokenInfos = new ArrayList<>(items == null ? 1 : items.size());
     int lastIndex = 0;
     if (items != null) {
       for (int i = 0; i < items.size(); i++) {
-        OrderedToken item = items.get(i);
-        int start = Math.max(item.getStartOffset(), lastIndex);
-        int end = item.getEndOffset();
+        OrderedToken current = items.get(i);
+        int start = Math.max(current.getStartOffset(), lastIndex);
+        int end = current.getEndOffset();
 
         if (start > end) {  //invalid token, or smaller than already pushed one which had higher priority
-          continue;      
+          continue;
         }
 
         if (start > lastIndex) { //use original content type for not highlighted text 
-          pushedTokenInfos.add(new PushedTokenInfo(contentType, lastIndex, start)); 
+          pushedTokenInfos.add(new PushedTokenInfo(contentType, lastIndex, start));
         }
 
         //   look for overlapping range with higher priority
         for (int j = i + 1; j < items.size(); j++) {
           OrderedToken next = items.get(j);
           if (end > next.getStartOffset()) { //some other token overlaps the current one 
-            if (item.getOrder() > next.getOrder()) { //with higher priority
-              end = next.getStartOffset(); //cut the current token
+            if (current.getOrder() > next.getOrder()) { //with higher priority
+              end = next.getStartOffset(); //reduce the range of the current token
             }
           }
           else {   //no other token overlaps, since it is sorted by startOffset
@@ -127,7 +131,7 @@ class ConsoleHighlighter extends DocumentAdapter implements EditorHighlighter {
           continue;
         }
 
-        pushedTokenInfos.add(new PushedTokenInfo(item.getContentType(), start, end));
+        pushedTokenInfos.add(new PushedTokenInfo(current.getContentType(), start, end));
         lastIndex = end;
       }
     }
@@ -137,8 +141,107 @@ class ConsoleHighlighter extends DocumentAdapter implements EditorHighlighter {
     return pushedTokenInfos;
   }
 
+  /**
+   * TODO better comments
+   */
+  protected List<PushedTokenInfo> transform_withMergingOfTextAttributes(ConsoleViewContentType contentType,
+                                                                        List<OrderedToken> items, int length) {
+    List<PushedTokenInfo> pushedTokenInfos = new ArrayList<>(items == null ? 1 : items.size());
+    int lastEnd = 0;
+    if (items != null) {
+      Set<OrderedToken> previousOverlappingTokens = new HashSet<>();
+
+      for (int i = 0; i < items.size(); i++) {
+        boolean processTokenAgain = false;
+        TreeSet<OrderedToken> overlapping = null;
+        OrderedToken current = items.get(i);
+        int start = Math.max(current.getStartOffset(), lastEnd);
+        int end = current.getEndOffset();
+
+        if (start > end) {
+          continue;
+        }
+
+        if (start > lastEnd) { //use original content type for not highlighted text 
+          pushedTokenInfos.add(new PushedTokenInfo(contentType, lastEnd, start));
+        }
+
+        //find overlapping tokens to merge, reduce range according to them
+        for (int j = i + 1; j < items.size(); j++) {
+          OrderedToken next = items.get(j);
+          if (start >= next.getStartOffset() && start < next.getEndOffset()) {
+            //overlapping token to merge 
+            if (overlapping == null) {
+              overlapping = new TreeSet<>(Comparator.comparingInt(OrderedToken::getOrder));
+            }
+            overlapping.add(next);
+
+            if (end > next.getEndOffset() && start < next.getEndOffset()) {
+              //current one is longer, so we need to process the rest of it next time
+              end = next.getEndOffset();
+              processTokenAgain = true;
+            }
+          }
+          else if (end > next.getStartOffset() && lastEnd < next.getStartOffset()) {
+            //current token is overlapped, must split it and process merge next time 
+            end = next.getStartOffset(); //cut the current token
+            processTokenAgain = true;
+          }
+        }
+
+        if (processTokenAgain) {
+          i--;
+        }
+
+        //find previous overlapping tokens to merge
+        Iterator<OrderedToken> iterator = previousOverlappingTokens.iterator();
+        while (iterator.hasNext()) {
+          OrderedToken previous = iterator.next();
+          if (current != previous) {
+            if (start < previous.getEndOffset()) { //some other token overlaps the current one 
+              if (overlapping == null) {
+                overlapping = new TreeSet<>(Comparator.comparingInt(OrderedToken::getOrder));
+              }
+              overlapping.add(previous);
+            }
+            else {
+              iterator.remove(); //will not overlap ever again
+            }
+          }
+        }
+
+        if (start == end) {   //skip empty range 
+          continue;
+        }
+
+        TextAttributes mergedAttributes = null;
+        if (overlapping != null) {
+          overlapping.add(current);
+          mergedAttributes = overlapping.pollFirst().getContentType().getAttributes().clone();
+          for (OrderedToken token : overlapping) {
+            mergedAttributes = merge(token.getContentType().getAttributes(), mergedAttributes);
+          }
+          mergedAttributes = merge(contentType.getAttributes(), mergedAttributes);
+        }
+
+
+        if (mergedAttributes != null) {
+          pushedTokenInfos.add(new PushedTokenInfo(mergedAttributes, start, end));
+        }
+        else {
+          pushedTokenInfos.add(new PushedTokenInfo(current.getContentType(), start, end));
+        }
+        lastEnd = end;
+      }
+    }
+    if (lastEnd < length) {
+      pushedTokenInfos.add(new PushedTokenInfo(contentType, lastEnd, length));
+    }
+    return pushedTokenInfos;
+  }
+
   @Nullable
-  private List<OrderedToken> adjustAndSort(TokenBuffer.TokenInfo tokenInfo) {
+  protected List<OrderedToken> adjustAndSort(TokenBuffer.TokenInfo tokenInfo) {
     List<OrderedToken> items = null;
     List<HighlightingInputFilter.ResultItem> highlighters = tokenInfo.highlighters;
     int i = 0;
@@ -155,6 +258,11 @@ class ConsoleHighlighter extends DocumentAdapter implements EditorHighlighter {
         adjustedStart = Math.min(adjustedStart, length);
         adjustedEnd = Math.min(adjustedEnd, length);
 
+        if (adjustedStart < 0 || adjustedEnd > length || adjustedStart == adjustedEnd) {
+          LOG.warn(
+            "Invalid range on " + item + " (adjustedStart=" + adjustedStart + ", adjustedEnd=" + adjustedEnd + ", length=" + length + ")");
+          continue;
+        }
         items.add(new OrderedToken(adjustedStart, adjustedEnd, item.getContentType(), i++));
       }
       Collections.sort(items, OrderedToken.MY_COMPARATOR);
@@ -172,12 +280,21 @@ class ConsoleHighlighter extends DocumentAdapter implements EditorHighlighter {
   }
 
   static class PushedTokenInfo {
-    final ConsoleViewContentType myContentType;
+    final TextAttributes mergedAttributes;
+    final ConsoleViewContentType contentType;
     int startOffset;
     int endOffset;
 
-    PushedTokenInfo(final ConsoleViewContentType myTokenInfo, int startOffset, int endOffset) {
-      this.myContentType = myTokenInfo;
+    PushedTokenInfo(@NotNull final TextAttributes mergedAttributes, final int startOffset, final int endOffset) {
+      this.mergedAttributes = mergedAttributes;
+      this.contentType = null;
+      this.startOffset = startOffset;
+      this.endOffset = endOffset;
+    }
+
+    PushedTokenInfo(@NotNull final ConsoleViewContentType myTokenInfo, final int startOffset, final int endOffset) {
+      mergedAttributes = null;
+      this.contentType = myTokenInfo;
       this.startOffset = startOffset;
       this.endOffset = endOffset;
     }
@@ -189,11 +306,43 @@ class ConsoleHighlighter extends DocumentAdapter implements EditorHighlighter {
 
     @Override
     public String toString() {
-      return "[" + startOffset + ";" + endOffset + "] " + myContentType;
+      return "[" + startOffset + ";" + endOffset + "] " + (contentType != null ? contentType : mergedAttributes);
     }
 
     public int getStart() {
       return startOffset;
+    }
+
+    private TextAttributes getAttributes() {
+      if (mergedAttributes != null) {
+        return mergedAttributes;
+      }
+      //noinspection ConstantConditions
+      return contentType.getAttributes();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+
+      PushedTokenInfo info = (PushedTokenInfo)o;
+
+      if (startOffset != info.startOffset) return false;
+      if (endOffset != info.endOffset) return false;
+      if (mergedAttributes != null ? !mergedAttributes.equals(info.mergedAttributes) : info.mergedAttributes != null) return false;
+      if (contentType != null ? !contentType.equals(info.contentType) : info.contentType != null) return false;
+
+      return true;
+    }
+
+    @Override
+    public int hashCode() {
+      int result = mergedAttributes != null ? mergedAttributes.hashCode() : 0;
+      result = 31 * result + (contentType != null ? contentType.hashCode() : 0);
+      result = 31 * result + startOffset;
+      result = 31 * result + endOffset;
+      return result;
     }
   }
 
@@ -202,8 +351,8 @@ class ConsoleHighlighter extends DocumentAdapter implements EditorHighlighter {
 
     int myOrder;
 
-    public OrderedToken(int offset, int offset1, ConsoleViewContentType type, int order) {
-      super(offset, offset1, type);
+    public OrderedToken(int offset, int endOffset, ConsoleViewContentType type, int order) {
+      super(offset, endOffset, type);
       this.myOrder = order;
     }
 
@@ -325,8 +474,7 @@ class ConsoleHighlighter extends DocumentAdapter implements EditorHighlighter {
 
       @Override
       public TextAttributes getTextAttributes() {
-        TextAttributes attributes = atEnd() ? null : getTokenInfo().myContentType.getAttributes();
-        return attributes;
+        return atEnd() ? null : getTokenInfo().getAttributes();
       }
 
       @Override
@@ -397,6 +545,23 @@ class ConsoleHighlighter extends DocumentAdapter implements EditorHighlighter {
       return o1.getStartOffset() - o2.getStartOffset();
     }
   }
+
+  protected static TextAttributes merge(@NotNull TextAttributes under, TextAttributes above) {
+    if (above.getBackgroundColor() == null) {
+      above.setBackgroundColor(under.getBackgroundColor());
+    }
+    if (above.getForegroundColor() == null) {
+      above.setForegroundColor(under.getForegroundColor());
+    }
+    above.setFontType(above.getFontType() | under.getFontType());
+
+    if (above.getEffectColor() == null) {
+      above.setEffectColor(under.getEffectColor());
+      above.setEffectType(under.getEffectType());
+    }
+    return above;
+  }
+  
 }
 
  
