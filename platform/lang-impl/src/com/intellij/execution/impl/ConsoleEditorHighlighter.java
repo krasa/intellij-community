@@ -29,7 +29,10 @@ import com.intellij.psi.tree.IElementType;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
 
 /**
  * MarkupModel is too expensive, it is probably never going to be fast enough for the console, use this for highlighting from HighlightingInputFilter and content type on input. 
@@ -37,9 +40,10 @@ import java.util.*;
  * - some of it is copy paste from IJ 2016...
  * <p>
  * TODO keep SYSTEM_ERR,SYSTEM_OUT... when clearing? perhaps make another list just for backing content types?
+ * TODO consider: merge all highlighters with the text content type - or save memory by having plugins do it ? or do some small cache for merged ones? 
  */
 @SuppressWarnings("ForLoopReplaceableByForEach")
-public class ConsoleHighlighter extends DocumentAdapter implements EditorHighlighter {
+public class ConsoleEditorHighlighter extends DocumentAdapter implements EditorHighlighter {
   private static final Logger LOG = Logger.getInstance("#com.intellij.execution.impl.ConsoleHighlighter");
 
   /**
@@ -60,10 +64,8 @@ public class ConsoleHighlighter extends DocumentAdapter implements EditorHighlig
     }
 
     try {
-      ConsoleViewContentType contentType = tokenInfo.contentType;
-      List<OrderedToken> items = adjustAndSort(tokenInfo);
-      //List<PushedTokenInfo> pushedTokens = transform_naive(contentType, items, endOffset - startOffset);
-      List<PushedTokenInfo> pushedTokens = transform_withMergingOfTextAttributes(contentType, items, endOffset - startOffset);
+      List<OrderedToken> items = adjustRangesAndSort(tokenInfo);
+      List<PushedTokenInfo> pushedTokens = transform_withMergingOfTextAttributes(tokenInfo.contentType, items, endOffset - startOffset);
 
       for (int i = 0; i < pushedTokens.size(); i++) {
         PushedTokenInfo newToken = pushedTokens.get(i);
@@ -89,64 +91,17 @@ public class ConsoleHighlighter extends DocumentAdapter implements EditorHighlig
   private boolean mergeWithLastToken(PushedTokenInfo newToken) {
     if (!myTokens.isEmpty()) {
       final PushedTokenInfo lastPushedToken = myTokens.get(myTokens.size() - 1);
+
       if (lastPushedToken.contentType == newToken.contentType
           && lastPushedToken.mergedAttributes == newToken.mergedAttributes
           && lastPushedToken.endOffset == newToken.startOffset) {
+
         lastPushedToken.endOffset = newToken.endOffset; // optimization}
         return true;
       }
     }
     return false;
   }
-
-  /**
-   * it is a little bit broken, see tests
-   */
-  @Deprecated
-  protected List<PushedTokenInfo> transform_naive(ConsoleViewContentType contentType, List<OrderedToken> items, int length) {
-    List<PushedTokenInfo> tokensToPush = new ArrayList<>(items == null ? 1 : items.size());
-    int lastIndex = 0;
-    if (items != null) {
-      for (int i = 0; i < items.size(); i++) {
-        OrderedToken current = items.get(i);
-        int start = Math.max(current.getStartOffset(), lastIndex);
-        int end = current.getEndOffset();
-
-        if (start > end) {  //invalid token, or smaller than already pushed one which had higher priority
-          continue;
-        }
-
-        if (start > lastIndex) { //use original content type for not highlighted text 
-          tokensToPush.add(new PushedTokenInfo(contentType, lastIndex, start));
-        }
-
-        //   look for overlapping range with higher priority
-        for (int j = i + 1; j < items.size(); j++) {
-          OrderedToken next = items.get(j);
-          if (next.startsBefore(end)) { //some other token overlaps the current one 
-            if (current.getOrder() > next.getOrder()) { //with higher priority
-              end = next.getStartOffset(); //reduce the range of the current token
-            }
-          }
-          else {   //no other token overlaps, since it is sorted by startOffset
-            break;
-          }
-        }
-
-        if (start == end) {   //skip empty range 
-          continue;
-        }
-
-        tokensToPush.add(new PushedTokenInfo(current.getContentType(), start, end));
-        lastIndex = end;
-      }
-    }
-    if (lastIndex < length) {
-      tokensToPush.add(new PushedTokenInfo(contentType, lastIndex, length));
-    }
-    return tokensToPush;
-  }
-
 
   protected List<PushedTokenInfo> transform_withMergingOfTextAttributes(ConsoleViewContentType contentType,
                                                                         List<OrderedToken> items,
@@ -161,7 +116,7 @@ public class ConsoleHighlighter extends DocumentAdapter implements EditorHighlig
           throw new IllegalStateException("probably infinite cycle detected, length=" + length + ", items=" + items);
         }
         boolean processTokenAgain = false;
-        TreeSet<OrderedToken> overlapping = null;
+        List<OrderedToken> overlapping = null;
         OrderedToken current = items.get(i);
         int start = Math.max(current.getStartOffset(), lastEnd);
         int end = current.getEndOffset();
@@ -180,7 +135,7 @@ public class ConsoleHighlighter extends DocumentAdapter implements EditorHighlig
           if (next.overlapsWith(start)) {
             //overlapping token to merge 
             if (overlapping == null) {
-              overlapping = new TreeSet<>(Comparator.comparingInt(OrderedToken::getOrder));
+              overlapping = new ArrayList<>();
             }
             overlapping.add(next);
 
@@ -227,12 +182,14 @@ public class ConsoleHighlighter extends DocumentAdapter implements EditorHighlig
   }
 
   private static TextAttributes mergeTextAttributes(ConsoleViewContentType contentType,
-                                                    TreeSet<OrderedToken> overlapping,
+                                                    List<OrderedToken> overlapping,
                                                     OrderedToken current) {
-    TextAttributes mergedAttributes;
     overlapping.add(current);
-    mergedAttributes = overlapping.pollFirst().getContentType().getAttributes().clone();
-    for (OrderedToken token : overlapping) {
+    Collections.sort(overlapping, OrderedToken.ORDER_COMPARATOR);
+
+    TextAttributes mergedAttributes = overlapping.get(0).getContentType().getAttributes().clone();
+    for (int i = 1; i < overlapping.size(); i++) {
+      OrderedToken token = overlapping.get(i);
       mergedAttributes = merge(token.getContentType().getAttributes(), mergedAttributes);
     }
     mergedAttributes = merge(contentType.getAttributes(), mergedAttributes);
@@ -240,7 +197,7 @@ public class ConsoleHighlighter extends DocumentAdapter implements EditorHighlig
   }
 
   @Nullable
-  protected List<OrderedToken> adjustAndSort(TokenBuffer.TokenInfo tokenInfo) {
+  protected List<OrderedToken> adjustRangesAndSort(TokenBuffer.TokenInfo tokenInfo) {
     List<OrderedToken> items = null;
     List<HighlightingInputFilter.ResultItem> highlighters = tokenInfo.highlighters;
     int i = 0;
@@ -347,6 +304,7 @@ public class ConsoleHighlighter extends DocumentAdapter implements EditorHighlig
 
   static class OrderedToken extends HighlightingInputFilter.ResultItem {
     private static final OrderedItemComparator MY_COMPARATOR = new OrderedItemComparator();
+    private static final Comparator<OrderedToken> ORDER_COMPARATOR = Comparator.comparingInt(OrderedToken::getOrder);
 
     int myOrder;
 

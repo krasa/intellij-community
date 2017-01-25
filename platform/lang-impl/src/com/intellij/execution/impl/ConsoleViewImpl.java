@@ -106,7 +106,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
   private static boolean ourTypedHandlerInitialized;
   private final Alarm myFlushUserInputAlarm = new Alarm(Alarm.ThreadToUse.POOLED_THREAD, this);
   private static final CharMatcher NEW_LINE_MATCHER = CharMatcher.anyOf("\n\r");
-  private ConsoleHighlighter myHighlighter;
+  private ConsoleEditorHighlighter myHighlighter;
 
   private static synchronized void initTypedHandler() {
     if (ourTypedHandlerInitialized) return;
@@ -952,8 +952,8 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     return ConsoleViewUtil.setupConsoleEditor(myProject, true, false);
   }
 
-  protected ConsoleHighlighter createHighlighter() {
-    return new ConsoleHighlighter();
+  protected ConsoleEditorHighlighter createHighlighter() {
+    return new ConsoleEditorHighlighter();
   }
 
   private void registerConsoleEditorActions() {
