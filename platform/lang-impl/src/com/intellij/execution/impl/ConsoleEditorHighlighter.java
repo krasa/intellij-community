@@ -40,7 +40,7 @@ import java.util.List;
  * - some of it is copy paste from IJ 2016...
  * <p>
  * TODO keep SYSTEM_ERR,SYSTEM_OUT... when clearing? perhaps make another list just for backing content types?
- * TODO consider: merge all highlighters with the text content type - or save memory by having plugins do it ? or do some small cache for merged ones? 
+ * TODO consider: merge all highlighters with the text content type - or save memory by having plugins do it - or merge them the first time and have some cache - or do nothing? 
  */
 @SuppressWarnings("ForLoopReplaceableByForEach")
 public class ConsoleEditorHighlighter extends DocumentAdapter implements EditorHighlighter {
