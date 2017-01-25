@@ -282,7 +282,7 @@ public class TaskExecutionView implements ConsoleView, DataProvider {
   }
 
   @Override
-  public void rehighlightHyperlinksAndFoldings() {
+  public void rehighlightHyperlinksAndFoldings(boolean reloadInputHighlighters) {
   }
   
 

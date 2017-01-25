@@ -27,7 +27,7 @@ public interface ConsoleView extends ExecutionConsole {
 
   void clear();
 
-  void rehighlightHyperlinksAndFoldings();
+  void rehighlightHyperlinksAndFoldings(boolean reloadInputHighlighters);
   
   void scrollTo(int offset);
 

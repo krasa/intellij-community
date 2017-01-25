@@ -152,9 +152,9 @@ public class DuplexConsoleView<S extends ConsoleView, T extends ConsoleView> ext
   }
 
   @Override
-  public void rehighlightHyperlinksAndFoldings() {
-    myPrimaryConsoleView.rehighlightHyperlinksAndFoldings();
-    mySecondaryConsoleView.rehighlightHyperlinksAndFoldings();
+  public void rehighlightHyperlinksAndFoldings(boolean reloadInputHighlighters) {
+    myPrimaryConsoleView.rehighlightHyperlinksAndFoldings(reloadInputHighlighters);
+    mySecondaryConsoleView.rehighlightHyperlinksAndFoldings(reloadInputHighlighters);
   }
   
 

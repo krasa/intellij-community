@@ -82,8 +82,8 @@ public abstract class BaseTestsOutputConsoleView implements ConsoleView, Observa
   }
 
   @Override
-  public void rehighlightHyperlinksAndFoldings() {
-    myConsole.rehighlightHyperlinksAndFoldings();
+  public void rehighlightHyperlinksAndFoldings(boolean reloadInputHighlighters) {
+    myConsole.rehighlightHyperlinksAndFoldings(reloadInputHighlighters);
   }
     
   @Override

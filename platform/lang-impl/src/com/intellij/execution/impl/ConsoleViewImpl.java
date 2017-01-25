@@ -1005,18 +1005,15 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
   }
 
   @Override
-  public void rehighlightHyperlinksAndFoldings() {
-    rehighlightHyperlinksAndFoldings(true);
-  }
-
-  private void rehighlightHyperlinksAndFoldings(boolean runHighlightingInputFilters) {
+  public void rehighlightHyperlinksAndFoldings(boolean reloadInputHighlighters) {
     if (myEditor == null || myProject.isDisposed()) return;
 
     clearHyperlinkAndFoldings();
-    highlightHyperlinksAndFoldings(0, runHighlightingInputFilters);
+    highlightHyperlinksAndFoldings(0, reloadInputHighlighters);
   }
-  
-  private void highlightHyperlinksAndFoldings(int startLine, boolean runHighlightingInputFilters) {
+
+
+  private void highlightHyperlinksAndFoldings(int startLine, boolean reloadInputHighlighters) {
     ApplicationManager.getApplication().assertIsDispatchThread();
     boolean canHighlightHyperlinks = !myFilters.isEmpty();
 
@@ -1025,8 +1022,8 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     }
     int endLine = myEditor.getDocument().getLineCount() - 1;
 
-    if (runHighlightingInputFilters && myHighlightingInputFilter != null) {
-      resetInputHighlighters(myHighlightingInputFilter);
+    if (reloadInputHighlighters && myHighlightingInputFilter != null) {
+      reloadInputHighlighters();
     }
     
     if (canHighlightHyperlinks) {
@@ -1041,7 +1038,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     }
   }
 
-  public void resetInputHighlighters(@NotNull HighlightingInputFilter filter) {
+  public void reloadInputHighlighters() {
     myHighlighter.clear();
 
     final Document document = myEditor.getDocument();
@@ -1055,7 +1052,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
         endOffset++; // add '\n'
       }
       final String text = getLineText(document, line, true);
-      HighlightingInputFilter.Result result = filter.applyFilter(text, ConsoleViewContentType.NORMAL_OUTPUT);
+      HighlightingInputFilter.Result result = myHighlightingInputFilter.applyFilter(text, ConsoleViewContentType.NORMAL_OUTPUT);
       if (result != null) {
         TokenBuffer.TokenInfo info =
           new TokenBuffer.TokenInfo(ConsoleViewContentType.NORMAL_OUTPUT, result.getResultItems(), text, null, 0);
