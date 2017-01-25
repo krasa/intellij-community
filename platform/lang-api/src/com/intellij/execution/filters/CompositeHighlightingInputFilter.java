@@ -100,4 +100,11 @@ public class CompositeHighlightingInputFilter implements HighlightingInputFilter
       return myFilter.getClass().getSimpleName();
     }
   }
+
+  @Override
+  public String toString() {
+    return "CompositeHighlightingInputFilter{" +
+           "myFilters=" + myFilters +
+           '}';
+  }
 }

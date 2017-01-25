@@ -90,6 +90,8 @@ import java.util.*;
 import java.util.List;
 import java.util.concurrent.*;
 
+import static com.intellij.execution.impl.EditorHyperlinkSupport.getLineText;
+
 public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableConsoleView, DataProvider, OccurenceNavigator {
   @NonNls private static final String CONSOLE_VIEW_POPUP_MENU = "ConsoleView.PopupMenu";
   private static final Logger LOG = Logger.getInstance("#com.intellij.execution.impl.ConsoleViewImpl");
@@ -104,7 +106,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
   private static boolean ourTypedHandlerInitialized;
   private final Alarm myFlushUserInputAlarm = new Alarm(Alarm.ThreadToUse.POOLED_THREAD, this);
   private static final CharMatcher NEW_LINE_MATCHER = CharMatcher.anyOf("\n\r");
-  private ConsoleHighlighter myFastHighlighter;
+  private ConsoleHighlighter myHighlighter;
 
   private static synchronized void initTypedHandler() {
     if (ourTypedHandlerInitialized) return;
@@ -228,7 +230,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
 
     myTextInputFilter = computeTextInputFilters(project, searchScope);
     myHighlightingInputFilter = computeHighlightingInputFilter(project, searchScope);
-    myFastHighlighter = createHighlighter();
+    myHighlighter = createHighlighter();
          
 
     project.getMessageBus().connect(this).subscribe(DumbService.DUMB_MODE, new DumbService.DumbModeListener() {
@@ -730,7 +732,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
           // remove last line if any
           if (document.getLineCount() != 0) {
             int lineStartOffset = document.getLineStartOffset(document.getLineCount() - 1);
-            myFastHighlighter.updateTokensOnTextRemoval(document.getTextLength(), document.getTextLength() + 1);
+            myHighlighter.updateTokensOnTextRemoval(document.getTextLength(), document.getTextLength() + 1);
             document.deleteString(lineStartOffset, document.getTextLength());
           }
         }
@@ -799,14 +801,14 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
                                                                contentType.getAttributes(), HighlighterTargetArea.EXACT_RANGE);
       tokenMarker.putUserData(CONTENT_TYPE, contentType);
     }
-    myFastHighlighter.addToken(startOffset, endOffset, tokenInfo);
+    myHighlighter.addToken(startOffset, endOffset, tokenInfo);
   }
 
   private void onDocumentChanged(@NotNull DocumentEvent event) {
     if (event.getNewLength() == 0) {
       // string has been removed, adjust token ranges
       synchronized (LOCK) {
-        myFastHighlighter.updateTokensOnTextRemoval(event.getOffset(), event.getOffset() + event.getOldLength());
+        myHighlighter.updateTokensOnTextRemoval(event.getOffset(), event.getOffset() + event.getOldLength());
       }
     }
   }
@@ -822,7 +824,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     final DocumentEx document = myEditor.getDocument();
     synchronized (LOCK) {
       clearHyperlinkAndFoldings();
-      myFastHighlighter.clear();
+      myHighlighter.clear();
     }
     final int documentTextLength = document.getTextLength();
     if (documentTextLength > 0) {
@@ -939,7 +941,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
       editor.putUserData(CONSOLE_VIEW_IN_EDITOR_VIEW, this);
 
       editor.getSettings().setAllowSingleLogicalLineFolding(true); // We want to fold long soft-wrapped command lines
-      editor.setHighlighter(myFastHighlighter);
+      editor.setHighlighter(myHighlighter);
                  
       return editor;
     });
@@ -1002,6 +1004,18 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     menu.getComponent().show(mouseEvent.getComponent(), mouseEvent.getX(), mouseEvent.getY());
   }
 
+  @Override
+  public void rehighlightHyperlinksAndFoldings() {
+    rehighlightHyperlinksAndFoldings(true);
+  }
+
+  private void rehighlightHyperlinksAndFoldings(boolean runHighlightingInputFilters) {
+    if (myEditor == null || myProject.isDisposed()) return;
+
+    clearHyperlinkAndFoldings();
+    highlightHyperlinksAndFoldings(0, runHighlightingInputFilters);
+  }
+  
   private void highlightHyperlinksAndFoldings(int startLine, boolean runHighlightingInputFilters) {
     ApplicationManager.getApplication().assertIsDispatchThread();
     boolean canHighlightHyperlinks = !myFilters.isEmpty();
@@ -1012,10 +1026,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     int endLine = myEditor.getDocument().getLineCount() - 1;
 
     if (runHighlightingInputFilters && myHighlightingInputFilter != null) {
-      synchronized (LOCK) { //do i need lock?
-        myFastHighlighter.clear();
-      }
-      myHyperlinks.highlightHyperlinks(new HighlightingInputFilterAdapter(myHighlightingInputFilter), startLine, endLine);
+      resetInputHighlighters(myHighlightingInputFilter);
     }
     
     if (canHighlightHyperlinks) {
@@ -1030,16 +1041,33 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     }
   }
 
-  @Override
-  public void rehighlightHyperlinksAndFoldings() {
-    rehighlightHyperlinksAndFoldings(true);
+  public void resetInputHighlighters(@NotNull HighlightingInputFilter filter) {
+    myHighlighter.clear();
+
+    final Document document = myEditor.getDocument();
+    final int startLine = 0;
+    final int endLine = myEditor.getDocument().getLineCount() - 1;
+
+    int startOffset = 0;
+    for (int line = startLine; line <= endLine; line++) {
+      int endOffset = document.getLineEndOffset(line);
+      if (endOffset < document.getTextLength()) {
+        endOffset++; // add '\n'
+      }
+      final String text = getLineText(document, line, true);
+      HighlightingInputFilter.Result result = filter.applyFilter(text, ConsoleViewContentType.NORMAL_OUTPUT);
+      if (result != null) {
+        TokenBuffer.TokenInfo info =
+          new TokenBuffer.TokenInfo(ConsoleViewContentType.NORMAL_OUTPUT, result.getResultItems(), text, null, 0);
+        myHighlighter.addToken(startOffset, endOffset, info);
+        startOffset = endOffset;
+      }
+    }
   }
 
-  private void rehighlightHyperlinksAndFoldings(boolean runHighlightingInputFilters) {
-    if (myEditor == null || myProject.isDisposed()) return;
-
-    clearHyperlinkAndFoldings();
-    highlightHyperlinksAndFoldings(0, runHighlightingInputFilters);
+  @Nullable
+  public HighlightingInputFilter getHighlightingInputFilter() {
+    return myHighlightingInputFilter;
   }
 
   private void runHeavyFilters(int line1, int endLine) {
@@ -1138,7 +1166,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
         ContainerUtil.addIfNotNull(toAdd, region);
         return;
       }
-      String lineText = EditorHyperlinkSupport.getLineText(document, line, false);
+      String lineText = getLineText(document, line, false);
       current = foldingForLine(lineText);
       if (current != null) {
         myFolding.put(line, current);
@@ -1157,7 +1185,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
 
       List<String> toFold = new ArrayList<>(lEnd - lStart + 1);
       for (int i = lStart; i <= lEnd; i++) {
-        toFold.add(EditorHyperlinkSupport.getLineText(document, i, false));
+        toFold.add(getLineText(document, i, false));
       }
 
       int oStart = document.getLineStartOffset(lStart);
@@ -1599,7 +1627,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
         return null;
       }
 
-      String text = EditorHyperlinkSupport.getLineText(myEditor.getDocument(), 0, false);
+      String text = getLineText(myEditor.getDocument(), 0, false);
       // Don't fold the first line if the line is not that big.
       if (text.length() < 1000) {
         return null;
@@ -1694,31 +1722,5 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     return myEditor.getDocument().getText();
   }
 
-  private static class HighlightingInputFilterAdapter implements Filter {
-    private final HighlightingInputFilter myFilter;
-
-    public HighlightingInputFilterAdapter(@NotNull HighlightingInputFilter filter) {
-      myFilter = filter;
-    }
-
-    @Nullable
-    @Override
-    public Result applyFilter(String line, int entireLength) {
-      int offset = entireLength - line.length();
-      //why bother sending the content type?
-      HighlightingInputFilter.Result result = myFilter.applyFilter(line, null);
-      if (result != null) {
-        List<ResultItem> items = new ArrayList<>(result.getResultItems().size());
-        for (HighlightingInputFilter.ResultItem item : result.getResultItems()) {
-          if (item != null) {
-            TextAttributes attributes = item.getContentType().getAttributes();
-            items.add(new ResultItem(item.getStartOffset() + offset, item.getEndOffset() + offset, null, attributes));
-          }
-        }
-        return new Result(items);
-      }
-      return null;
-    }
-  }
 }
 

@@ -36,8 +36,6 @@ import java.util.*;
  * Asynchronous Filters do not need to use this, it would be too complex, and unnecessary as number of their highlights will be always low (if GrepConsole will use HighlightingInputFilter.
  * - some of it is copy paste from IJ 2016...
  * <p>
- * TODO consider using it for USER_INPUT, as was in IJ 2016, whatever makes the code cleaner and less buggy
- * TODO #rehighlightHyperlinksAndFoldings by HighlightingInputFilter should use it - HighlightingInputFilterAdapter puts them into MarkupModel
  * TODO keep SYSTEM_ERR,SYSTEM_OUT... when clearing? perhaps make another list just for backing content types?
  */
 @SuppressWarnings("ForLoopReplaceableByForEach")
@@ -53,28 +51,38 @@ public class ConsoleHighlighter extends DocumentAdapter implements EditorHighlig
    */
   private final List<PushedTokenInfo> myTokens = new ArrayList<>();
   private HighlighterClient myEditor;
+  private boolean broken;
 
 
   public void addToken(int startOffset, int endOffset, final TokenBuffer.TokenInfo tokenInfo) {
-    ConsoleViewContentType contentType = tokenInfo.contentType;
+    if (broken) {
+      return;
+    }
 
-    List<OrderedToken> items = adjustAndSort(tokenInfo);
-    //List<PushedTokenInfo> pushedTokens = transform_naive(contentType, items, endOffset - startOffset);
-    List<PushedTokenInfo> pushedTokens = transform_withMergingOfTextAttributes(contentType, items, endOffset - startOffset);
+    try {
+      ConsoleViewContentType contentType = tokenInfo.contentType;
+      List<OrderedToken> items = adjustAndSort(tokenInfo);
+      //List<PushedTokenInfo> pushedTokens = transform_naive(contentType, items, endOffset - startOffset);
+      List<PushedTokenInfo> pushedTokens = transform_withMergingOfTextAttributes(contentType, items, endOffset - startOffset);
 
-    for (int i = 0; i < pushedTokens.size(); i++) {
-      PushedTokenInfo newToken = pushedTokens.get(i);
+      for (int i = 0; i < pushedTokens.size(); i++) {
+        PushedTokenInfo newToken = pushedTokens.get(i);
 
-      //adjusted by document offset
-      int adjustedStartOffset = Math.min(newToken.startOffset + startOffset, endOffset);
-      int adjustedEndOffset = Math.min(newToken.endOffset + startOffset, endOffset);
+        //adjusted by document offset
+        int adjustedStartOffset = Math.min(newToken.startOffset + startOffset, endOffset);
+        int adjustedEndOffset = Math.min(newToken.endOffset + startOffset, endOffset);
 
-      newToken.startOffset = adjustedStartOffset;
-      newToken.endOffset = adjustedEndOffset;
+        newToken.startOffset = adjustedStartOffset;
+        newToken.endOffset = adjustedEndOffset;
 
-      if (!mergeWithLastToken(newToken)) {
-        myTokens.add(newToken);
+        if (!mergeWithLastToken(newToken)) {
+          myTokens.add(newToken);
+        }
       }
+    }
+    catch (Exception e) {
+      LOG.error(e);
+      broken = true;
     }
   }
 
@@ -95,9 +103,8 @@ public class ConsoleHighlighter extends DocumentAdapter implements EditorHighlig
    * it is a little bit broken, see tests
    */
   @Deprecated
-  protected List<PushedTokenInfo> transform_naive(ConsoleViewContentType contentType,
-                                                  List<OrderedToken> items, int length) {
-    List<PushedTokenInfo> pushedTokenInfos = new ArrayList<>(items == null ? 1 : items.size());
+  protected List<PushedTokenInfo> transform_naive(ConsoleViewContentType contentType, List<OrderedToken> items, int length) {
+    List<PushedTokenInfo> tokensToPush = new ArrayList<>(items == null ? 1 : items.size());
     int lastIndex = 0;
     if (items != null) {
       for (int i = 0; i < items.size(); i++) {
@@ -110,7 +117,7 @@ public class ConsoleHighlighter extends DocumentAdapter implements EditorHighlig
         }
 
         if (start > lastIndex) { //use original content type for not highlighted text 
-          pushedTokenInfos.add(new PushedTokenInfo(contentType, lastIndex, start));
+          tokensToPush.add(new PushedTokenInfo(contentType, lastIndex, start));
         }
 
         //   look for overlapping range with higher priority
@@ -130,24 +137,29 @@ public class ConsoleHighlighter extends DocumentAdapter implements EditorHighlig
           continue;
         }
 
-        pushedTokenInfos.add(new PushedTokenInfo(current.getContentType(), start, end));
+        tokensToPush.add(new PushedTokenInfo(current.getContentType(), start, end));
         lastIndex = end;
       }
     }
     if (lastIndex < length) {
-      pushedTokenInfos.add(new PushedTokenInfo(contentType, lastIndex, length));
+      tokensToPush.add(new PushedTokenInfo(contentType, lastIndex, length));
     }
-    return pushedTokenInfos;
+    return tokensToPush;
   }
 
 
   protected List<PushedTokenInfo> transform_withMergingOfTextAttributes(ConsoleViewContentType contentType,
-                                                                        List<OrderedToken> items, int length) {
+                                                                        List<OrderedToken> items,
+                                                                        int length) {
     List<PushedTokenInfo> tokensToPush = new ArrayList<>(items == null ? 1 : items.size());
     int lastEnd = 0;
     if (items != null) {
 
+      int remainingCycles = items.size() * 10;
       for (int i = 0; i < items.size(); i++) {
+        if (--remainingCycles < 0) {
+          throw new IllegalStateException("probably infinite cycle detected, length=" + length + ", items=" + items);
+        }
         boolean processTokenAgain = false;
         TreeSet<OrderedToken> overlapping = null;
         OrderedToken current = items.get(i);
@@ -178,7 +190,7 @@ public class ConsoleHighlighter extends DocumentAdapter implements EditorHighlig
               processTokenAgain = true;
             }
           }
-          else if (next.startsBetween(start, end)) {   //starts after start, but before end
+          else if (next.startsBetween(start, end)) {   //starts after 'start', but before 'end'
             // must split the current one and process merge next time 
             end = next.getStartOffset(); 
             processTokenAgain = true;
@@ -189,7 +201,7 @@ public class ConsoleHighlighter extends DocumentAdapter implements EditorHighlig
           i--;
         }
 
-        if (start == end) {   //skip empty range 
+        if (start == end) {  
           continue;
         }
 
