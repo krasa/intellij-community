@@ -216,7 +216,17 @@ public class ConsoleEditorHighlighter extends DocumentAdapter implements EditorH
 
         if (adjustedStart < 0 || adjustedEnd > length || adjustedStart == adjustedEnd) {
           LOG.warn(
-            "Invalid range on " + item + " (adjustedStart=" + adjustedStart + ", adjustedEnd=" + adjustedEnd + ", length=" + length + ")");
+            "Invalid range on " +
+            item +
+            " (adjustedStart=" +
+            adjustedStart +
+            ", adjustedEnd=" +
+            adjustedEnd +
+            ", textLength=" +
+            length +
+            ", tokenOffset=" +
+            tokenOffset +
+            ")");
           continue;
         }
         items.add(new OrderedToken(adjustedStart, adjustedEnd, item.getContentType(), i++));
@@ -531,7 +541,7 @@ public class ConsoleEditorHighlighter extends DocumentAdapter implements EditorH
     }
   }
 
-  protected static TextAttributes merge(@NotNull TextAttributes under, TextAttributes above) {
+  protected static TextAttributes merge(@NotNull TextAttributes under, @NotNull TextAttributes above) {
     if (above.getBackgroundColor() == null) {
       above.setBackgroundColor(under.getBackgroundColor());
     }
