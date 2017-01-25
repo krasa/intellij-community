@@ -26,7 +26,6 @@ import com.intellij.openapi.editor.highlighter.HighlighterClient;
 import com.intellij.openapi.editor.highlighter.HighlighterIterator;
 import com.intellij.openapi.editor.markup.TextAttributes;
 import com.intellij.psi.tree.IElementType;
-import com.intellij.util.containers.HashSet;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -117,7 +116,7 @@ public class ConsoleHighlighter extends DocumentAdapter implements EditorHighlig
         //   look for overlapping range with higher priority
         for (int j = i + 1; j < items.size(); j++) {
           OrderedToken next = items.get(j);
-          if (end > next.getStartOffset()) { //some other token overlaps the current one 
+          if (next.startsBefore(end)) { //some other token overlaps the current one 
             if (current.getOrder() > next.getOrder()) { //with higher priority
               end = next.getStartOffset(); //reduce the range of the current token
             }
@@ -141,15 +140,12 @@ public class ConsoleHighlighter extends DocumentAdapter implements EditorHighlig
     return pushedTokenInfos;
   }
 
-  /**
-   * TODO better comments
-   */
+
   protected List<PushedTokenInfo> transform_withMergingOfTextAttributes(ConsoleViewContentType contentType,
                                                                         List<OrderedToken> items, int length) {
-    List<PushedTokenInfo> pushedTokenInfos = new ArrayList<>(items == null ? 1 : items.size());
+    List<PushedTokenInfo> tokensToPush = new ArrayList<>(items == null ? 1 : items.size());
     int lastEnd = 0;
     if (items != null) {
-      Set<OrderedToken> previousOverlappingTokens = new HashSet<>();
 
       for (int i = 0; i < items.size(); i++) {
         boolean processTokenAgain = false;
@@ -163,28 +159,28 @@ public class ConsoleHighlighter extends DocumentAdapter implements EditorHighlig
         }
 
         if (start > lastEnd) { //use original content type for not highlighted text 
-          pushedTokenInfos.add(new PushedTokenInfo(contentType, lastEnd, start));
+          tokensToPush.add(new PushedTokenInfo(contentType, lastEnd, start));
         }
 
         //find overlapping tokens to merge, reduce range according to them
         for (int j = i + 1; j < items.size(); j++) {
           OrderedToken next = items.get(j);
-          if (start >= next.getStartOffset() && start < next.getEndOffset()) {
+          if (next.overlapsWith(start)) {
             //overlapping token to merge 
             if (overlapping == null) {
               overlapping = new TreeSet<>(Comparator.comparingInt(OrderedToken::getOrder));
             }
             overlapping.add(next);
 
-            if (end > next.getEndOffset() && start < next.getEndOffset()) {
+            if (next.endsBefore(end)) {
               //current one is longer, so we need to process the rest of it next time
               end = next.getEndOffset();
               processTokenAgain = true;
             }
           }
-          else if (end > next.getStartOffset() && lastEnd < next.getStartOffset()) {
-            //current token is overlapped, must split it and process merge next time 
-            end = next.getStartOffset(); //cut the current token
+          else if (next.startsBetween(start, end)) {   //starts after start, but before end
+            // must split the current one and process merge next time 
+            end = next.getStartOffset(); 
             processTokenAgain = true;
           }
         }
@@ -193,51 +189,42 @@ public class ConsoleHighlighter extends DocumentAdapter implements EditorHighlig
           i--;
         }
 
-        //find previous overlapping tokens to merge
-        Iterator<OrderedToken> iterator = previousOverlappingTokens.iterator();
-        while (iterator.hasNext()) {
-          OrderedToken previous = iterator.next();
-          if (current != previous) {
-            if (start < previous.getEndOffset()) { //some other token overlaps the current one 
-              if (overlapping == null) {
-                overlapping = new TreeSet<>(Comparator.comparingInt(OrderedToken::getOrder));
-              }
-              overlapping.add(previous);
-            }
-            else {
-              iterator.remove(); //will not overlap ever again
-            }
-          }
-        }
-
         if (start == end) {   //skip empty range 
           continue;
         }
 
         TextAttributes mergedAttributes = null;
         if (overlapping != null) {
-          overlapping.add(current);
-          mergedAttributes = overlapping.pollFirst().getContentType().getAttributes().clone();
-          for (OrderedToken token : overlapping) {
-            mergedAttributes = merge(token.getContentType().getAttributes(), mergedAttributes);
-          }
-          mergedAttributes = merge(contentType.getAttributes(), mergedAttributes);
+          mergedAttributes = mergeTextAttributes(contentType, overlapping, current);
         }
 
 
         if (mergedAttributes != null) {
-          pushedTokenInfos.add(new PushedTokenInfo(mergedAttributes, start, end));
+          tokensToPush.add(new PushedTokenInfo(mergedAttributes, start, end));
         }
         else {
-          pushedTokenInfos.add(new PushedTokenInfo(current.getContentType(), start, end));
+          tokensToPush.add(new PushedTokenInfo(current.getContentType(), start, end));
         }
         lastEnd = end;
       }
     }
     if (lastEnd < length) {
-      pushedTokenInfos.add(new PushedTokenInfo(contentType, lastEnd, length));
+      tokensToPush.add(new PushedTokenInfo(contentType, lastEnd, length));
     }
-    return pushedTokenInfos;
+    return tokensToPush;
+  }
+
+  private static TextAttributes mergeTextAttributes(ConsoleViewContentType contentType,
+                                                    TreeSet<OrderedToken> overlapping,
+                                                    OrderedToken current) {
+    TextAttributes mergedAttributes;
+    overlapping.add(current);
+    mergedAttributes = overlapping.pollFirst().getContentType().getAttributes().clone();
+    for (OrderedToken token : overlapping) {
+      mergedAttributes = merge(token.getContentType().getAttributes(), mergedAttributes);
+    }
+    mergedAttributes = merge(contentType.getAttributes(), mergedAttributes);
+    return mergedAttributes;
   }
 
   @Nullable
@@ -365,6 +352,34 @@ public class ConsoleHighlighter extends DocumentAdapter implements EditorHighlig
       return "OrderedItem{" +
              "myOrder=" + myOrder +
              "} " + super.toString();
+    }
+
+    private boolean startsBefore(int end) {
+      return getStartOffset() < end;
+    }
+
+    private boolean startsBeforeOrAt(int start) {
+      return getStartOffset() <= start;
+    }
+
+    private boolean endsAfter(int start) {
+      return start < getEndOffset();
+    }
+
+    private boolean endsBefore(int end) {
+      return getEndOffset() < end;
+    }
+
+    private boolean startsAfter(int lastEnd) {
+      return lastEnd < getStartOffset();
+    }
+
+    private boolean overlapsWith(int start) {
+      return startsBeforeOrAt(start) && endsAfter(start);
+    }
+
+    private boolean startsBetween(int start, int end) {
+      return startsAfter(start) && startsBefore(end);
     }
   }
 
