@@ -1062,10 +1062,6 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     }
   }
 
-  @Nullable
-  public HighlightingInputFilter getHighlightingInputFilter() {
-    return myHighlightingInputFilter;
-  }
 
   private void runHeavyFilters(int line1, int endLine) {
     final int startLine = Math.max(0, line1);
