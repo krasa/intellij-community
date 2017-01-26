@@ -1039,6 +1039,9 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
   }
 
   public void reloadInputHighlighters() {
+    if (myHighlightingInputFilter == null) {
+      return;
+    }
     myHighlighter.clear();
 
     final Document document = myEditor.getDocument();
@@ -1057,8 +1060,8 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
         TokenBuffer.TokenInfo info =
           new TokenBuffer.TokenInfo(ConsoleViewContentType.NORMAL_OUTPUT, result.getResultItems(), text, null, 0);
         myHighlighter.addToken(startOffset, endOffset, info);
-        startOffset = endOffset;
       }
+      startOffset = endOffset;
     }
   }
 
