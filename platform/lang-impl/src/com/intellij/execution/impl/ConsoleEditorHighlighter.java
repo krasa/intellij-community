@@ -162,7 +162,7 @@ public class ConsoleEditorHighlighter extends DocumentAdapter implements EditorH
 
         TextAttributes mergedAttributes = null;
         if (overlapping != null) {
-          mergedAttributes = mergeTextAttributes(contentType, overlapping, current);
+          mergedAttributes = mergeTextAttributes(overlapping, current);
         }
 
 
@@ -181,8 +181,7 @@ public class ConsoleEditorHighlighter extends DocumentAdapter implements EditorH
     return tokensToPush;
   }
 
-  private static TextAttributes mergeTextAttributes(ConsoleViewContentType contentType,
-                                                    List<OrderedToken> overlapping,
+  private static TextAttributes mergeTextAttributes(List<OrderedToken> overlapping,
                                                     OrderedToken current) {
     overlapping.add(current);
     Collections.sort(overlapping, OrderedToken.ORDER_COMPARATOR);
@@ -192,7 +191,6 @@ public class ConsoleEditorHighlighter extends DocumentAdapter implements EditorH
       OrderedToken token = overlapping.get(i);
       mergedAttributes = merge(token.getContentType().getAttributes(), mergedAttributes);
     }
-    mergedAttributes = merge(contentType.getAttributes(), mergedAttributes);
     return mergedAttributes;
   }
 

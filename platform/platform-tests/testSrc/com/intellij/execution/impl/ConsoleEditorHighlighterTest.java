@@ -202,6 +202,6 @@ public class ConsoleEditorHighlighterTest {
       ConsoleViewContentType type = highlight[i];
       merge = ConsoleEditorHighlighter.merge(type.getAttributes(), merge);
     }
-    return ConsoleEditorHighlighter.merge(NORMAL_OUTPUT.getAttributes(), merge);
+    return merge;
   }
 }
