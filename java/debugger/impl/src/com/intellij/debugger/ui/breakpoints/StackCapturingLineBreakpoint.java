@@ -97,7 +97,7 @@ public class StackCapturingLineBreakpoint extends WildcardMethodBreakpoint {
           }
           Value key = ContainerUtil.getOrElse(frameProxy.getArgumentValues(), myParamNo, null);
           if (key instanceof ObjectReference) {
-            stacks.put((ObjectReference)key, StackFrameItem.createFrames(suspendContext.getThread()));
+            stacks.put((ObjectReference)key, StackFrameItem.createFrames(suspendContext.getThread(), process, true));
           }
         }
       }
@@ -119,5 +119,31 @@ public class StackCapturingLineBreakpoint extends WildcardMethodBreakpoint {
     StackCapturingLineBreakpoint breakpoint =
       new StackCapturingLineBreakpoint(debugProcess.getProject(), classFqn, methodName, methodSignature, paramNo);
     breakpoint.createRequest(debugProcess);
+  }
+
+  @Nullable
+  public static List<StackFrameItem> getRelatedStack(@Nullable StackFrameProxyImpl frame, @Nullable DebugProcessImpl process) {
+    if (process != null && frame != null) {
+      Map<ObjectReference, List<StackFrameItem>> data = process.getUserData(CAPTURED_STACKS);
+      if (data != null) {
+        try {
+          return data.get(frame.thisObject());
+        }
+        catch (EvaluateException ignore) {
+        }
+      }
+    }
+    return null;
+  }
+
+  @Nullable
+  public static List<StackFrameItem> getRelatedStack(@Nullable ObjectReference key, @Nullable DebugProcessImpl process) {
+    if (process != null && key != null) {
+      Map<ObjectReference, List<StackFrameItem>> data = process.getUserData(CAPTURED_STACKS);
+      if (data != null) {
+        return data.get(key);
+      }
+    }
+    return null;
   }
 }
