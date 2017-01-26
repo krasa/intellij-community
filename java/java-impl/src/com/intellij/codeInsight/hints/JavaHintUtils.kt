@@ -25,7 +25,6 @@ import com.intellij.psi.util.TypeConversionUtil
 
 object JavaInlayHintsProvider {
 
-  
   fun createHints(callExpression: PsiCallExpression): Set<InlayInfo> {
     val resolveResult = callExpression.resolveMethodGenerics()
     val hints = createHintsForResolvedMethod(callExpression, resolveResult)
@@ -92,7 +91,13 @@ object JavaInlayHintsProvider {
   private fun createUnclearInlays(args: List<CallArgumentInfo>): List<InlayInfo> {
     return args
       .filter { isUnclearExpression(it.argument) }
-      .mapNotNull { createInlayInfo(it.argument, it.parameter) }
+      .mapNotNull { 
+        val inlayInfo = createInlayInfo(it.argument, it.parameter)
+        if (ParameterHintsPassFactory.isDebug()) {
+          println("Hint for ${it.argument} : ${inlayInfo?.text}")  
+        }
+        inlayInfo
+      }
   }
 
   private fun getVarArgInlay(info: CallInfo): InlayInfo? {
@@ -165,9 +170,9 @@ object JavaInlayHintsProvider {
     val varargExpressions = arguments.drop(regularParamsCount)
     return CallInfo(regularArgInfos, varargParam, varargExpressions)
   }
-
+  
   private fun isUnclearExpression(callArgument: PsiElement): Boolean {
-    return when (callArgument) {
+    val isShowHint = when (callArgument) {
       is PsiLiteralExpression -> true
       is PsiThisExpression -> true
       is PsiBinaryExpression -> true
@@ -179,6 +184,12 @@ object JavaInlayHintsProvider {
       }
       else -> false
     }
+
+    if (ParameterHintsPassFactory.isDebug()) {
+      println("${System.nanoTime()}: ${callArgument.text} : ${callArgument.javaClass} : isShowHint->$isShowHint")
+    }
+    
+    return isShowHint
   }
 }
 

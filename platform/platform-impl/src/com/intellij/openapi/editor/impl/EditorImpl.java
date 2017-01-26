@@ -108,6 +108,7 @@ import java.awt.dnd.DropTargetDragEvent;
 import java.awt.dnd.DropTargetDropEvent;
 import java.awt.event.*;
 import java.awt.font.TextHitInfo;
+import java.awt.geom.Point2D;
 import java.awt.im.InputMethodRequests;
 import java.awt.image.BufferedImage;
 import java.beans.PropertyChangeListener;
@@ -503,15 +504,15 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     myEditorComponent = new EditorComponentImpl(this);
     myScrollPane.putClientProperty(JBScrollPane.BRIGHTNESS_FROM_VIEW, true);
     myVerticalScrollBar = (MyScrollBar)myScrollPane.getVerticalScrollBar();
-    // JBScrollPane.Layout relies on "opaque" property directly (instead of "editor.transparent.scrollbar")
-    myVerticalScrollBar.setOpaque(SystemProperties.isTrueSmoothScrollingEnabled() &&
-                                  !IdeBackgroundUtil.isBackgroundImageSet(project));
     myPanel = new JPanel();
 
     // JBScrollPane.Layout relies on "opaque" property directly (instead of "editor.transparent.scrollbar")
-    myScrollPane.getHorizontalScrollBar().setOpaque(SystemProperties.isTrueSmoothScrollingEnabled() &&
-                                                    !IdeBackgroundUtil.isBackgroundImageSet(project));
-
+    boolean opaque = JBScrollPane.isPreciseRotationSupported() || SystemProperties.isTrueSmoothScrollingEnabled();
+    if (opaque && !IdeBackgroundUtil.isBackgroundImageSet(project)) {
+      //Do not set opaque to false if a scroll bar is opaque (System Preferences / Show scroll bars / Always)
+      myVerticalScrollBar.setOpaque(true);
+      myScrollPane.getHorizontalScrollBar().setOpaque(true);
+    }
     UIUtil.putClientProperty(
       myPanel, UIUtil.NOT_IN_HIERARCHY_COMPONENTS, (Iterable<JComponent>)() -> {
         JComponent component = getPermanentHeaderComponent();
@@ -904,7 +905,7 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
       // To have both the hardware acceleration and the background image we need to completely redesign JViewport machinery to support
       // independent layers, which is (probably) possible, but it's a rather cumbersome task.
       // Smooth scrolling still works event without the blit-acceleration, but with suboptimal performance and CPU usage.
-      if (IdeBackgroundUtil.isBackgroundImageSet(myProject)) {
+      if (SystemProperties.isTrueSmoothScrollingEnabled() && IdeBackgroundUtil.isBackgroundImageSet(myProject)) {
         JComponent component = new JComponent() {}; // transparent
         component.setPreferredSize(new Dimension(1, 1));
         layeredPane.add(component, JLayeredPane.POPUP_LAYER);
@@ -1217,8 +1218,14 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
     return myView.xyToVisualPosition(p);
   }
 
+  @Override
   @NotNull
-  Point offsetToXY(int offset, boolean leanTowardsLargerOffsets) {
+  public VisualPosition xyToVisualPosition(@NotNull Point2D p) {
+    return myView.xyToVisualPosition(p);
+  }
+
+  @NotNull
+  Point2D offsetToXY(int offset, boolean leanTowardsLargerOffsets) {
     return myView.offsetToXY(offset, leanTowardsLargerOffsets, false);
   }
   
@@ -1279,6 +1286,13 @@ public final class EditorImpl extends UserDataHolderBase implements EditorEx, Hi
   @Override
   @NotNull
   public Point visualPositionToXY(@NotNull VisualPosition visible) {
+    Point2D point2D = myView.visualPositionToXY(visible);
+    return new Point((int)point2D.getX(), (int)point2D.getY());
+  }
+
+  @Override
+  @NotNull
+  public Point2D visualPositionToPoint2D(@NotNull VisualPosition visible) {
     return myView.visualPositionToXY(visible);
   }
 

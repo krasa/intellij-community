@@ -685,7 +685,8 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
   @Override
   public int getContentSize() {
     synchronized (LOCK) {
-      return myEditor.getDocument().getTextLength() + myDeferredBuffer.length();
+      return (myEditor == null ? 0 : myEditor.getDocument().getTextLength())
+             + myDeferredBuffer.length();
     }
   }
 

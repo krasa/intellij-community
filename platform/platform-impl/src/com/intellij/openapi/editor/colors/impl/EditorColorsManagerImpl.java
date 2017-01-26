@@ -22,7 +22,9 @@ import com.intellij.configurationStore.SchemeDataHolder;
 import com.intellij.configurationStore.SchemeExtensionProvider;
 import com.intellij.ide.WelcomeWizardUtil;
 import com.intellij.ide.ui.LafManager;
+import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.impl.ApplicationImpl;
 import com.intellij.openapi.components.PersistentStateComponent;
 import com.intellij.openapi.components.State;
 import com.intellij.openapi.components.Storage;
@@ -126,7 +128,7 @@ public class EditorColorsManagerImpl extends EditorColorsManager implements Pers
           return false;
         }
 
-        return scheme.isEqualToBundled(bundledScheme);
+        return scheme.equals(bundledScheme);
       }
 
       @Override
@@ -297,7 +299,9 @@ public class EditorColorsManagerImpl extends EditorColorsManager implements Pers
 
   @Override
   public void setGlobalScheme(@Nullable EditorColorsScheme scheme) {
-    mySchemeManager.setCurrent(scheme == null ? getDefaultScheme() : scheme);
+    Application application = ApplicationManager.getApplication();
+    boolean notify = (application instanceof ApplicationImpl && ((ApplicationImpl)application).isLoaded());
+    mySchemeManager.setCurrent(scheme == null ? getDefaultScheme() : scheme, notify);
   }
 
   private void setGlobalSchemeInner(@Nullable EditorColorsScheme scheme) {

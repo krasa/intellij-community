@@ -43,6 +43,7 @@ import com.intellij.util.containers.HashSet;
 import gnu.trove.TIntObjectHashMap;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.TestOnly;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -50,6 +51,17 @@ import java.util.stream.Collectors;
 public class ParameterHintsPassFactory extends AbstractProjectComponent implements TextEditorHighlightingPassFactory {
   private static final Key<Boolean> REPEATED_PASS = Key.create("RepeatedParameterHintsPass");
 
+  private static boolean isDebug = false;
+  
+  @TestOnly
+  public static void setDebug(boolean value) {
+    isDebug = value;  
+  }
+  
+  public static boolean isDebug() {
+    return isDebug;
+  }
+  
   public ParameterHintsPassFactory(Project project, TextEditorHighlightingPassRegistrar registrar) {
     super(project);
     registrar.registerTextEditorHighlightingPass(this, null, null, false, -1);
@@ -91,7 +103,15 @@ public class ParameterHintsPassFactory extends AbstractProjectComponent implemen
         .filter((e) -> e != null)
         .collect(Collectors.toList());
 
+      if (isDebug) {
+        System.out.println(System.nanoTime() + ": [HintsPass] Traversing started");
+      }
+      
       SyntaxTraverser.psiTraverser(myFile).forEach(element -> process(element, provider, matchers));
+      
+      if (isDebug) {
+        System.out.println(System.nanoTime() + ": [HintsPass] Traversing ended");
+      }
     }
 
     private static Set<String> getBlackList(Language language) {
@@ -123,6 +143,10 @@ public class ParameterHintsPassFactory extends AbstractProjectComponent implemen
 
     @Override
     public void doApplyInformationToEditor() {
+      if (isDebug) {
+        System.out.println(System.nanoTime() + ": hints addition started");
+      }
+
       assert myDocument != null;
       boolean firstTime = myEditor.getUserData(REPEATED_PASS) == null;
       ParameterHintsPresentationManager presentationManager = ParameterHintsPresentationManager.getInstance();
@@ -135,16 +159,30 @@ public class ParameterHintsPassFactory extends AbstractProjectComponent implemen
       for (Inlay inlay : myEditor.getInlayModel().getInlineElementsInRange(0, myDocument.getTextLength())) {
         if (!presentationManager.isParameterHint(inlay)) continue;
         int offset = inlay.getOffset();
+        
         String newText = myAnnotations.remove(offset);
-        if (delayRemoval(inlay, caretMap)) continue;
         String oldText = presentationManager.getHintText(inlay);
+        
+        if (isDebug) {
+          System.out.println("Hint at: " + offset + " Old text: " + oldText + " New text: " + newText);
+        }
+        
+        if (delayRemoval(inlay, caretMap)) continue;
         if (!Objects.equals(newText, oldText)) {
           if (newText == null) {
             removedHints.add(oldText);
             presentationManager.deleteHint(myEditor, inlay);
+        
+            if (isDebug) {
+              System.out.println("Hint deleted " + offset);
+            }
           }
           else {
             presentationManager.replaceHint(myEditor, inlay, newText);
+            
+            if (isDebug) {
+              System.out.println("Hint replaced " + offset + " with new text: " + newText);
+            }
           }
         }
       }
@@ -152,9 +190,16 @@ public class ParameterHintsPassFactory extends AbstractProjectComponent implemen
         int offset = e.getKey();
         String text = e.getValue();
         presentationManager.addHint(myEditor, offset, text, !firstTime && !removedHints.contains(text));
+        if (isDebug) {
+          System.out.println(System.nanoTime() + ": hint added \"" + text + "\" " + offset);
+        }
       }
       keeper.restoreOriginalLocation();
       myEditor.putUserData(REPEATED_PASS, Boolean.TRUE);
+
+      if (isDebug) {
+        System.out.println(System.nanoTime() + ": hints applied to editor");
+      }
     }
 
     private boolean delayRemoval(Inlay inlay, TIntObjectHashMap<Caret> caretMap) {

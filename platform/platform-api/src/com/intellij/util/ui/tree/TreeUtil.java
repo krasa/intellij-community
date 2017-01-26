@@ -794,14 +794,27 @@ public final class TreeUtil {
     expand(tree, new TreePath(tree.getModel().getRoot()), levels);
   }
 
-  private static void expand(@NotNull JTree tree, @NotNull TreePath path, int levels) {
-    if (levels == 0) return;
+  /**
+   * Expands n levels of the tree counting from the root and return true if there is no nodes to expand
+   * @param tree to expand nodes of
+   * @param levels depths of the expantion
+   */
+  public static boolean expandWithResult(@NotNull JTree tree, int levels) {
+    return expand(tree, new TreePath(tree.getModel().getRoot()), levels);
+  }
+
+  private static boolean expand(@NotNull JTree tree, @NotNull TreePath path, int levels) {
+    if (levels == 0) return false;
     tree.expandPath(path);
     TreeNode node = (TreeNode)path.getLastPathComponent();
     Enumeration children = node.children();
+
+    boolean isReady = true;
     while (children.hasMoreElements()) {
-      expand(tree, path.pathByAddingChild(children.nextElement()) , levels - 1);
+      if (!expand(tree, path.pathByAddingChild(children.nextElement()) , levels - 1))
+        isReady = false;
     }
+    return isReady;
   }
 
   @NotNull
@@ -976,13 +989,30 @@ public final class TreeUtil {
     }
   }
 
-  public static int indexedBinarySearch(@NotNull TreeNode parent, @NotNull TreeNode key, Comparator comparator) {
+  public static <T extends MutableTreeNode> void insertNode(@NotNull T child, @NotNull T parent, @Nullable DefaultTreeModel model,
+                                                            @NotNull Comparator<? super T> comparator) {
+    int index = indexedBinarySearch(parent, child, comparator);
+    if (index >= 0) {
+      LOG.error("Node " + child + " is already added to " + parent);
+      return;
+    }
+    int insertionPoint = -(index + 1);
+    if (model != null) {
+      model.insertNodeInto(child, parent, insertionPoint);
+    }
+    else {
+      parent.insert(child, insertionPoint);
+    }
+  }
+
+  public static <T extends TreeNode> int indexedBinarySearch(@NotNull T parent, @NotNull T key, @NotNull Comparator<? super T> comparator) {
     int low = 0;
     int high = parent.getChildCount() - 1;
 
     while (low <= high) {
       int mid = (low + high) / 2;
-      TreeNode treeNode = parent.getChildAt(mid);
+      //noinspection unchecked
+      T treeNode = (T)parent.getChildAt(mid);
       int cmp = comparator.compare(treeNode, key);
       if (cmp < 0) {
         low = mid + 1;
@@ -999,6 +1029,6 @@ public final class TreeUtil {
 
   @NotNull
   public static Comparator<TreePath> getDisplayOrderComparator(@NotNull final JTree tree) {
-    return (path1, path2) -> tree.getRowForPath(path1) - tree.getRowForPath(path2);
+    return Comparator.comparingInt(tree::getRowForPath);
   }
 }

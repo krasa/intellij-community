@@ -242,7 +242,7 @@ public class StreamApiMigrationInspection extends BaseJavaBatchLocalInspectionTo
 
   static boolean isAddAllCall(TerminalBlock tb) {
     PsiMethodCallExpression call = tb.getSingleMethodCall();
-    LOG.assertTrue(call != null);
+    if (call == null) return false;
     if (!ExpressionUtils.isReferenceTo(call.getArgumentList().getExpressions()[0], tb.getVariable())) return false;
     if (!"add".equals(call.getMethodExpression().getReferenceName())) return false;
     PsiExpression qualifierExpression = call.getMethodExpression().getQualifierExpression();
@@ -542,7 +542,7 @@ public class StreamApiMigrationInspection extends BaseJavaBatchLocalInspectionTo
       }
       if (nonFinalVariables.isEmpty()) {
         CollectMigration.CollectTerminal terminal = CollectMigration.extractCollectTerminal(tb);
-        if(terminal != null && getInitializerUsageStatus(terminal.getTargetVariable(), loop) != UNKNOWN) {
+        if(terminal != null) {
           boolean addAll = loop instanceof PsiForeachStatement && !tb.hasOperations() && isAddAllCall(tb);
           // Don't suggest to convert the loop which can be trivially replaced via addAll:
           // this is covered by UseBulkOperationInspection and ManualArrayToCollectionCopyInspection
