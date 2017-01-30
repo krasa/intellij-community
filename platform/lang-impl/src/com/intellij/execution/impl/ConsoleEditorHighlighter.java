@@ -39,7 +39,6 @@ import java.util.List;
  * Asynchronous Filters do not need to use this, it would be too complex, and unnecessary as number of their highlights will be always low (if GrepConsole will use HighlightingInputFilter.
  * - some of it is copy paste from IJ 2016...
  * <p>
- * TODO keep SYSTEM_ERR,SYSTEM_OUT... when clearing? perhaps make another list just for backing content types?
  * TODO consider: merge all highlighters with the text content type - or save memory by having plugins do it - or merge them the first time and have some cache - or do nothing? 
  */
 @SuppressWarnings("ForLoopReplaceableByForEach")
@@ -53,7 +52,8 @@ public class ConsoleEditorHighlighter extends DocumentAdapter implements EditorH
    *
    * assumed that tokens are ordered by offset in ascending order.
    */
-  private final List<PushedTokenInfo> myTokens = new ArrayList<>();
+  private final List<PushedTokenInfo> myHighlighters = new ArrayList<>();
+  private final List<PushedTokenInfo> myContentTypes = new ArrayList<>();
   private HighlighterClient myEditor;
   private boolean broken;
 
@@ -63,12 +63,17 @@ public class ConsoleEditorHighlighter extends DocumentAdapter implements EditorH
       return;
     }
 
+    PushedTokenInfo contentTypeToken = new PushedTokenInfo(tokenInfo.contentType, startOffset, endOffset);
+    if (!mergeWithLastToken(contentTypeToken, myContentTypes)) {
+      myContentTypes.add(contentTypeToken);
+    }
+    
     try {
       List<OrderedToken> items = adjustRangesAndSort(tokenInfo);
-      List<PushedTokenInfo> pushedTokens = transform_withMergingOfTextAttributes(tokenInfo.contentType, items, endOffset - startOffset);
+      List<PushedTokenInfo> tokens = transform_withMergingOfTextAttributes(tokenInfo.contentType, items, endOffset - startOffset);
 
-      for (int i = 0; i < pushedTokens.size(); i++) {
-        PushedTokenInfo newToken = pushedTokens.get(i);
+      for (int i = 0; i < tokens.size(); i++) {
+        PushedTokenInfo newToken = tokens.get(i);
 
         //adjusted by document offset
         int adjustedStartOffset = Math.min(newToken.startOffset + startOffset, endOffset);
@@ -77,8 +82,8 @@ public class ConsoleEditorHighlighter extends DocumentAdapter implements EditorH
         newToken.startOffset = adjustedStartOffset;
         newToken.endOffset = adjustedEndOffset;
 
-        if (!mergeWithLastToken(newToken)) {
-          myTokens.add(newToken);
+        if (!mergeWithLastToken(newToken, myHighlighters)) {
+          myHighlighters.add(newToken);
         }
       }
     }
@@ -88,9 +93,9 @@ public class ConsoleEditorHighlighter extends DocumentAdapter implements EditorH
     }
   }
 
-  private boolean mergeWithLastToken(PushedTokenInfo newToken) {
-    if (!myTokens.isEmpty()) {
-      final PushedTokenInfo lastPushedToken = myTokens.get(myTokens.size() - 1);
+  private boolean mergeWithLastToken(PushedTokenInfo newToken, List<PushedTokenInfo> tokens) {
+    if (!tokens.isEmpty()) {
+      final PushedTokenInfo lastPushedToken = tokens.get(tokens.size() - 1);
 
       if (lastPushedToken.contentType == newToken.contentType
           && lastPushedToken.mergedAttributes == newToken.mergedAttributes
@@ -235,12 +240,22 @@ public class ConsoleEditorHighlighter extends DocumentAdapter implements EditorH
   }
 
 
-  public void clear() {
-    myTokens.clear();
+  public void clearAll() {
+    myHighlighters.clear();
+    myContentTypes.clear();
   }
 
-  public long tokensSize() {
-    return myTokens.size();
+  public void clearHighlighters() {
+    myHighlighters.clear();
+  }
+
+  public ConsoleViewContentType findContentTypeByOffset(int offset) {
+    int index = findTokenInfoIndexByOffset(offset, myContentTypes);
+    if (index >= myContentTypes.size()) {
+      return ConsoleViewContentType.NORMAL_OUTPUT;
+    }
+    PushedTokenInfo info = myContentTypes.get(index);
+    return info.contentType;
   }
 
   static class PushedTokenInfo {
@@ -314,6 +329,16 @@ public class ConsoleEditorHighlighter extends DocumentAdapter implements EditorH
     private static final OrderedItemComparator MY_COMPARATOR = new OrderedItemComparator();
     private static final Comparator<OrderedToken> ORDER_COMPARATOR = Comparator.comparingInt(OrderedToken::getOrder);
 
+    private static class OrderedItemComparator implements Comparator<OrderedToken> {
+      @Override
+      public int compare(OrderedToken o1, OrderedToken o2) {
+        if (o1.getStartOffset() == o2.getStartOffset()) {
+          return o1.getOrder() - o2.getOrder();
+        }
+        return o1.getStartOffset() - o2.getStartOffset();
+      }
+    }
+    
     int myOrder;
 
     public OrderedToken(int offset, int endOffset, ConsoleViewContentType type, int order) {
@@ -371,8 +396,13 @@ public class ConsoleEditorHighlighter extends DocumentAdapter implements EditorH
    * @param endOffset   end offset of the removed text (exclusive)
    */
   public void updateTokensOnTextRemoval(int startOffset, int endOffset) {
-    final int firstIndex = findTokenInfoIndexByOffset(startOffset);
-    if (firstIndex >= myTokens.size()) {
+    updateTokensOnTextRemovalInternal(startOffset, endOffset, myHighlighters);
+    updateTokensOnTextRemovalInternal(startOffset, endOffset, myContentTypes);
+  }
+
+  private void updateTokensOnTextRemovalInternal(int startOffset, int endOffset, List<PushedTokenInfo> tokens) {
+    final int firstIndex = findTokenInfoIndexByOffset(startOffset, tokens);
+    if (firstIndex >= tokens.size()) {
       return;
     }
 
@@ -380,7 +410,7 @@ public class ConsoleEditorHighlighter extends DocumentAdapter implements EditorH
     boolean updateOnly = false;
     int removeIndexStart = -1;
     int removeIndexEnd = -1;
-    final PushedTokenInfo firstToken = myTokens.get(firstIndex);
+    final PushedTokenInfo firstToken = tokens.get(firstIndex);
 
     if (startOffset == firstToken.startOffset) {
       // Removed range is located entirely at the first token.
@@ -399,8 +429,8 @@ public class ConsoleEditorHighlighter extends DocumentAdapter implements EditorH
       updateOnly = true;
     }
 
-    for (int i = firstIndex + 1; i < myTokens.size(); i++) {
-      final PushedTokenInfo tokenInfo = myTokens.get(i);
+    for (int i = firstIndex + 1; i < tokens.size(); i++) {
+      final PushedTokenInfo tokenInfo = tokens.get(i);
       if (updateOnly) {
         tokenInfo.startOffset -= removedSymbolsNumber;
         tokenInfo.endOffset -= removedSymbolsNumber;
@@ -424,7 +454,7 @@ public class ConsoleEditorHighlighter extends DocumentAdapter implements EditorH
     }
 
     if (removeIndexStart >= 0) {
-      myTokens.subList(removeIndexStart, removeIndexEnd + 1).clear();
+      tokens.subList(removeIndexStart, removeIndexEnd + 1).clear();
     }
   }
 
@@ -435,15 +465,16 @@ public class ConsoleEditorHighlighter extends DocumentAdapter implements EditorH
    *
    * @param tokens target tokens ordered by offset in ascending order
    * @param offset target offset
+   * @param tokens
    * @return index of the target token within the given list; given list length if no such token is found
    */
-  public int findTokenInfoIndexByOffset(final int offset) {
+  private int findTokenInfoIndexByOffset(final int offset, List<PushedTokenInfo> tokens) {
     int low = 0;
-    int high = myTokens.size() - 1;
+    int high = tokens.size() - 1;
 
     while (low <= high) {
       final int mid = (low + high) / 2;
-      final PushedTokenInfo midVal = myTokens.get(mid);
+      final PushedTokenInfo midVal = tokens.get(mid);
       if (offset < midVal.startOffset) {
         high = mid - 1;
       }
@@ -454,13 +485,13 @@ public class ConsoleEditorHighlighter extends DocumentAdapter implements EditorH
         return mid;
       }
     }
-    return myTokens.size();
+    return tokens.size();
   }
 
   @NotNull
   @Override
   public HighlighterIterator createIterator(final int startOffset) {
-    final int startIndex = findTokenInfoIndexByOffset(startOffset);
+    final int startIndex = findTokenInfoIndexByOffset(startOffset, myHighlighters);
 
     return new HighlighterIterator() {
       private int myIndex = startIndex;
@@ -501,7 +532,7 @@ public class ConsoleEditorHighlighter extends DocumentAdapter implements EditorH
 
       @Override
       public boolean atEnd() {
-        return myIndex < 0 || myIndex >= myTokens.size();
+        return myIndex < 0 || myIndex >= myHighlighters.size();
       }
 
       @Override
@@ -510,7 +541,7 @@ public class ConsoleEditorHighlighter extends DocumentAdapter implements EditorH
       }
 
       private PushedTokenInfo getTokenInfo() {
-        return myTokens.get(myIndex);
+        return myHighlighters.get(myIndex);
       }
     };
   }
@@ -529,15 +560,6 @@ public class ConsoleEditorHighlighter extends DocumentAdapter implements EditorH
   public void setColorScheme(@NotNull EditorColorsScheme scheme) {
   }
 
-  private static class OrderedItemComparator implements Comparator<OrderedToken> {
-    @Override
-    public int compare(OrderedToken o1, OrderedToken o2) {
-      if (o1.getStartOffset() == o2.getStartOffset()) {
-        return o1.getOrder() - o2.getOrder();
-      }
-      return o1.getStartOffset() - o2.getStartOffset();
-    }
-  }
 
   protected static TextAttributes merge(@NotNull TextAttributes under, @NotNull TextAttributes above) {
     if (above.getBackgroundColor() == null) {

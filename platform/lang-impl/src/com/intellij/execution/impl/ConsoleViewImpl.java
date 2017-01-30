@@ -825,7 +825,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     final DocumentEx document = myEditor.getDocument();
     synchronized (LOCK) {
       clearHyperlinkAndFoldings();
-      myHighlighter.clear();
+      myHighlighter.clearAll();
     }
     final int documentTextLength = document.getTextLength();
     if (documentTextLength > 0) {
@@ -1043,7 +1043,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
     if (myHighlightingInputFilter == null) {
       return;
     }
-    myHighlighter.clear();
+    myHighlighter.clearHighlighters();
 
     final Document document = myEditor.getDocument();
     final int startLine = 0;
@@ -1056,12 +1056,12 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
         endOffset++; // add '\n'
       }
       final String text = getLineText(document, line, true);
-      HighlightingInputFilter.Result result = myHighlightingInputFilter.applyFilter(text, ConsoleViewContentType.NORMAL_OUTPUT);
-      if (result != null) {
-        TokenBuffer.TokenInfo info =
-          new TokenBuffer.TokenInfo(ConsoleViewContentType.NORMAL_OUTPUT, result.getResultItems(), text, null, 0);
-        myHighlighter.addToken(startOffset, endOffset, info);
-      }
+
+      ConsoleViewContentType contentType = myHighlighter.findContentTypeByOffset(startOffset);
+      HighlightingInputFilter.Result result = myHighlightingInputFilter.applyFilter(text, contentType);
+      List<HighlightingInputFilter.ResultItem> highlights = result != null ? result.getResultItems() : null;
+      myHighlighter.addToken(startOffset, endOffset, new TokenBuffer.TokenInfo(contentType, highlights, text, null, 0));
+      
       startOffset = endOffset;
     }
   }
