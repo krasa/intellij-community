@@ -1060,7 +1060,7 @@ public class ConsoleViewImpl extends JPanel implements ConsoleView, ObservableCo
       ConsoleViewContentType contentType = myHighlighter.findContentTypeByOffset(startOffset);
       HighlightingInputFilter.Result result = myHighlightingInputFilter.applyFilter(text, contentType);
       List<HighlightingInputFilter.ResultItem> highlights = result != null ? result.getResultItems() : null;
-      myHighlighter.addToken(startOffset, endOffset, new TokenBuffer.TokenInfo(contentType, highlights, text, null, 0));
+      myHighlighter.addHighlight(startOffset, endOffset, new TokenBuffer.TokenInfo(contentType, highlights, text, null, 0));
       
       startOffset = endOffset;
     }
