@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2016 JetBrains s.r.o.
+ * Copyright 2000-2017 JetBrains s.r.o.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -112,9 +112,8 @@ public class CompletionLookupArranger extends LookupArranger {
   @Override
   public Map<LookupElement, List<Pair<String, Object>>> getRelevanceObjects(@NotNull Iterable<LookupElement> items,
                                                                                boolean hideSingleValued) {
-    //noinspection unchecked
-    final Map<LookupElement, List<Pair<String, Object>>> map = new com.intellij.util.containers.hash.LinkedHashMap(EqualityPolicy.IDENTITY);
-    final MultiMap<CompletionSorterImpl, LookupElement> inputBySorter = groupItemsBySorter(items);
+    Map<LookupElement, List<Pair<String, Object>>> map = ContainerUtil.newIdentityHashMap();
+    MultiMap<CompletionSorterImpl, LookupElement> inputBySorter = groupItemsBySorter(items);
     int sorterNumber = 0;
     for (CompletionSorterImpl sorter : inputBySorter.keySet()) {
       sorterNumber++;
@@ -138,8 +137,12 @@ public class CompletionLookupArranger extends LookupArranger {
       }
     }
 
-    return map;
-
+    //noinspection unchecked
+    Map<LookupElement, List<Pair<String, Object>>> result = new com.intellij.util.containers.hash.LinkedHashMap(EqualityPolicy.IDENTITY);
+    for (LookupElement item : items) {
+      result.put(item, map.get(item));
+    }
+    return result;
   }
 
   private static boolean haveSameWeights(List<Pair<LookupElement, Object>> pairs) {
@@ -235,7 +238,7 @@ public class CompletionLookupArranger extends LookupArranger {
   }
 
   private static boolean isAlphaSorted() {
-    return ourUISettings.SORT_LOOKUP_ELEMENTS_LEXICOGRAPHICALLY;
+    return ourUISettings.isSortLookupElementsLexicographically();
   }
 
   @Override

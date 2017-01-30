@@ -122,9 +122,7 @@ class Operators {
       "a.xor(b)"               : "a ^ b",
       "a.leftShift(b)"         : "a << b",
       "a.rightShift(b)"        : "a >> b",
-      "a.rightShiftUnsigned(b)": "a >>> b",
-      "a.asType(String)"       : "a as String",
-      "!a.asType(String)"      : "!(a as String)",
+      "a.rightShiftUnsigned(b)": "a >>> b"
     ].each {
       doTest it.key, it.value
     }
@@ -198,6 +196,14 @@ class Operators {
     doTest "a.p<caret>lus(b) - 1", "a + b - 1"
     doTest "a.m<caret>inus(b) + 1", "a - b + 1"
     doTest "a.p<caret>lus(b) + 1", "a + b + 1"
+  }
+
+  void testAsType() {
+    doTest "a.asType(String)", "a as String"
+    doTest "!a.asType(String)", "!(a as String)"
+    doTest "a.asType(String.class)"
+    doTest "a.asType(a.getClass())"
+    doTest "a.asType(UnknownClass)"
   }
 
   void testComplex() {
@@ -282,25 +288,27 @@ class Operators {
   final String DECLARATIONS = 'def (Operators a, Operators b) = [null, null]\n'
 
   private void doTest(String before, String after = null) {
-    fixture.with {
-      configureByText '_.groovy', "$DECLARATIONS$before"
-      moveCaret()
-      def intentions = filterAvailableIntentions('Replace ')
-      if (after) {
-        assert intentions: before
-        launchAction intentions.first()
-        checkResult "$DECLARATIONS$after"
-      }
-      else {
-        assert !intentions
+    Closeable closeCaret =  {fixture.editor.caretModel.moveToOffset(0)}
+
+    closeCaret.withCloseable {
+      fixture.with {
+        configureByText '_.groovy', "$DECLARATIONS$before"
+        moveCaret()
+        def intentions = filterAvailableIntentions('Replace ')
+        if (after) {
+          assert intentions: before
+          launchAction intentions.first()
+          checkResult "$DECLARATIONS$after"
+        }
+        else {
+          assert !intentions
+        }
       }
     }
   }
 
   private void moveCaret() {
-    def statement =
-
-   (fixture.file as GroovyFile).statements.last()
+    def statement = (fixture.file as GroovyFile).statements.last()
     GrMethodCall call = null
 
     if (statement instanceof GrMethodCall) {

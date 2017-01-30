@@ -31,7 +31,6 @@ import com.intellij.diff.fragments.DiffFragment;
 import com.intellij.diff.fragments.LineFragment;
 import com.intellij.diff.fragments.MergeLineFragment;
 import com.intellij.diff.fragments.MergeWordFragment;
-import com.intellij.diff.impl.DiffSettingsHolder;
 import com.intellij.diff.impl.DiffSettingsHolder.DiffSettings;
 import com.intellij.diff.requests.ContentDiffRequest;
 import com.intellij.diff.requests.DiffRequest;
@@ -94,6 +93,7 @@ import com.intellij.util.ArrayUtil;
 import com.intellij.util.DocumentUtil;
 import com.intellij.util.LineSeparator;
 import com.intellij.util.containers.ContainerUtil;
+import com.intellij.util.containers.Convertor;
 import com.intellij.util.ui.JBInsets;
 import com.intellij.util.ui.JBUI;
 import com.intellij.util.ui.UIUtil;
@@ -1320,12 +1320,23 @@ public class DiffUtil {
 
   @NotNull
   public static DiffSettings getDiffSettings(@NotNull DiffContext context) {
-    DiffSettings settings = context.getUserData(DiffSettingsHolder.KEY);
+    DiffSettings settings = context.getUserData(DiffSettings.KEY);
     if (settings == null) {
       settings = DiffSettings.getSettings(context.getUserData(DiffUserDataKeys.PLACE));
-      context.putUserData(DiffSettingsHolder.KEY, settings);
+      context.putUserData(DiffSettings.KEY, settings);
     }
     return settings;
+  }
+
+  @NotNull
+  public static <K, V> TreeMap<K, V> trimDefaultValues(@NotNull TreeMap<K, V> map, @NotNull Convertor<K, V> defaultValue) {
+    TreeMap<K, V> result = new TreeMap<>();
+    for (Map.Entry<K, V> it : map.entrySet()) {
+      K key = it.getKey();
+      V value = it.getValue();
+      if (!value.equals(defaultValue.convert(key))) result.put(key, value);
+    }
+    return result;
   }
 
   //

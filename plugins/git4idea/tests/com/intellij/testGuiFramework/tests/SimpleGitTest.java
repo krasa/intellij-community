@@ -20,10 +20,10 @@ import com.intellij.idea.ActionsBundle;
 import com.intellij.openapi.vcs.FileStatus;
 import com.intellij.openapi.vcs.VcsBundle;
 import com.intellij.testGuiFramework.fixtures.*;
-import com.intellij.testGuiFramework.impl.GuiTestCase;
 import git4idea.i18n.GitBundle;
 import org.fest.swing.core.FastRobot;
 import org.fest.swing.timing.Pause;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.awt.event.KeyEvent;
@@ -35,7 +35,8 @@ import static com.intellij.testGuiFramework.matcher.TitleMatcher.withTitleMatche
 /**
  * @author Sergey Karashevich
  */
-public class SimpleGitTest extends GuiTestCase {
+@Ignore
+public class SimpleGitTest extends GitGuiTestCase {
 
   @Test
   public void testSimpleGit(){
