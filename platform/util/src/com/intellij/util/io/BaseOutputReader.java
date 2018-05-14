@@ -45,6 +45,15 @@ public abstract class BaseOutputReader extends BaseDataReader {
         }
       };
     }
+
+    @Override
+    public String toString() {
+      return "Options{" +
+             "splitToLines=" + splitToLines() +
+             ", sendIncompleteLines=" + sendIncompleteLines() +
+             ", withSeparators=" + withSeparators() +
+             "}";
+    }
   }
 
   protected final Reader myReader;
@@ -53,6 +62,7 @@ public abstract class BaseOutputReader extends BaseDataReader {
   private final char[] myInputBuffer = new char[8192];
   private final StringBuilder myLineBuffer = new StringBuilder();
   private boolean myCarry;
+  private int recursionLevel = 0;
 
   public BaseOutputReader(@NotNull InputStream inputStream, @Nullable Charset charset) {
     this(createInputStreamReader(inputStream, charset));
@@ -98,6 +108,7 @@ public abstract class BaseOutputReader extends BaseDataReader {
     boolean read = false;
 
     try {
+      recursionLevel++;
       int n;
       while (myReader.ready() && (n = myReader.read(myInputBuffer)) >= 0) {
         if (n > 0) {
@@ -105,8 +116,19 @@ public abstract class BaseOutputReader extends BaseDataReader {
           processInput(myInputBuffer, myLineBuffer, n);
         }
       }
+      //sometimes it takes some time for the stream to send rest of the line, what's few recursions compared to broken logs?
+      if (myLineBuffer.length() > 0 && recursionLevel <= 5) {  //TODO config
+        //and what's one little sleep compared to broken logs?
+        try {
+          Thread.sleep(10); //TODO config, 1ms is too low, 10 might be also
+        }
+        catch (InterruptedException e) {
+        }
+        readAvailableNonBlocking();
+      }
     }
     finally {
+      --recursionLevel;
       if (myCarry) {
         myLineBuffer.append('\r');
         myCarry = false;
@@ -186,10 +208,10 @@ public abstract class BaseOutputReader extends BaseDataReader {
           sendText(line);
         }
       }
-
-      if (line.length() > 0 && myOptions.sendIncompleteLines()) {
-        sendText(line);
-      }
+      //Delete this. It makes no sense, why not let caller flush it in finally?
+      //if (line.length() > 0 && myOptions.sendIncompleteLines()) {
+      //  sendText(line);
+      //}
     }
     else {
       onTextAvailable(new String(buffer, 0, n));
