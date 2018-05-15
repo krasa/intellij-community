@@ -15,6 +15,7 @@
  */
 package com.intellij.util.io;
 
+import com.intellij.openapi.diagnostic.Logger;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -27,6 +28,8 @@ import java.nio.charset.Charset;
  * @author traff
  */
 public abstract class BaseOutputReader extends BaseDataReader {
+  private static final Logger LOG = Logger.getInstance(BaseOutputReader.class);
+
   /** See {@link #BaseOutputReader(Reader, Options)}, {@link #readAvailable}, and {@link #processInput} for reference. */
   public static class Options {
     public static final Options BLOCKING = withPolicy(SleepingPolicy.BLOCKING);
@@ -62,7 +65,6 @@ public abstract class BaseOutputReader extends BaseDataReader {
   private final char[] myInputBuffer = new char[8192];
   private final StringBuilder myLineBuffer = new StringBuilder();
   private boolean myCarry;
-  private int recursionLevel = 0;
 
   public BaseOutputReader(@NotNull InputStream inputStream, @Nullable Charset charset) {
     this(createInputStreamReader(inputStream, charset));
@@ -108,27 +110,31 @@ public abstract class BaseOutputReader extends BaseDataReader {
     boolean read = false;
 
     try {
-      recursionLevel++;
       int n;
       while (myReader.ready() && (n = myReader.read(myInputBuffer)) >= 0) {
         if (n > 0) {
           read = true;
           processInput(myInputBuffer, myLineBuffer, n);
+
+          //sometimes it takes some time for the stream to send the rest of the line, what's a little bit of waiting compared to broken logs?
+          //NetBeans seems to wait for 500ms (if it is the same case) https://github.com/apache/incubator-netbeans/blob/master/maven/src/org/netbeans/modules/maven/execute/CommandLineOutputHandler.java#L241
+          for (int sleepIterations = 0; sleepIterations < 10; sleepIterations++) {
+            if (isStopped || myReader.ready()) {
+              break;
+            }
+            try {
+              synchronized (mySleepMonitor) {
+                mySleepMonitor.wait(10);
+              }
+            }
+            catch (InterruptedException e) {
+              LOG.error(e);
+            }
+          }
         }
-      }
-      //sometimes it takes some time for the stream to send the rest of the line, what's few recursions compared to broken logs?
-      if (myLineBuffer.length() > 0 && recursionLevel <= 5) {  //TODO config
-        //and what's one little sleep compared to broken logs?
-        try {
-          Thread.sleep(10); //TODO config, 1ms is too low, 10 might be also
-        }
-        catch (InterruptedException e) {
-        }
-        readAvailableNonBlocking();
       }
     }
     finally {
-      --recursionLevel;
       if (myCarry) {
         myLineBuffer.append('\r');
         myCarry = false;
