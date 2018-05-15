@@ -116,7 +116,7 @@ public abstract class BaseOutputReader extends BaseDataReader {
           processInput(myInputBuffer, myLineBuffer, n);
         }
       }
-      //sometimes it takes some time for the stream to send rest of the line, what's few recursions compared to broken logs?
+      //sometimes it takes some time for the stream to send the rest of the line, what's few recursions compared to broken logs?
       if (myLineBuffer.length() > 0 && recursionLevel <= 5) {  //TODO config
         //and what's one little sleep compared to broken logs?
         try {
@@ -208,7 +208,7 @@ public abstract class BaseOutputReader extends BaseDataReader {
           sendText(line);
         }
       }
-      //Delete this. It makes no sense, why not let caller flush it in finally?
+      //Delete this. It makes no sense, why not let the caller flush it in the finally?
       //if (line.length() > 0 && myOptions.sendIncompleteLines()) {
       //  sendText(line);
       //}
