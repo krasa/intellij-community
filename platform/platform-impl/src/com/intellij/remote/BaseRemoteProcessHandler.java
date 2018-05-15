@@ -153,6 +153,11 @@ public class BaseRemoteProcessHandler<T extends RemoteProcess> extends BaseProce
       }
     }
 
+    @Override
+    protected boolean shouldStopWaiting() {
+      return myRemoteProcess.isDisconnected();
+    }
+
     protected synchronized void setClosed(boolean closed) {
       myClosed = closed;
     }
