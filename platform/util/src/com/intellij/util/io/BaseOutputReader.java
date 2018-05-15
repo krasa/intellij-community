@@ -118,17 +118,19 @@ public abstract class BaseOutputReader extends BaseDataReader {
 
           //sometimes it takes some time for the stream to send the rest of the line, what's a little bit of waiting compared to broken logs?
           //NetBeans waits for 500ms https://github.com/apache/incubator-netbeans/blob/master/maven/src/org/netbeans/modules/maven/execute/CommandLineOutputHandler.java#L241
-          for (int i = 0; i < 100; i++) {
-            if (myReader.ready() || isStopped || shouldStopWaiting()) {
-              break;
-            }
-            try {
-              synchronized (mySleepMonitor) {
-                mySleepMonitor.wait(5);
+          if (myLineBuffer.length() > 0 && !myReader.ready()) {
+            for (int i = 0; i < 100; i++) {
+              if (myReader.ready() || isStopped || shouldStopWaiting()) {
+                break;
               }
-            }
-            catch (InterruptedException e) {
-              LOG.error(e);
+              try {
+                synchronized (mySleepMonitor) {
+                  mySleepMonitor.wait(5);
+                }
+              }
+              catch (InterruptedException e) {
+                LOG.error(e);
+              }
             }
           }
         }
