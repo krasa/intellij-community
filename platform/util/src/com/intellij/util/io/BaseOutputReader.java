@@ -118,7 +118,7 @@ public abstract class BaseOutputReader extends BaseDataReader {
 
           //sometimes it takes some time for the stream to send the rest of the line, what's a little bit of waiting compared to broken logs?
           //NetBeans seems to wait for 500ms (if it is the same case) https://github.com/apache/incubator-netbeans/blob/master/maven/src/org/netbeans/modules/maven/execute/CommandLineOutputHandler.java#L241
-          for (int sleepIterations = 0; sleepIterations < 10; sleepIterations++) {
+          for (int i = 0; i < 10; i++) {
             if (isStopped || myReader.ready()) {
               break;
             }
