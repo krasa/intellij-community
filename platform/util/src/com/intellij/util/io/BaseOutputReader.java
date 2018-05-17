@@ -125,7 +125,7 @@ public abstract class BaseOutputReader extends BaseDataReader {
               }
               try {
                 synchronized (mySleepMonitor) {
-                  mySleepMonitor.wait(5);
+                  mySleepMonitor.wait(mySleepingPolicy.getTimeToSleep(i == 0));
                 }
               }
               catch (InterruptedException e) {
