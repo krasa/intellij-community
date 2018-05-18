@@ -2,6 +2,7 @@
 package com.intellij.openapi.fileEditor.impl;
 
 import com.intellij.openapi.extensions.ExtensionPointName;
+import com.intellij.openapi.fileEditor.FileEditor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import org.jetbrains.annotations.NotNull;
@@ -15,6 +16,11 @@ public interface EditorTabTitleProvider {
 
   @Nullable
   String getEditorTabTitle(@NotNull Project project, @NotNull VirtualFile file);
+
+  @Nullable
+  default String getEditorTabTitle(@NotNull Project project, @NotNull VirtualFile file, @Nullable FileEditor editor) {
+    return getEditorTabTitle(project, file);
+  }
 
   @Nullable
   default String getEditorTabTooltipText(@NotNull Project project, @NotNull VirtualFile virtualFile) {

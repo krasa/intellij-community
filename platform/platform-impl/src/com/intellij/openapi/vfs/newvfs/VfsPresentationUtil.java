@@ -2,6 +2,7 @@
 package com.intellij.openapi.vfs.newvfs;
 
 import com.intellij.openapi.extensions.Extensions;
+import com.intellij.openapi.fileEditor.FileEditor;
 import com.intellij.openapi.fileEditor.UniqueVFilePathBuilder;
 import com.intellij.openapi.fileEditor.impl.EditorTabColorProvider;
 import com.intellij.openapi.fileEditor.impl.EditorTabTitleProvider;
@@ -27,12 +28,20 @@ public class VfsPresentationUtil {
     return escapeMnemonics(firstLast(getPresentableNameForUI(project, file), 20));
   }
 
+  @Deprecated
   @NotNull
   public static String getPresentableNameForUI(@NotNull Project project, @NotNull VirtualFile file) {
+    return getPresentableNameForUI(project, file, null);
+  }
+
+  @NotNull
+  public static String getPresentableNameForUI(@NotNull Project project,
+                                               @NotNull VirtualFile file,
+                                               @Nullable FileEditor editor) {
     List<EditorTabTitleProvider> providers = DumbService.getInstance(project).filterByDumbAwareness(
       Extensions.getExtensions(EditorTabTitleProvider.EP_NAME));
     for (EditorTabTitleProvider provider : providers) {
-      String result = provider.getEditorTabTitle(project, file);
+      String result = provider.getEditorTabTitle(project, file, editor);
       if (result != null) {
         return result;
       }
@@ -41,9 +50,15 @@ public class VfsPresentationUtil {
     return file.getPresentableName();
   }
 
+  @Deprecated
   @NotNull
   public static String getUniquePresentableNameForUI(@NotNull Project project, @NotNull VirtualFile file) {
-    String name = getPresentableNameForUI(project, file);
+    return getUniquePresentableNameForUI(project, file, null);
+  }
+
+  @NotNull
+  public static String getUniquePresentableNameForUI(@NotNull Project project, @NotNull VirtualFile file, @Nullable FileEditor editor) {
+    String name = getPresentableNameForUI(project, file, editor);
     if (name.equals(file.getPresentableName())) {
       return UniqueVFilePathBuilder.getInstance().getUniqueVirtualFilePath(project, file);
     }
