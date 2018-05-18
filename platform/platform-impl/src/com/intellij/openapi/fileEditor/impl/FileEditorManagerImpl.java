@@ -412,7 +412,7 @@ public class FileEditorManagerImpl extends FileEditorManagerEx implements Persis
   /**
    * Updates tab title and tab tool tip for the specified {@code file}
    */
-  void updateFileName(@Nullable final VirtualFile file) {
+  public void updateFileName(@Nullable final VirtualFile file) {
     // Queue here is to prevent title flickering when tab is being closed and two events arriving: with component==null and component==next focused tab
     // only the last event makes sense to handle
     myQueue.queue(new Update("UpdateFileName " + (file == null ? "" : file.getPath())) {
