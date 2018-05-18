@@ -713,7 +713,8 @@ public class EditorWindow {
 
         final VirtualFile file = editor.getFile();
         final Icon template = AllIcons.FileTypes.Text;
-        myTabbedPane.insertTab(file, EmptyIcon.create(template.getIconWidth(), template.getIconHeight()), new TComp(this, editor), null, indexToInsert);
+        FileEditor fileEditor = editor.getSelectedEditor();
+        myTabbedPane.insertTab(fileEditor, file, EmptyIcon.create(template.getIconWidth(), template.getIconHeight()), new TComp(this, editor), null, indexToInsert);
         trimToSize(UISettings.getInstance().getEditorTabLimit(), file, false);
         if (selectEditor) {
           setSelectedEditor(editor, focusEditor);
@@ -895,10 +896,10 @@ public class EditorWindow {
     setIconAt(index, getFileIcon(file));
   }
 
-  void updateFileName(VirtualFile file) {
-    final int index = findEditorIndex(findFileComposite(file));
+  void updateFileName(EditorWithProviderComposite composite, VirtualFile file) {
+    final int index = findEditorIndex(composite);
     if (index != -1) {
-      setTitleAt(index, VfsPresentationUtil.getPresentableNameForUI(getManager().getProject(), file));
+      setTitleAt(index, VfsPresentationUtil.getPresentableNameForUI(getManager().getProject(), file, composite.getSelectedEditor()));
       setToolTipTextAt(index, UISettings.getInstance().getShowTabsTooltips()
                               ? getManager().getFileTooltipText(file)
                               : null);

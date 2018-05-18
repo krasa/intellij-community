@@ -12,10 +12,12 @@ import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.command.CommandProcessor;
 import com.intellij.openapi.editor.markup.EffectType;
 import com.intellij.openapi.editor.markup.TextAttributes;
+import com.intellij.openapi.fileEditor.FileEditor;
 import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.fileEditor.ex.FileEditorManagerEx;
 import com.intellij.openapi.fileEditor.impl.EditorHistoryManager;
 import com.intellij.openapi.fileEditor.impl.EditorWindow;
+import com.intellij.openapi.fileEditor.impl.EditorWithProviderComposite;
 import com.intellij.openapi.fileEditor.impl.FileEditorManagerImpl;
 import com.intellij.openapi.keymap.KeymapUtil;
 import com.intellij.openapi.project.DumbAware;
@@ -1235,7 +1237,7 @@ public class Switcher extends AnAction implements DumbAware {
     private final Project myProject;
     private String myNameForRendering;
 
-    public FileInfo(VirtualFile first, EditorWindow second, Project project) {
+    public FileInfo(@NotNull VirtualFile first, @Nullable EditorWindow second, @NotNull Project project) {
       super(first, second);
       myProject = project;
     }
@@ -1243,9 +1245,24 @@ public class Switcher extends AnAction implements DumbAware {
     String getNameForRendering() {
       if (myNameForRendering == null) {
         // Recently changed files would also be taken into account (not only open 'visible' files)
-        myNameForRendering = getUniquePresentableNameForUI(myProject, first);
+        myNameForRendering = getUniquePresentableNameForUI(myProject, first, getEditor(this.second));
       }
       return myNameForRendering;
+    }
+
+
+    @Nullable
+    private FileEditor getEditor(@Nullable EditorWindow window) {
+      if (window != null) {
+        EditorWithProviderComposite[] editors = window.getEditors();
+        for (EditorWithProviderComposite fileEditor : editors) {
+          VirtualFile file = fileEditor.getFile();
+          if (first.equals(file)) {
+            return fileEditor.getSelectedEditorWithProvider().getFirst();
+          }
+        }
+      }
+      return null;
     }
   }
 }
