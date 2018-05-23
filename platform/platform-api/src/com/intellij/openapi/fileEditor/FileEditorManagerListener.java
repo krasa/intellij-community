@@ -20,6 +20,14 @@ public interface FileEditorManagerListener extends EventListener{
   default void selectionChanged(@NotNull FileEditorManagerEvent event) {
   }
 
+  interface Synchronous extends EventListener {
+    Topic<Synchronous> FILE_EDITOR_MANAGER =
+      new Topic<>("synchronous file editor events", Synchronous.class, Topic.BroadcastDirection.TO_PARENT);
+
+    default void fileOpened(@NotNull FileEditorManager source, @NotNull VirtualFile file) {
+    }
+  }
+  
   interface Before extends EventListener {
     Topic<Before> FILE_EDITOR_MANAGER =
       new Topic<>("file editor before events", Before.class, Topic.BroadcastDirection.TO_PARENT);

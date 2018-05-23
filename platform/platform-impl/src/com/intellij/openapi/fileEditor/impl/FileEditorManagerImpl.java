@@ -922,8 +922,13 @@ public class FileEditorManagerImpl extends FileEditorManagerEx implements Persis
           IdeFocusManager.getInstance(myProject).toFront(window.getOwner());
         }
       }
-
+      
+      
       if (newEditor) {
+        if (isFileOpen(file)) {
+          getProject().getMessageBus().syncPublisher(FileEditorManagerListener.Synchronous.FILE_EDITOR_MANAGER).fileOpened(this, file);
+        }
+        
         notifyPublisher(() -> {
           if (isFileOpen(file)) {
             getProject().getMessageBus().syncPublisher(FileEditorManagerListener.FILE_EDITOR_MANAGER)
