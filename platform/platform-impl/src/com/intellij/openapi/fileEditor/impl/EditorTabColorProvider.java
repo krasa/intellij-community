@@ -16,6 +16,7 @@
 package com.intellij.openapi.fileEditor.impl;
 
 import com.intellij.openapi.extensions.ExtensionPointName;
+import com.intellij.openapi.fileEditor.FileEditor;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
 import org.jetbrains.annotations.NotNull;
@@ -35,5 +36,10 @@ public interface EditorTabColorProvider {
   @Nullable
   default Color getProjectViewColor(@NotNull Project project, @NotNull VirtualFile file) {
     return null;
+  }
+
+  @Nullable
+  default Color getEditorTabColor(@NotNull Project project, @NotNull VirtualFile file, @Nullable FileEditor editor) {
+    return getEditorTabColor(project, file);
   }
 }

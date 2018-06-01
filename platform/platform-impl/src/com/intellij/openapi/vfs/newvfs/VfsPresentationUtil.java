@@ -65,12 +65,21 @@ public class VfsPresentationUtil {
     return name;
   }
 
+  @Deprecated
   @Nullable
-  public static Color getFileTabBackgroundColor(@NotNull Project project, @NotNull VirtualFile file) {
+  public static Color getFileTabBackgroundColor(@NotNull Project project,
+                                                @NotNull VirtualFile file) {
+    return getFileTabBackgroundColor(project, file, null);
+  }
+
+  @Nullable
+  public static Color getFileTabBackgroundColor(@NotNull Project project,
+                                                @NotNull VirtualFile file,
+                                                FileEditor editor) {
     List<EditorTabColorProvider> providers = DumbService.getInstance(project).filterByDumbAwareness(
       Extensions.getExtensions(EditorTabColorProvider.EP_NAME));
     for (EditorTabColorProvider provider : providers) {
-      Color result = provider.getEditorTabColor(project, file);
+      Color result = provider.getEditorTabColor(project, file, editor);
       if (result != null) {
         return result;
       }
