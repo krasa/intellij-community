@@ -461,9 +461,10 @@ public class EditorWindow {
   }
 
   void updateFileBackgroundColor(@NotNull VirtualFile file) {
-    final int index = findEditorIndex(findFileComposite(file));
+    EditorWithProviderComposite composite = findFileComposite(file);
+    final int index = findEditorIndex(composite);
     if (index != -1) {
-      final Color color = getFileTabBackgroundColor(getManager().getProject(), file);
+      final Color color = getFileTabBackgroundColor(getManager().getProject(), file, composite.getSelectedEditor());
       setBackgroundColorAt(index, color);
     }
   }

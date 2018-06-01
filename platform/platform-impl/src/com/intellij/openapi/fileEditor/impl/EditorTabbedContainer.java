@@ -351,7 +351,7 @@ public final class EditorTabbedContainer implements Disposable, CloseAction.Clos
     if (tab != null) return;
 
     tab = new TabInfo(comp).setText(getPresentableNameForUI(myProject, file, fileEditor))
-                           .setTabColor(getFileTabBackgroundColor(myProject, file))
+                           .setTabColor(getFileTabBackgroundColor(myProject, file, fileEditor))
                            .setIcon(icon)
                            .setTooltipText(tooltip)
                            .setObject(file)
@@ -411,7 +411,7 @@ public final class EditorTabbedContainer implements Disposable, CloseAction.Clos
   /** @deprecated Use {@link VfsPresentationUtil#getFileBackgroundColor} */
   @Nullable
   public static Color calcTabColor(@NotNull Project project, @NotNull VirtualFile file) {
-    return getFileTabBackgroundColor(project, file);
+    return getFileTabBackgroundColor(project, file, null);
   }
 
   public Component getComponentAt(final int i) {
