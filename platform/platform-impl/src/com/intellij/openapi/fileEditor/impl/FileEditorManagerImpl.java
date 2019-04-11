@@ -1245,8 +1245,14 @@ public class FileEditorManagerImpl extends FileEditorManagerEx implements Persis
     final EditorWindow currentWindow = lockfree ? getMainSplitters().getCurrentWindow() : getSplitters().getCurrentWindow();
     if (currentWindow != null) {
       final EditorWithProviderComposite selectedEditor = currentWindow.getSelectedEditor();
-      if (selectedEditor != null && selectedEditor.getSelectedEditor() instanceof TextEditor) {
-        return ((TextEditor)selectedEditor.getSelectedEditor()).getEditor();
+      if (selectedEditor != null) {
+        FileEditor fileEditor = selectedEditor.getSelectedEditor();
+        if (fileEditor instanceof TextEditor) {
+          return ((TextEditor)fileEditor).getEditor();
+        }
+        else if (fileEditor instanceof TextEditorWithPreview) {
+          return ((TextEditorWithPreview)fileEditor).getTextEditor().getEditor();
+        }
       }
     }
 

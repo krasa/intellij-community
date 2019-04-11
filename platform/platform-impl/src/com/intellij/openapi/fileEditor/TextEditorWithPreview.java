@@ -85,6 +85,10 @@ public class TextEditorWithPreview extends UserDataHolderBase implements FileEdi
     myPreview.deselectNotify();
   }
 
+  public TextEditor getTextEditor() {
+    return myEditor;
+  }
+
   @NotNull
   @Override
   public JComponent getComponent() {
