@@ -18,6 +18,7 @@ package com.intellij.diff.tools.holders;
 import com.intellij.diff.DiffContext;
 import com.intellij.diff.contents.DiffContent;
 import com.intellij.diff.contents.DocumentContent;
+import com.intellij.diff.util.DiffUserDataKeysEx;
 import com.intellij.diff.util.DiffUtil;
 import com.intellij.ide.DataManager;
 import com.intellij.openapi.actionSystem.CommonDataKeys;
@@ -91,6 +92,7 @@ public class TextEditorHolder extends EditorHolder {
   @NotNull
   public static TextEditorHolder create(@Nullable Project project, @NotNull DocumentContent content) {
     EditorEx editor = DiffUtil.createEditor(content.getDocument(), project, false, true);
+    editor.putUserData(DiffUserDataKeysEx.DOCUMENT_CONTENT, content);
     DiffUtil.configureEditor(editor, content, project);
     return new TextEditorHolder(project, editor);
   }

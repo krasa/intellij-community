@@ -17,6 +17,7 @@ package com.intellij.diff.util;
 
 import com.intellij.diff.DiffTool;
 import com.intellij.diff.comparison.ComparisonPolicy;
+import com.intellij.diff.contents.DocumentContent;
 import com.intellij.diff.fragments.LineFragment;
 import com.intellij.diff.merge.MergeResult;
 import com.intellij.diff.merge.MergeTool;
@@ -51,6 +52,8 @@ public interface DiffUserDataKeysEx extends DiffUserDataKeys {
   Key<String> FILE_NAME = Key.create("Diff.FileName");
 
   Key<Boolean> DIFF_IN_EDITOR = Key.create("Diff.DiffInEditor");
+
+  Key<DocumentContent> DOCUMENT_CONTENT = new Key<>("Diff.DocumentContent");
 
   //
   // DiffRequest
